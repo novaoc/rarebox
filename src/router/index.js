@@ -8,6 +8,7 @@ const routes = [
   { path: '/decks', name: 'Decks', component: () => import('../views/DeckListView.vue'), meta: { title: 'Decks', description: 'Build and track Pokémon TCG decks. Compare against your collection and see what you still need.' } },
   { path: '/decks/meta', name: 'MetaDecks', component: () => import('../views/MetaDecksView.vue'), meta: { title: 'Meta Decks', description: 'Browse popular competitive Pokémon TCG decks. Import with one click.' } },
   { path: '/decks/:id', name: 'DeckBuilder', component: () => import('../views/DeckBuilderView.vue'), meta: { title: 'Deck Builder', description: 'Build your deck, track card ownership, and calculate costs.' } },
+  { path: '/trade', name: 'TradeAnalyzer', component: () => import('../views/TradeAnalyzerView.vue'), meta: { title: 'Trade Analyzer', description: 'Compare cards side-by-side. Scan or add cards to each side and see the price difference instantly.' } },
   { path: '/settings', name: 'Settings', component: () => import('../views/SettingsView.vue'), meta: { title: 'Settings', description: 'Export data, manage backups, transfer to device, and configure alerts.' } },
   { path: '/terms', name: 'Terms', component: () => import('../views/TermsView.vue'), meta: { title: 'Terms & Conditions', description: 'Terms & Conditions and Privacy Policy for Rarebox.' } },
 ]
