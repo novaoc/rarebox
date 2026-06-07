@@ -237,6 +237,15 @@ export const usePortfolioStore = defineStore('portfolio', () => {
     cleanupSnapshots()
   }
 
+  function removeItems(portfolioId, itemIds) {
+    const portfolio = portfolios.value.find(p => p.id === portfolioId)
+    if (!portfolio) return
+    const idSet = new Set(itemIds)
+    portfolio.items = portfolio.items.filter(i => !idSet.has(i.id))
+    persist()
+    cleanupSnapshots()
+  }
+
   // Update market prices for items (cards + sealed/graded)
   function updateCardPrice(portfolioId, itemId, price) {
     updateItem(portfolioId, itemId, {
@@ -418,6 +427,7 @@ export const usePortfolioStore = defineStore('portfolio', () => {
     addItem,
     updateItem,
     removeItem,
+    removeItems,
     updateCardPrice,
     getPortfolioStats,
     recordSnapshot,

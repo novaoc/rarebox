@@ -104,17 +104,44 @@
         <table class="table">
           <thead>
             <tr>
+              <th class="checkbox-col">
+                <div class="checkbox-wrapper">
+                  <input
+                    type="checkbox"
+                    :checked="isAllSelected"
+                    :indeterminate="isPartiallySelected"
+                    @change="toggleSelectAll"
+                    aria-label="Select all items"
+                  />
+                </div>
+              </th>
               <th>Item</th>
-              <th>Type</th>
+              <th class="hide-mobile">Type</th>
               <th>Qty</th>
               <th>Paid</th>
               <th>Value</th>
-              <th>Gain/Loss</th>
-              <th></th>
+              <th class="hide-small">Gain/Loss</th>
+              <th class="hide-mobile"></th>
             </tr>
           </thead>
           <tbody>
-            <tr v-for="item in filteredItems" :key="item.id" class="item-row" @click="selectItem(item)">
+            <tr
+              v-for="item in filteredItems"
+              :key="item.id"
+              class="item-row"
+              :class="{ selected: selectedIds.has(item.id) }"
+              @click="selectItem(item)"
+            >
+              <td class="checkbox-col" @click.stop>
+                <div class="checkbox-wrapper">
+                  <input
+                    type="checkbox"
+                    :checked="selectedIds.has(item.id)"
+                    @change="toggleItemSelection(item.id)"
+                    :aria-label="'Select ' + getItemName(item)"
+                  />
+                </div>
+              </td>
               <td>
                 <div class="item-name-cell">
                   <img
@@ -138,7 +165,7 @@
                   </div>
                 </div>
               </td>
-              <td>
+              <td class="hide-mobile">
                 <span class="badge" :class="typeBadgeClass(item.type)">{{ item.type }}</span>
               </td>
               <td class="font-mono">{{ item.quantity || 1 }}</td>
@@ -146,7 +173,7 @@
               <td class="font-mono">
                 <span class="text-accent">${{ (getCurrentValue(item) * (item.quantity || 1)).toFixed(2) }}</span>
               </td>
-              <td>
+              <td class="hide-small">
                 <div class="gain-cell">
                   <span :class="getGain(item) >= 0 ? 'text-success' : 'text-danger'">
                     {{ getGain(item) >= 0 ? '+' : '' }}${{ Math.abs(getGain(item)).toFixed(2) }}
@@ -154,10 +181,14 @@
                   <span class="gain-pct text-muted">({{ getGainPct(item) >= 0 ? '+' : '' }}{{ getGainPct(item).toFixed(1) }}%)</span>
                 </div>
               </td>
-              <td>
+              <td class="hide-mobile">
                 <div class="actions flex gap-2">
-                  <button class="btn btn-ghost btn-icon btn-sm" @click.stop="editItem(item)" title="Edit">✎</button>
-                  <button class="btn btn-ghost btn-icon btn-sm" @click.stop="removeItem(item)" title="Remove" style="color:var(--danger)">✕</button>
+                  <button class="btn btn-ghost btn-icon btn-sm" @click.stop="editItem(item)" aria-label="Edit item">
+                    <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-pencil"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
+                  </button>
+                  <button class="btn btn-ghost btn-icon btn-sm" @click.stop="removeItem(item)" aria-label="Remove item" style="color:var(--danger)">
+                    <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-x"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+                  </button>
                 </div>
               </td>
             </tr>
@@ -167,12 +198,34 @@
       </div>
     </div>
 
+    <!-- Bulk Action Bar -->
+    <transition name="slide-up">
+      <div v-if="selectedIds.size > 0" class="bulk-action-bar">
+        <div class="bulk-action-content">
+          <div class="bulk-info">
+            <span class="bulk-count">{{ selectedIds.size }}</span>
+            <span class="bulk-label">{{ selectedIds.size === 1 ? 'item' : 'items' }} selected</span>
+          </div>
+          <div class="bulk-actions">
+            <button class="btn btn-ghost btn-sm" @click="selectedIds.clear()">Cancel</button>
+            <button class="btn btn-danger btn-sm" @click="confirmBulkDelete = true">
+              <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-trash-2"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>
+              <span class="hide-mobile">Delete Selected</span>
+              <span class="show-mobile">Delete</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </transition>
+
     <!-- Item detail panel -->
     <transition name="slide-up">
       <div v-if="selectedItem" class="item-detail-panel card">
         <div class="panel-header-row">
           <h3>{{ getItemName(selectedItem) }}</h3>
-          <button class="btn btn-ghost btn-icon" @click="selectedItem = null">✕</button>
+          <button class="btn btn-ghost btn-icon" @click="selectedItem = null" aria-label="Close details">
+            <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-x"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+          </button>
         </div>
         <div class="panel-body-row">
           <div class="panel-left" v-if="selectedItem.cardData?.images?.small || selectedItem.imageUrl">
@@ -258,7 +311,9 @@
         <div class="modal">
           <div class="modal-header">
             <h3>Edit Item</h3>
-            <button class="btn btn-ghost btn-icon" @click="editingItem = null">✕</button>
+            <button class="btn btn-ghost btn-icon" @click="editingItem = null" aria-label="Close modal">
+              <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-x"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+            </button>
           </div>
           <div class="modal-body">
             <div class="form-row">
@@ -298,7 +353,9 @@
         <div class="modal" style="max-width:400px">
           <div class="modal-header">
             <h3>Delete Portfolio</h3>
-            <button class="btn btn-ghost btn-icon" @click="confirmDelete = false">✕</button>
+            <button class="btn btn-ghost btn-icon" @click="confirmDelete = false" aria-label="Close modal">
+              <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-x"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+            </button>
           </div>
           <div class="modal-body">
             <p class="text-secondary">Are you sure you want to delete <strong>{{ portfolio.name }}</strong>? This will remove all {{ portfolio.items.length }} items. This cannot be undone.</p>
@@ -306,6 +363,27 @@
           <div class="modal-footer">
             <button class="btn btn-secondary" @click="confirmDelete = false">Cancel</button>
             <button class="btn btn-danger" @click="deletePortfolio">Delete Forever</button>
+          </div>
+        </div>
+      </div>
+    </transition>
+
+    <!-- Bulk Delete confirm -->
+    <transition name="fade">
+      <div v-if="confirmBulkDelete" class="modal-overlay" @click.self="confirmBulkDelete = false">
+        <div class="modal" style="max-width:400px">
+          <div class="modal-header">
+            <h3>Delete Selected Items</h3>
+            <button class="btn btn-ghost btn-icon" @click="confirmBulkDelete = false" aria-label="Close modal">
+              <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-x"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+            </button>
+          </div>
+          <div class="modal-body">
+            <p class="text-secondary">Are you sure you want to delete <strong>{{ selectedIds.size }}</strong> items from your collection? This cannot be undone.</p>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-secondary" @click="confirmBulkDelete = false">Cancel</button>
+            <button class="btn btn-danger" @click="deleteSelected">Delete {{ selectedIds.size }} Items</button>
           </div>
         </div>
       </div>
@@ -320,7 +398,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, nextTick, onMounted } from 'vue'
+import { ref, computed, watch, nextTick, onMounted, reactive } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { usePortfolioStore } from '../stores/portfolio'
 import { exportPortfolioToExcel } from '../utils/excel'
@@ -350,9 +428,52 @@ const showBulkImport = ref(false)
 const editingItem = ref(null)
 const editForm = ref({})
 const confirmDelete = ref(false)
+const confirmBulkDelete = ref(false)
 const editCurrentValue = ref(null)
 const refreshing = ref(false)
 const refreshStatus = ref('')
+
+// Bulk Selection
+const selectedIds = reactive(new Set())
+
+const isAllSelected = computed(() => {
+  if (filteredItems.value.length === 0) return false
+  return filteredItems.value.every(i => selectedIds.has(i.id))
+})
+
+const isPartiallySelected = computed(() => {
+  const selectedCount = filteredItems.value.filter(i => selectedIds.has(i.id)).length
+  return selectedCount > 0 && selectedCount < filteredItems.value.length
+})
+
+function toggleItemSelection(id) {
+  if (selectedIds.has(id)) {
+    selectedIds.delete(id)
+  } else {
+    selectedIds.add(id)
+  }
+}
+
+function toggleSelectAll() {
+  if (isAllSelected.value) {
+    filteredItems.value.forEach(i => selectedIds.delete(i.id))
+  } else {
+    filteredItems.value.forEach(i => selectedIds.add(i.id))
+  }
+}
+
+function deleteSelected() {
+  store.removeItems(portfolio.value.id, Array.from(selectedIds))
+  selectedIds.clear()
+  confirmBulkDelete.value = false
+  if (selectedItem.value && !portfolio.value.items.find(i => i.id === selectedItem.value.id)) {
+    selectedItem.value = null
+  }
+}
+
+// Clear selection when filter changes
+watch(activeFilter, () => selectedIds.clear())
+watch(itemSearch, () => selectedIds.clear())
 
 // PriceCharting fetch (direct browser API)
 const pcQuery = ref('')
@@ -514,6 +635,7 @@ function removeItem(item) {
   if (confirm(`Remove ${getItemName(item)} from portfolio?`)) {
     store.removeItem(portfolio.value.id, item.id)
     if (selectedItem.value?.id === item.id) selectedItem.value = null
+    selectedIds.delete(item.id)
   }
 }
 
@@ -633,7 +755,7 @@ function deletePortfolio() {
 </script>
 
 <style scoped>
-.portfolio-view { max-width: 1200px; margin: 0 auto; }
+.portfolio-view { max-width: 1200px; margin: 0 auto; padding-bottom: 80px; }
 
 .portfolio-header {
   display: flex;
@@ -677,6 +799,12 @@ function deletePortfolio() {
 .input-sm { padding: 5px 10px; font-size: 12px; }
 .search-mini-wrap { width: 180px; }
 
+.checkbox-col { width: 44px; padding-left: 12px !important; padding-right: 0 !important; }
+.checkbox-wrapper { display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; }
+.checkbox-wrapper input[type="checkbox"] { width: 18px; height: 18px; cursor: pointer; accent-color: var(--accent); }
+
+.item-row.selected { background: var(--accent-dim-extra, rgba(245, 166, 35, 0.05)); }
+
 .item-name-cell { display: flex; align-items: center; gap: 10px; }
 .item-thumb { width: 36px; height: 50px; object-fit: contain; border-radius: 3px; flex-shrink: 0; pointer-events: none; -webkit-user-drag: none; user-drag: none; }
 .item-thumb-sealed { background: var(--bg-primary); border-radius: 4px; }
@@ -686,6 +814,28 @@ function deletePortfolio() {
 
 .gain-cell { display: flex; flex-direction: column; font-size: 13px; font-variant-numeric: tabular-nums; }
 .gain-pct { font-size: 11px; }
+
+/* Bulk Action Bar */
+.bulk-action-bar {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--bg-card);
+  border: 1px solid var(--accent);
+  border-radius: 50px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+  padding: 8px 12px 8px 20px;
+  z-index: 90;
+  width: auto;
+  min-width: 300px;
+}
+.bulk-action-content { display: flex; align-items: center; justify-content: space-between; gap: 24px; }
+.bulk-info { display: flex; align-items: center; gap: 8px; }
+.bulk-count { background: var(--accent); color: white; font-size: 12px; font-weight: 700; min-width: 20px; height: 20px; border-radius: 10px; display: flex; align-items: center; justify-content: center; padding: 0 6px; }
+.bulk-label { font-size: 14px; font-weight: 600; }
+.bulk-actions { display: flex; gap: 8px; }
+.bulk-actions .btn-danger { display: flex; align-items: center; gap: 6px; border-radius: 40px; }
 
 /* Item detail panel */
 .item-detail-panel { margin-top: 24px; }
@@ -729,6 +879,12 @@ function deletePortfolio() {
   margin-top: 2px;
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .slide-up-enter-active, .slide-up-leave-active, .fade-enter-active, .fade-leave-active {
+    transition: none !important;
+  }
+}
+
 /* Item detail panel — mobile bottom sheet */
 @media (max-width: 768px) {
   .item-detail-panel {
@@ -762,16 +918,22 @@ function deletePortfolio() {
   .portfolio-header-actions .btn { font-size: 11px; padding: 5px 8px; }
   .portfolio-name { font-size: 18px; }
   .portfolio-dot-lg { width: 12px; height: 12px; margin-top: 4px; }
-  /* Hide less critical columns */
-  .table th:nth-child(2), .table td:nth-child(2) { display: none; } /* Type */
-  .table th:last-child, .table td:last-child { display: none; } /* Actions */
-  .table { min-width: 360px; }
+  
+  .hide-mobile { display: none !important; }
+  .show-mobile { display: inline-block !important; }
+  
+  .table { min-width: 440px; }
   .item-thumb { width: 30px; height: 42px; }
   .item-name { font-size: 12px; }
   .item-sub { font-size: 10px; }
+  
+  .bulk-action-bar { bottom: 12px; min-width: calc(100% - 24px); border-radius: 12px; padding: 8px 16px; }
+  .bulk-action-content { gap: 12px; }
+  .bulk-label { font-size: 13px; }
 }
 
 @media (max-width: 640px) {
+  .hide-small { display: none !important; }
   .item-detail-panel { max-height: 90vh; }
   /* Make items table scrollable horizontally */
   .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
@@ -785,11 +947,11 @@ function deletePortfolio() {
   .stats-row { grid-template-columns: 1fr 1fr; gap: 8px; }
   .stat-tile { padding: 12px 10px; }
   .stat-tile .value { font-size: 18px; }
-  /* Compact gain/loss on small screens */
-  .gain-pct { display: none; }
   /* Name edit */
   .name-edit-row { flex-wrap: wrap; }
   .name-input { width: 100%; }
   .portfolio-header-actions { flex-wrap: wrap; }
 }
+
+.show-mobile { display: none; }
 </style>
