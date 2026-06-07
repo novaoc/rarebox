@@ -64,7 +64,7 @@
 
 <script setup>
 import { ref, watch, computed, onMounted } from 'vue'
-import { fetchPriceHistory, buildChartSeries, filterByYears, getVariantLabel } from '../services/priceHistory'
+import { fetchPriceHistory, buildChartSeries, getVariantLabel } from '../services/priceHistory'
 
 const props = defineProps({
   cardId: { type: String, required: true },
@@ -147,7 +147,9 @@ const priceStats = computed(() => {
   const data = chartSeries.value?.[0]?.data
   if (!data || data.length === 0) return null
 
-  const prices = data.map(p => p.y).filter(Boolean)
+  const prices = data.map(p => p.y).filter(v => v !== null && v !== undefined)
+  if (prices.length === 0) return null
+
   const current = prices[prices.length - 1]
   const first = prices[0]
   const high = Math.max(...prices)
@@ -183,6 +185,7 @@ function buildSeries() {
   }
   const allSeries = Array.isArray(result) ? result : result.series
   selectedVariant.value = result.key || selectedVariant.value
+  availableVariants.value = result.availableVariants || availableVariants.value
   applyRange(allSeries)
 }
 
@@ -195,6 +198,11 @@ function setRange(range) {
 }
 
 function applyRange(allSeries) {
+  if (!allSeries || allSeries.length === 0) {
+    noData.value = true
+    return
+  }
+
   const DAY = 24 * 60 * 60 * 1000
   const rangeMap = { '7d': 7 * DAY, '1m': 30 * DAY, '6m': 182 * DAY, '1y': 365 * DAY, '3y': 1095 * DAY }
   const ms = rangeMap[activeRange.value] || 1095 * DAY
@@ -202,18 +210,30 @@ function applyRange(allSeries) {
 
   let filtered = allSeries.filter(p => p.x >= cutoff)
 
-  // If fewer than 2 points in range, anchor from the last known price before cutoff
-  // so the chart always draws a line instead of going blank
+  // FIX: Robust filtering anchor logic
+  // If we have fewer than 2 points in the requested range, but historical points exist,
+  // we must include the last known point before the cutoff to draw a valid line.
   if (filtered.length < 2) {
     const before = allSeries.filter(p => p.x < cutoff)
     if (before.length > 0) {
       const anchor = before[before.length - 1]
+      // Use the cutoff timestamp for the anchor point to bridge the gap perfectly
       filtered = [{ x: cutoff, y: anchor.y }, ...filtered]
     }
   }
 
-  // Still nothing — fall back to all available data
-  const display = filtered.length >= 2 ? filtered : allSeries
+  // If still less than 2 points (e.g. only 1 point exists in total), fallback to all data
+  // but ensure at least 2 points for ApexCharts area rendering (duplicate if needed)
+  let display = filtered.length >= 2 ? filtered : allSeries
+  if (display.length === 1) {
+    const p = display[0]
+    display = [{ x: p.x - DAY, y: p.y }, p]
+  }
+
+  if (display.length === 0) {
+    noData.value = true
+    return
+  }
 
   chartSeries.value = [{ name: 'Price', data: display }]
 
@@ -221,7 +241,6 @@ function applyRange(allSeries) {
     ? (display[display.length - 1].y >= display[0].y ? '#3fb950' : '#f85149')
     : '#f5a623'
 
-  // Set x-axis tick format based on range — prevents "hours" showing on 7D/1M
   const dtFmtMap = {
     '7d': 'dd MMM', '1m': 'dd MMM', '6m': 'MMM yyyy', '1y': 'MMM yyyy', '3y': 'MMM yyyy',
   }
