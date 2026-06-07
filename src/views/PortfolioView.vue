@@ -1,5 +1,14 @@
 <template>
   <div class="portfolio-view" v-if="portfolio">
+    <!-- Scanner Overlay -->
+    <Teleport to="body">
+      <Transition name="scanner">
+        <div v-if="showScanner" class="fixed inset-0 z-[200] bg-black">
+          <CameraViewfinder @capture="onCapture" @close="showScanner = false" />
+        </div>
+      </Transition>
+    </Teleport>
+
     <!-- Header -->
     <div class="portfolio-header">
       <div class="portfolio-title-row">
@@ -18,6 +27,10 @@
         </div>
       </div>
       <div class="portfolio-header-actions">
+        <button class="btn btn-scan btn-sm" @click="showScanner = true" aria-label="Scan card into portfolio">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-scan-line" aria-hidden="true"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M3 17v2a2 2 0 0 0 2 2h2"/><line x1="7" x2="17" y1="12" y2="12"/></svg>
+          Scan
+        </button>
         <router-link to="/search" class="btn btn-primary btn-sm">+ Add Card</router-link>
         <button class="btn btn-secondary btn-sm" @click="showAddSealed = true">+ Sealed</button>
         <button class="btn btn-secondary btn-sm" @click="showBulkImport = true">↑ Import</button>
@@ -96,7 +109,10 @@
         <div class="icon">📭</div>
         <h3>No items here</h3>
         <p>Add cards, sealed products, or graded slabs to this portfolio</p>
-        <router-link to="/search" class="btn btn-primary mt-3">Search Cards</router-link>
+        <div class="flex gap-2 mt-3">
+          <button class="btn btn-scan" @click="showScanner = true">Scan Card</button>
+          <router-link to="/search" class="btn btn-primary">Search Cards</router-link>
+        </div>
       </div>
 
       <div v-else>
@@ -409,6 +425,7 @@ import PriceChart from '../components/PriceChart.vue'
 import PortfolioChart from '../components/PortfolioChart.vue'
 import AddItemModal from '../components/AddItemModal.vue'
 import BulkImportModal from '../components/BulkImportModal.vue'
+import CameraViewfinder from '../components/scanner/CameraViewfinder.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -432,6 +449,7 @@ const confirmBulkDelete = ref(false)
 const editCurrentValue = ref(null)
 const refreshing = ref(false)
 const refreshStatus = ref('')
+const showScanner = ref(false)
 
 // Bulk Selection
 const selectedIds = reactive(new Set())
@@ -639,6 +657,29 @@ function removeItem(item) {
   }
 }
 
+function onCapture(imageData) {
+  showScanner.value = false
+  // Mock OCR result
+  const mockPrice = parseFloat((Math.random() * 50 + 1).toFixed(2))
+  const item = {
+    id: `scan-${Date.now()}`,
+    type: 'card',
+    name: 'Scanned Card',
+    imageUrl: imageData,
+    purchasePrice: mockPrice,
+    currentMarketPrice: mockPrice,
+    quantity: 1,
+    purchaseDate: new Date().toISOString().split('T')[0],
+    cardData: {
+      name: 'Scanned Card',
+      images: { small: imageData, large: imageData },
+      set: { name: 'Local Scan' },
+      number: '??'
+    }
+  }
+  store.addItem(portfolio.value.id, item)
+}
+
 function pcQueryForItem(item) {
   if (item.type === 'graded') {
     const name = item.cardData?.name || item.name || ''
@@ -775,6 +816,21 @@ function deletePortfolio() {
 .name-input { width: 250px; font-size: 16px; font-weight: 600; }
 .portfolio-header-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 
+.btn-scan {
+  background: var(--accent, #f5a623);
+  color: black;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 6px;
+  min-height: 44px;
+  padding: 0 16px;
+  border: none;
+  cursor: pointer;
+}
+.btn-scan:hover { background: #e0961d; }
+
 .stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 24px; }
 
 .filter-tabs { display: flex; gap: 4px; }
@@ -814,6 +870,10 @@ function deletePortfolio() {
 
 .gain-cell { display: flex; flex-direction: column; font-size: 13px; font-variant-numeric: tabular-nums; }
 .gain-pct { font-size: 11px; }
+
+/* Scanner Transitions */
+.scanner-enter-active, .scanner-leave-active { transition: opacity 0.2s ease; }
+.scanner-enter-from, .scanner-leave-to { opacity: 0; }
 
 /* Bulk Action Bar */
 .bulk-action-bar {
