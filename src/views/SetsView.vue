@@ -10,15 +10,15 @@
         </div>
         <div class="search-input-wrap">
           <span class="search-icon">
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-search"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-search" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
           </span>
           <input
             v-model="setFilter"
             class="input search-input"
             placeholder="Filter sets..."
           />
-          <button v-if="setFilter" class="btn btn-ghost btn-icon search-clear" @click="setFilter = ''">
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-x"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+          <button v-if="setFilter" class="btn btn-ghost btn-icon search-clear" @click="setFilter = ''" aria-label="Clear filter">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-x" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
           </button>
         </div>
       </div>
@@ -173,8 +173,8 @@
       <div v-if="selectedCard" class="card-detail-panel">
         <div class="panel-header">
           <h3>{{ selectedCard.name }}</h3>
-          <button class="btn btn-ghost btn-icon" @click="selectedCard = null">
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-x"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+          <button class="btn btn-ghost btn-icon" @click="selectedCard = null" aria-label="Close panel">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-x" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
           </button>
         </div>
         <div class="panel-body">
@@ -254,8 +254,8 @@
         <div class="bulk-modal">
           <div class="bulk-header">
             <h3>Add Cards from {{ selectedSet?.name }}</h3>
-            <button class="btn btn-ghost btn-icon" @click="showBulkAddModal = false">
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-x"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+            <button class="btn btn-ghost btn-icon" @click="showBulkAddModal = false" aria-label="Close modal">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-x" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
             </button>
           </div>
 
@@ -747,6 +747,20 @@ onMounted(loadSets)
   background: linear-gradient(90deg, transparent, rgba(255,255,255,0.05), transparent);
   animation: shimmer-anim 1.5s infinite;
 }
+
+@media (prefers-reduced-motion: reduce) {
+  .shimmer::after {
+    animation: none;
+    background: var(--bg-hover);
+  }
+  .set-card:hover {
+    transform: none;
+  }
+  .card-result:hover {
+    transform: none;
+  }
+}
+
 @keyframes shimmer-anim {
   0% { transform: translateX(-100%); }
   100% { transform: translateX(100%); }
