@@ -8,33 +8,33 @@
     <aside class="sidebar" :class="{ open: sidebarOpen }">
       <a href="/" class="sidebar-logo" @click.prevent="hardRefresh">
         <span class="logo-icon">
-          <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-hexagon"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+          <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-hexagon" aria-hidden="true"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
         </span>
         <span class="logo-text">Rarebox</span>
       </a>
-      <button class="btn btn-ghost btn-icon sidebar-close" @click="sidebarOpen = false" style="position:absolute;top:16px;right:12px;z-index:10">
-        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-x"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+      <button class="btn btn-ghost btn-icon sidebar-close" @click="sidebarOpen = false" aria-label="Close sidebar" style="position:absolute;top:16px;right:12px;z-index:10">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-x" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
       </button>
 
       <nav class="sidebar-nav">
         <router-link to="/" class="nav-item" @click="sidebarOpen = false">
           <span class="nav-icon">
-            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-layout-grid"><rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/></svg>
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-layout-grid" aria-hidden="true"><rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/></svg>
           </span> Dashboard
         </router-link>
         <router-link to="/search" class="nav-item" @click="sidebarOpen = false">
           <span class="nav-icon">
-            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-search"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-search" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
           </span> Search Cards
         </router-link>
         <router-link to="/sets" class="nav-item" @click="sidebarOpen = false">
           <span class="nav-icon">
-            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-layers"><path d="m12.83 2.18a2 2 0 0 0-1.66 0L2.1 6.27a2 2 0 0 0 0 3.46l9.07 4.09a2 2 0 0 0 1.66 0l9.07-4.09a2 2 0 0 0 0-3.46z"/><path d="m2.1 14.74 9.07 4.09a2 2 0 0 0 1.66 0l9.07-4.09"/><path d="m2.1 10.54 9.07 4.09a2 2 0 0 0 1.66 0l9.07-4.09"/></svg>
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-layers" aria-hidden="true"><path d="m12.83 2.18a2 2 0 0 0-1.66 0L2.1 6.27a2 2 0 0 0 0 3.46l9.07 4.09a2 2 0 0 0 1.66 0l9.07-4.09a2 2 0 0 0 0-3.46z"/><path d="m2.1 14.74 9.07 4.09a2 2 0 0 0 1.66 0l9.07-4.09"/><path d="m2.1 10.54 9.07 4.09a2 2 0 0 0 1.66 0l9.07-4.09"/></svg>
           </span> Browse Sets
         </router-link>
         <router-link to="/decks" class="nav-item" @click="sidebarOpen = false">
           <span class="nav-icon">
-            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-cards"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M7 8h10"/><path d="M7 12h10"/><path d="M7 16h4"/></svg>
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-gallery-vertical-end" aria-hidden="true"><path d="M7 2h10"/><path d="M5 6h14"/><rect width="18" height="12" x="3" y="10" rx="2"/></svg>
           </span> Decks
         </router-link>
       </nav>
@@ -54,9 +54,9 @@
           <span class="portfolio-nav-count">{{ p.items.length }}</span>
         </router-link>
 
-        <button class="nav-item add-portfolio-btn" @click="showNewPortfolioModal = true">
+        <button class="nav-item add-portfolio-btn" @click="showNewPortfolioModal = true" aria-label="Add new portfolio">
           <span class="nav-icon">
-            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-plus"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-plus" aria-hidden="true"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
           </span> New Portfolio
         </button>
       </nav>
@@ -64,7 +64,7 @@
       <div class="sidebar-bottom">
         <router-link to="/settings" class="nav-item" @click="sidebarOpen = false">
           <span class="nav-icon">
-            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-settings"><path d="M12.22 2h-.44a2 2 0 0 0-2 2l-.27 1.32a.41.41 0 0 1-.5.33l-1.32-.27a2 2 0 0 0-2.39 1.18l-.22.44a2 2 0 0 0 1.18 2.39l1.32.27a.41.41 0 0 1 .33.5l-.27 1.32a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2l.27-1.32a.41.41 0 0 1 .5-.33l1.32.27a2 2 0 0 0 2.39-1.18l.22-.44a2 2 0 0 0-1.18-2.39l-1.32-.27a.41.41 0 0 1-.33-.5l.27-1.32a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-settings" aria-hidden="true"><path d="M12.22 2h-.44a2 2 0 0 0-2 2l-.27 1.32a.41.41 0 0 1-.5.33l-1.32-.27a2 2 0 0 0-2.39 1.18l-.22.44a2 2 0 0 0 1.18 2.39l1.32.27a.41.41 0 0 1 .33.5l-.27 1.32a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2l.27-1.32a.41.41 0 0 1 .5-.33l1.32.27a2 2 0 0 0 2.39-1.18l.22-.44a2 2 0 0 0-1.18-2.39l-1.32-.27a.41.41 0 0 1-.33-.5l.27-1.32a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
           </span> Settings
         </router-link>
       </div>
@@ -72,12 +72,12 @@
 
     <div class="main-wrapper">
       <header class="topbar">
-        <button class="btn btn-ghost btn-icon hamburger" @click="sidebarOpen = !sidebarOpen">
-          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-menu"><line x1="4" x2="20" y1="12" y2="12"/><line x1="4" x2="20" y1="6" y2="6"/><line x1="4" x2="20" y1="18" y2="18"/></svg>
+        <button class="btn btn-ghost btn-icon hamburger" @click="sidebarOpen = !sidebarOpen" aria-label="Open sidebar">
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-menu" aria-hidden="true"><line x1="4" x2="20" y1="12" y2="12"/><line x1="4" x2="20" y1="6" y2="6"/><line x1="4" x2="20" y1="18" y2="18"/></svg>
         </button>
         <div class="topbar-breadcrumb">
           {{ currentPageTitle }}
-          <button v-if="currentTour" class="tour-info-btn" @click="replayTour" title="Watch tour video">i</button>
+          <button v-if="currentTour" class="tour-info-btn" @click="replayTour" title="Watch tour video" aria-label="Watch tour video">i</button>
         </div>
         <router-link to="/search" class="btn btn-primary btn-sm">
           + Add Card
@@ -106,8 +106,8 @@
         <div class="modal slide-up-enter-active">
           <div class="modal-header">
             <h3>New Portfolio</h3>
-            <button class="btn btn-ghost btn-icon" @click="showNewPortfolioModal = false">
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-x"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+            <button class="btn btn-ghost btn-icon" @click="showNewPortfolioModal = false" aria-label="Close modal">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-x" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
             </button>
           </div>
           <div class="modal-body">
@@ -125,6 +125,7 @@
                   :class="{ active: newPortfolioColor === c }"
                   :style="{ background: c }"
                   @click="newPortfolioColor = c"
+                  :aria-label="'Select color ' + c"
                 ></button>
               </div>
             </div>
@@ -254,6 +255,16 @@ onMounted(async () => {
   display: inline-flex;
   animation: logo-float 3s ease-in-out infinite;
 }
+
+@media (prefers-reduced-motion: reduce) {
+  .logo-icon {
+    animation: none;
+  }
+  .sidebar {
+    transition: none;
+  }
+}
+
 @keyframes logo-float {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-4px); }
