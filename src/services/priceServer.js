@@ -118,8 +118,8 @@ function priceForGrade(product, grade) {
 
 /**
  * Fetch market price from PriceCharting.
- * @param {string} query  - e.g. "Gengar VMAX Fusion Strike"
- * @param {string} grade  - "ungraded", "9", "10", "psa10", etc.
+ * @param {string} query  - e.g. \"Gengar VMAX Fusion Strike\"
+ * @param {string} grade  - \"ungraded\", \"9\", \"10\", \"psa10\", etc.
  */
 export async function fetchPrice(query, grade = 'ungraded') {
   const q = query.trim()
@@ -137,14 +137,20 @@ export async function fetchPrice(query, grade = 'ungraded') {
     throw new Error('server_down')
   }
 
-  // Prefer Pokemon products; fall back to all results
-  let pokemon = products.filter(p =>
-    (p.consoleName || '').toLowerCase().includes('pokemon')
-  )
-  if (!pokemon.length) pokemon = products
-  if (!pokemon.length) throw new Error('no_results')
+  // Determine game context from query
+  const isMtg = q.toLowerCase().includes('magic') || q.toLowerCase().includes('mtg')
 
-  const product = pokemon[0]
+  // Prefer relevant products; fall back to all results
+  let filtered = products.filter(p => {
+    const consoleName = (p.consoleName || '').toLowerCase()
+    if (isMtg) return consoleName.includes('magic')
+    return consoleName.includes('pokemon')
+  })
+
+  if (!filtered.length) filtered = products
+  if (!filtered.length) throw new Error('no_results')
+
+  const product = filtered[0]
   const price = priceForGrade(product, grade)
   if (!price) throw new Error('no_results')
 
@@ -172,24 +178,28 @@ export async function fetchPrice(query, grade = 'ungraded') {
 export const fetchEbayPrice = fetchPrice
 
 /**
- * Search for sealed Pokemon products.
- * @param {string} query - e.g. "Fusion Strike booster box"
+ * Search for sealed products.
+ * @param {string} query - e.g. \"Fusion Strike booster box\"
+ * @param {string} game - \"pokemon\" or \"magic\"
  */
-export async function searchSealed(query) {
+export async function searchSealed(query, game = 'pokemon') {
   const q = query.trim()
   if (!q) throw new Error('empty_query')
 
-  const cacheKey = `sealed:${q.toLowerCase()}`
+  const cacheKey = `sealed:${game}:${q.toLowerCase()}`
   const cached = cacheGet(cacheKey)
   if (cached) return { results: cached, cached: true }
 
   let products = []
+  const searchQuery = game === 'magic' ? `${q} magic` : `${q} sealed pokemon`
+  
   try {
-    products = await searchPC(`${q} sealed pokemon`)
-    // If query mentions "case", also search without "sealed" to find case listings
+    products = await searchPC(searchQuery)
+    
+    // If query mentions \"case\", also search without \"sealed\" to find case listings
     if (q.toLowerCase().includes('case')) {
       try {
-        const caseProducts = await searchPC(`${q} pokemon`)
+        const caseProducts = await searchPC(`${q} ${game}`)
         // Merge, dedup by slug
         const seen = new Set(products.map(p => p.id))
         for (const p of caseProducts) {
@@ -206,7 +216,9 @@ export async function searchSealed(query) {
   const results = products
     .filter(p => {
       const name = (p.productName || '').toLowerCase()
-      return !skip.some(s => name.includes(s))
+      const consoleName = (p.consoleName || '').toLowerCase()
+      const matchesGame = game === 'magic' ? consoleName.includes('magic') : consoleName.includes('pokemon')
+      return matchesGame && !skip.some(s => name.includes(s))
     })
     .map(p => ({
       name: p.productName || '',
