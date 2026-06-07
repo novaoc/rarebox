@@ -1,5 +1,5 @@
-import { performOCR, parseCardText } from './ocrWorker';
-import { searchCards } from './pokemonApi';
+import { performOCR, parseCardText } from './ocrWorker.js';
+import { searchCards } from './pokemonApi.js';
 
 /**
  * Full Pipeline: Image -> OCR -> API Match -> Card Data
