@@ -9,18 +9,22 @@
           <button class="lang-tab" :class="{ active: lang === 'ja' }" @click="switchLang('ja')">Japanese</button>
         </div>
         <div class="search-input-wrap">
-          <span class="search-icon">⌕</span>
+          <span class="search-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-search"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+          </span>
           <input
             v-model="setFilter"
             class="input search-input"
             placeholder="Filter sets..."
           />
-          <button v-if="setFilter" class="btn btn-ghost btn-icon search-clear" @click="setFilter = ''">✕</button>
+          <button v-if="setFilter" class="btn btn-ghost btn-icon search-clear" @click="setFilter = ''">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-x"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+          </button>
         </div>
       </div>
 
-      <div v-if="loadingSets" class="flex-center" style="padding:80px">
-        <div class="spinner spinner-lg"></div>
+      <div v-if="loadingSets" class="sets-grid">
+        <div v-for="i in 12" :key="i" class="skeleton-card shimmer"></div>
       </div>
 
       <div v-else-if="setsError" class="empty-state">
@@ -105,8 +109,8 @@
         </div>
       </div>
 
-      <div v-if="loadingCards" class="flex-center" style="padding:60px">
-        <div class="spinner spinner-lg"></div>
+      <div v-if="loadingCards" class="cards-grid">
+        <div v-for="i in 12" :key="i" class="skeleton-card-tall shimmer"></div>
       </div>
 
       <div v-else-if="cardsError" class="empty-state">
@@ -169,7 +173,9 @@
       <div v-if="selectedCard" class="card-detail-panel">
         <div class="panel-header">
           <h3>{{ selectedCard.name }}</h3>
-          <button class="btn btn-ghost btn-icon" @click="selectedCard = null">✕</button>
+          <button class="btn btn-ghost btn-icon" @click="selectedCard = null">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-x"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+          </button>
         </div>
         <div class="panel-body">
           <div class="panel-top">
@@ -248,7 +254,9 @@
         <div class="bulk-modal">
           <div class="bulk-header">
             <h3>Add Cards from {{ selectedSet?.name }}</h3>
-            <button class="btn btn-ghost btn-icon" @click="showBulkAddModal = false">✕</button>
+            <button class="btn btn-ghost btn-icon" @click="showBulkAddModal = false">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-x"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+            </button>
           </div>
 
           <div class="bulk-controls">
@@ -654,14 +662,14 @@ onMounted(loadSets)
 .lang-tab:hover { color: var(--text-primary); }
 .lang-tab.active { background: var(--accent); color: #0d1117; font-weight: 600; }
 .search-input-wrap { flex: 1; position: relative; display: flex; align-items: center; max-width: 400px; }
-.search-icon { position: absolute; left: 12px; font-size: 16px; color: var(--text-muted); pointer-events: none; }
+.search-icon { position: absolute; left: 12px; font-size: 16px; color: var(--text-muted); pointer-events: none; display: flex; align-items: center; }
 .search-input { padding-left: 36px; padding-right: 36px; font-size: 14px; }
-.search-clear { position: absolute; right: 4px; }
+.search-clear { position: absolute; right: 4px; display: flex; align-items: center; justify-content: center; }
 
 .sets-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: 10px;
+  gap: 12px;
 }
 
 .set-card {
@@ -714,6 +722,35 @@ onMounted(loadSets)
 }
 .browse-symbol { width: 22px; height: 22px; object-fit: contain; pointer-events: none; -webkit-user-drag: none; user-drag: none; }
 .set-browse-filters { display: flex; gap: 8px; align-items: center; }
+
+/* Skeleton Loader */
+.skeleton-card {
+  height: 84px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+.skeleton-card-tall {
+  aspect-ratio: 2.5 / 4.2;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+.shimmer {
+  position: relative;
+  overflow: hidden;
+}
+.shimmer::after {
+  content: '';
+  position: absolute;
+  top: 0; right: 0; bottom: 0; left: 0;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.05), transparent);
+  animation: shimmer-anim 1.5s infinite;
+}
+@keyframes shimmer-anim {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
 
 /* Bulk add modal */
 .modal-overlay {
@@ -882,7 +919,7 @@ onMounted(loadSets)
   .panel-card-img { width: 160px; min-width: 160px; }
   .panel-body { padding: 12px 16px; }
   .panel-header { padding: 12px 16px; }
-  .sets-grid { grid-template-columns: 1fr; }
+  .sets-grid { grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 10px; }
 }
 
 @media (max-width: 480px) {
