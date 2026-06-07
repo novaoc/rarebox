@@ -1,39 +1,43 @@
-import { createWorker } from 'tesseract.js';
-
 /**
  * OCR Worker Service
  * Handles client-side text extraction using Tesseract.js
+ * Wrapped in a dynamic import to prevent boot-time crashes if loading fails
  */
 
 let worker = null;
 
 async function getWorker() {
   if (worker) return worker;
-  worker = await createWorker('eng');
-  return worker;
-}
-
-/**
- * Perform OCR on an image
- * @param {string|HTMLImageElement|HTMLCanvasElement|File} image 
- * @returns {Promise<string>}
- */
-export async function performOCR(image) {
-  const w = await getWorker();
-  const { data: { text } } = await w.recognize(image);
-  return text;
-}
-
-/**
- * Parse OCR text to find potential card names and numbers
- * @param {string} text 
- * @returns {{name: string, number: string}}
- */
-export function parseCardText(text) {
-  // Normalize text: remove extra whitespace, common misreads
-  const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
   
-  // 1. Look for Set Number pattern: "digits/digits" (e.g., 108/106)
+  try {
+    // Dynamic import to handle potential path/worker resolution issues in production
+    const { createWorker } = await import('tesseract.js');
+    worker = await createWorker('eng', 1, {
+      logger: m => console.log('OCR:', m),
+      errorHandler: e => console.error('OCR Error:', e),
+    });
+    return worker;
+  } catch (err) {
+    console.error('Failed to initialize Tesseract worker:', err);
+    throw err;
+  }
+}
+
+export async function performOCR(image) {
+  try {
+    const w = await getWorker();
+    const { data: { text } } = await w.recognize(image);
+    return text;
+  } catch (err) {
+    console.error('OCR execution failed:', err);
+    return '';
+  }
+}
+
+export function parseCardText(text) {
+  if (!text) return { name: '', number: '' };
+  
+  const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
   const numberPattern = /(\d+)\/(\d+)/;
   let cardNumber = '';
   
@@ -45,13 +49,9 @@ export function parseCardText(text) {
     }
   }
 
-  // 2. Extract potential name
-  // Usually the largest text or at the top. 
-  // We'll take the first line that isn't purely numbers or "HP"
   let cardName = '';
   for (const line of lines) {
     if (!line.match(/^\d+$/) && !line.match(/HP/i) && line.length > 3) {
-      // Basic cleaning: remove common junk characters
       cardName = line.replace(/[|] /g, '').trim();
       break;
     }
