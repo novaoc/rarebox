@@ -10,8 +10,10 @@ async function getWorker() {
   if (worker) return worker;
   
   try {
-    // Dynamic import to handle potential path/worker resolution issues in production
-    const { createWorker } = await import('tesseract.js');
+    // Dynamic import for ESM compatibility with Tesseract.js v5
+    const Tesseract = await import('tesseract.js');
+    const createWorker = Tesseract.createWorker || Tesseract.default.createWorker;
+    
     worker = await createWorker('eng', 1, {
       logger: m => console.log('OCR:', m),
       errorHandler: e => console.error('OCR Error:', e),
