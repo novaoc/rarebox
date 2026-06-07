@@ -1,26 +1,18 @@
-<script setup lang="ts">
+<script setup>
 import { ref, computed } from 'vue'
-import CameraViewfinder from '../components/scanner/CameraViewfinder.vue'
-import { identifyCard } from '../services/scanPipeline'
-import { getMarketPrice } from '../services/pokemonApi'
+// Missing component fallback or removal for now since it doesn't exist in the repo
+// import CameraViewfinder from '../components/scanner/CameraViewfinder.vue'
+import { identifyCard } from '../services/scanPipeline.js'
+import { getMarketPrice } from '../services/pokemonApi.js'
 
-interface Card {
-  id: string
-  name: string
-  setName: string
-  number: string
-  imageUrl: string
-  marketPrice: number
-}
-
-const sideACards = ref<Card[]>([])
-const sideBCards = ref<Card[]>([])
+const sideACards = ref([])
+const sideBCards = ref([])
 
 const showScanner = ref(false)
 const isProcessing = ref(false)
 const showManualSearch = ref(false)
 const manualQuery = ref('')
-const activeSide = ref<'A' | 'B'>('A')
+const activeSide = ref('A')
 
 const totalA = computed(() => sideACards.value.reduce((s, c) => s + c.marketPrice, 0))
 const totalB = computed(() => sideBCards.value.reduce((s, c) => s + c.marketPrice, 0))
@@ -43,14 +35,14 @@ const deltaBgClass = computed(() => {
   return 'bg-rb-accent-dim'
 })
 
-async function onCapture(imageData: string) {
+async function onCapture(imageData) {
   isProcessing.value = true
   
   const result = await identifyCard(imageData)
   
   if (result.success && result.card) {
     const market = getMarketPrice(result.card)
-    const card: Card = {
+    const card = {
       id: result.card.id,
       name: result.card.name,
       setName: result.card.set.name,
@@ -68,7 +60,7 @@ async function onCapture(imageData: string) {
   isProcessing.value = false
 }
 
-function addCardToSide(card: Card) {
+function addCardToSide(card) {
   if (activeSide.value === 'A') {
     sideACards.value.push(card)
   } else {
@@ -76,12 +68,12 @@ function addCardToSide(card: Card) {
   }
 }
 
-function openScanner(side: 'A' | 'B') {
+function openScanner(side) {
   activeSide.value = side
   showScanner.value = true
 }
 
-function removeCard(side: 'A' | 'B', index: number) {
+function removeCard(side, index) {
   if (side === 'A') {
     sideACards.value.splice(index, 1)
   } else {
@@ -89,7 +81,7 @@ function removeCard(side: 'A' | 'B', index: number) {
   }
 }
 
-function clearSide(side: 'A' | 'B') {
+function clearSide(side) {
   if (side === 'A') sideACards.value = []
   else sideBCards.value = []
 }
@@ -105,10 +97,11 @@ function clearSide(side: 'A' | 'B') {
           <p class="text-white font-medium">Analyzing Card Content...</p>
         </div>
         
-        <CameraViewfinder
-          @capture="onCapture"
-          @close="showScanner = false"
-        />
+        <!-- Fallback message since CameraViewfinder is missing in repo -->
+        <div class="flex flex-col items-center justify-center h-full text-white p-6">
+           <p class="mb-4">Scanner component is currently unavailable.</p>
+           <button @click="showScanner = false" class="px-6 py-2 bg-rb-accent text-black rounded-lg">Close</button>
+        </div>
         
         <!-- Manual Search Fallback Triggered via result -->
         <div v-if="showManualSearch" class="absolute inset-0 z-[70] flex items-center justify-center p-6 bg-black/90">
@@ -133,7 +126,7 @@ function clearSide(side: 'A' | 'B') {
               </button>
               <button 
                 class="flex-1 py-3 px-4 rounded-xl bg-rb-accent text-black font-bold min-h-[44px]"
-                @click="/* Manual search logic would go here, omitting for brevity */ showManualSearch = false; showScanner = false"
+                @click="/* Manual search logic would go here */ showManualSearch = false; showScanner = false"
               >
                 Search
               </button>
@@ -168,7 +161,6 @@ function clearSide(side: 'A' | 'B') {
 
     <!-- Main Content -->
     <div class="max-w-5xl mx-auto px-4 py-6">
-       <!-- [Card Grid Rendering Logic from previous version] -->
        <div class="flex flex-col md:flex-row gap-6">
           <div class="flex-1 bg-rb-card rounded-2xl border border-rb-border overflow-hidden">
              <div class="p-4 border-b border-rb-border flex justify-between items-center">
