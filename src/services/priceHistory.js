@@ -142,34 +142,34 @@ function processHistoryData(raw) {
 // Build chart series — merges historical data + current price as final point
 // Returns array of { x: timestamp, y: price } suitable for ApexCharts
 export function buildChartSeries(historyData, currentPrice, variantKey = null) {
-  if (!historyData?.variants) {
-    // No history — just return current price as single point
-    if (currentPrice) {
-      return [{ x: new Date().getTime(), y: currentPrice }]
-    }
-    return []
-  }
-
+  const available = historyData?.variants ? Object.keys(historyData.variants) : []
+  
   // Pick variant: prefer exact match, then near mint, then first available
-  const available = Object.keys(historyData.variants)
   let key = variantKey && available.includes(variantKey)
     ? variantKey
     : available.find(k => k.includes('nearmint') || k.includes('good'))
       || available[0]
+      || null
 
-  const points = historyData.variants[key] || []
-
-  // Convert to ApexCharts format
-  const series = points.map(p => ({
-    x: new Date(p.date).getTime(),
-    y: Math.round(p.price * 100) / 100
-  }))
+  let series = []
+  if (key && historyData.variants[key]) {
+    const points = historyData.variants[key]
+    series = points.map(p => ({
+      x: new Date(p.date).getTime(),
+      y: Math.round(p.price * 100) / 100
+    }))
+  }
 
   // Append current price as latest point if it's newer
-  if (currentPrice && series.length > 0) {
-    const lastDate = series[series.length - 1].x
+  if (currentPrice) {
     const now = Date.now()
-    if (now > lastDate + 1000 * 60 * 60 * 24) { // at least 1 day gap
+    if (series.length > 0) {
+      const lastDate = series[series.length - 1].x
+      if (now > lastDate + 1000 * 60 * 60 * 24) { // at least 1 day gap
+        series.push({ x: now, y: Math.round(currentPrice * 100) / 100 })
+      }
+    } else {
+      // FIX: Ensure even with no history, we return a point for the current price
       series.push({ x: now, y: Math.round(currentPrice * 100) / 100 })
     }
   }
@@ -179,7 +179,7 @@ export function buildChartSeries(historyData, currentPrice, variantKey = null) {
 
 // Filter series to last N years
 export function filterByYears(series, years = 3) {
-  const cutoff = Date.now() - years * 365 * 24 * 60 * 60 * 1000
+  const cutoff = Date.now() - years * 365.25 * 24 * 60 * 60 * 1000
   return series.filter(p => p.x >= cutoff)
 }
 
@@ -199,5 +199,6 @@ export const VARIANT_LABELS = {
 }
 
 export function getVariantLabel(key) {
+  if (!key) return 'Market'
   return VARIANT_LABELS[key] || key.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
 }
