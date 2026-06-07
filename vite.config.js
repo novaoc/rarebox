@@ -3,11 +3,14 @@ import vue from '@vitejs/plugin-vue'
 
 // https://vite.dev/config/
 export default defineConfig({
-  // Use relative base path so it works on Vercel root and GitHub Pages subfolders
   base: './',
   plugins: [vue()],
+  optimizeDeps: {
+    include: ['tesseract.js']
+  },
   build: {
-    // Ensure assets are handled correctly with relative paths
-    assetsDir: 'assets',
+    commonjsOptions: {
+      include: [/tesseract.js/, /node_modules/]
+    }
   }
 })
