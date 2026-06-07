@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 
 const routes = [
   { path: '/', name: 'Dashboard', component: () => import('../views/DashboardView.vue'), meta: { title: 'Dashboard', description: 'Track your Pokémon TCG collection — live prices, portfolio charts, and gain/loss across all your portfolios.' } },
+  { path: '/mockup', name: 'Mockup', component: () => import('../views/MockDashboard.vue'), meta: { title: 'New Dashboard Mockup', description: 'Prototype of the new dark-themed dashboard interface.' } },
   { path: '/search', name: 'Search', component: () => import('../views/SearchView.vue'), meta: { title: 'Search Cards', description: 'Search any Pokémon card across all sets. Live TCGPlayer prices and price history charts.' } },
   { path: '/sets', name: 'Sets', component: () => import('../views/SetsView.vue'), meta: { title: 'Browse Sets', description: 'Browse every Pokémon TCG set. View cards, release dates, and card counts.' } },
   { path: '/portfolio/:id', name: 'Portfolio', component: () => import('../views/PortfolioView.vue'), meta: { title: 'Portfolio', description: 'View portfolio items, value charts, gain/loss, and manage your collection.' } },
