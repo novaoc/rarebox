@@ -9,7 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "apexcharts": "^5.10.5",
+    "apexcharts": "^3.45.0",
     "dexie": "^4.4.2",
     "pinia": "^3.0.4",
     "qrcode": "^1.5.4",
@@ -21,6 +21,6 @@
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^6.0.5",
-    "vite": "^8.0.4"
+    "vite": "^6.0.4"
   }
 }
