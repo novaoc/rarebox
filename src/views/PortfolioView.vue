@@ -116,12 +116,12 @@
                 </div>
               </th>
               <th>Item</th>
-              <th>Type</th>
+              <th class="hide-mobile">Type</th>
               <th>Qty</th>
               <th>Paid</th>
               <th>Value</th>
-              <th>Gain/Loss</th>
-              <th></th>
+              <th class="hide-small">Gain/Loss</th>
+              <th class="hide-mobile"></th>
             </tr>
           </thead>
           <tbody>
@@ -165,7 +165,7 @@
                   </div>
                 </div>
               </td>
-              <td>
+              <td class="hide-mobile">
                 <span class="badge" :class="typeBadgeClass(item.type)">{{ item.type }}</span>
               </td>
               <td class="font-mono">{{ item.quantity || 1 }}</td>
@@ -173,7 +173,7 @@
               <td class="font-mono">
                 <span class="text-accent">${{ (getCurrentValue(item) * (item.quantity || 1)).toFixed(2) }}</span>
               </td>
-              <td>
+              <td class="hide-small">
                 <div class="gain-cell">
                   <span :class="getGain(item) >= 0 ? 'text-success' : 'text-danger'">
                     {{ getGain(item) >= 0 ? '+' : '' }}${{ Math.abs(getGain(item)).toFixed(2) }}
@@ -181,7 +181,7 @@
                   <span class="gain-pct text-muted">({{ getGainPct(item) >= 0 ? '+' : '' }}{{ getGainPct(item).toFixed(1) }}%)</span>
                 </div>
               </td>
-              <td>
+              <td class="hide-mobile">
                 <div class="actions flex gap-2">
                   <button class="btn btn-ghost btn-icon btn-sm" @click.stop="editItem(item)" aria-label="Edit item">
                     <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-pencil"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
@@ -210,7 +210,8 @@
             <button class="btn btn-ghost btn-sm" @click="selectedIds.clear()">Cancel</button>
             <button class="btn btn-danger btn-sm" @click="confirmBulkDelete = true">
               <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-trash-2"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>
-              Delete Selected
+              <span class="hide-mobile">Delete Selected</span>
+              <span class="show-mobile">Delete</span>
             </button>
           </div>
         </div>
@@ -917,18 +918,22 @@ function deletePortfolio() {
   .portfolio-header-actions .btn { font-size: 11px; padding: 5px 8px; }
   .portfolio-name { font-size: 18px; }
   .portfolio-dot-lg { width: 12px; height: 12px; margin-top: 4px; }
-  /* Hide less critical columns */
-  .table th:nth-child(3), .table td:nth-child(3) { display: none; } /* Type */
-  .table th:last-child, .table td:last-child { display: none; } /* Actions */
-  .table { min-width: 360px; }
+  
+  .hide-mobile { display: none !important; }
+  .show-mobile { display: inline-block !important; }
+  
+  .table { min-width: 440px; }
   .item-thumb { width: 30px; height: 42px; }
   .item-name { font-size: 12px; }
   .item-sub { font-size: 10px; }
   
   .bulk-action-bar { bottom: 12px; min-width: calc(100% - 24px); border-radius: 12px; padding: 8px 16px; }
+  .bulk-action-content { gap: 12px; }
+  .bulk-label { font-size: 13px; }
 }
 
 @media (max-width: 640px) {
+  .hide-small { display: none !important; }
   .item-detail-panel { max-height: 90vh; }
   /* Make items table scrollable horizontally */
   .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
@@ -942,11 +947,11 @@ function deletePortfolio() {
   .stats-row { grid-template-columns: 1fr 1fr; gap: 8px; }
   .stat-tile { padding: 12px 10px; }
   .stat-tile .value { font-size: 18px; }
-  /* Compact gain/loss on small screens */
-  .gain-pct { display: none; }
   /* Name edit */
   .name-edit-row { flex-wrap: wrap; }
   .name-input { width: 100%; }
   .portfolio-header-actions { flex-wrap: wrap; }
 }
+
+.show-mobile { display: none; }
 </style>
