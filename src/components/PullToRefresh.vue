@@ -1,9 +1,7 @@
 <template>
   <div
+    ref="containerEl"
     class="pull-to-refresh-container"
-    @touchstart="handleTouchStart"
-    @touchmove="handleTouchMove"
-    @touchend="handleTouchEnd"
     :style="containerStyle"
   >
     <!-- Pull down indicator -->
@@ -47,7 +45,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 
 const props = defineProps({
   refreshing: {
@@ -66,9 +64,29 @@ const props = defineProps({
 
 const emit = defineEmits(['refresh'])
 
+const containerEl = ref(null)
 const startY = ref(0)
+const startX = ref(0)
 const pullDistance = ref(0)
 const isPulling = ref(false)
+const lockedDirection = ref(null) // null | 'vertical' | 'horizontal'
+let scrollParent = null
+
+// Find the nearest scrollable ancestor — the app scrolls inside .main-content,
+// not the window, so window.scrollY is always 0 and can't gate the gesture.
+function getScrollParent(el) {
+  let node = el?.parentElement
+  while (node) {
+    const oy = getComputedStyle(node).overflowY
+    if ((oy === 'auto' || oy === 'scroll') && node.scrollHeight > node.clientHeight) return node
+    node = node.parentElement
+  }
+  return document.scrollingElement || document.documentElement
+}
+
+function atTop() {
+  return (scrollParent ? scrollParent.scrollTop : window.scrollY) <= 0
+}
 
 const containerStyle = computed(() => {
   if (props.refreshing) return { overflow: 'hidden' }
@@ -93,38 +111,66 @@ const svgStyle = computed(() => {
   }
 })
 
-function handleTouchStart(e) {
-  // Only allow pull if we're at the top
-  if (window.scrollY > 0 || props.refreshing) return
+function onTouchStart(e) {
+  // Only allow pull if the scroll container is at the very top
+  if (props.refreshing || !atTop()) return
   startY.value = e.touches[0].clientY
+  startX.value = e.touches[0].clientX
   isPulling.value = true
+  lockedDirection.value = null
 }
 
-function handleTouchMove(e) {
+function onTouchMove(e) {
   if (!isPulling.value) return
-  const currentY = e.touches[0].clientY
-  const diff = currentY - startY.value
+  const t = e.touches[0]
+  const dy = t.clientY - startY.value
+  const dx = t.clientX - startX.value
 
-  if (diff > 0) {
-    pullDistance.value = diff
-    // Prevent scrolling when pulling down
+  // Lock gesture direction on first meaningful movement so a horizontal swipe
+  // (e.g. the horizontally-scrollable items table) never triggers a refresh.
+  if (lockedDirection.value === null && (Math.abs(dx) > 8 || Math.abs(dy) > 8)) {
+    lockedDirection.value = Math.abs(dx) > Math.abs(dy) ? 'horizontal' : 'vertical'
+  }
+  if (lockedDirection.value === 'horizontal') {
+    isPulling.value = false
+    pullDistance.value = 0
+    return
+  }
+
+  if (dy > 0 && atTop()) {
+    pullDistance.value = dy
+    // Non-passive listener (bound in onMounted) so this actually suppresses
+    // the native rubber-band scroll on iOS instead of being ignored.
     if (e.cancelable) e.preventDefault()
   } else {
     pullDistance.value = 0
-    isPulling.value = false
   }
 }
 
-function handleTouchEnd() {
+function onTouchEnd() {
   if (!isPulling.value) return
-
-  if (pullDistance.value >= props.threshold) {
-    emit('refresh')
-  }
-
+  if (pullDistance.value >= props.threshold) emit('refresh')
   isPulling.value = false
   pullDistance.value = 0
+  lockedDirection.value = null
 }
+
+onMounted(() => {
+  scrollParent = getScrollParent(containerEl.value)
+  const el = containerEl.value
+  if (!el) return
+  el.addEventListener('touchstart', onTouchStart, { passive: true })
+  el.addEventListener('touchmove', onTouchMove, { passive: false })
+  el.addEventListener('touchend', onTouchEnd, { passive: true })
+})
+
+onBeforeUnmount(() => {
+  const el = containerEl.value
+  if (!el) return
+  el.removeEventListener('touchstart', onTouchStart)
+  el.removeEventListener('touchmove', onTouchMove)
+  el.removeEventListener('touchend', onTouchEnd)
+})
 </script>
 
 <style scoped>
