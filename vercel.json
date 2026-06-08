@@ -7,6 +7,7 @@
     { "source": "/api/search", "destination": "/api/search" },
     { "source": "/api/price", "destination": "/api/price" },
     { "source": "/api/sealed", "destination": "/api/sealed" },
+    { "source": "/api/optcg", "destination": "/api/optcg" },
     { "source": "/((?!api/).*)", "destination": "/index.html" }
   ],
   "functions": {

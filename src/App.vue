@@ -189,7 +189,9 @@ const portfolioColors = [
 const currentPageTitle = computed(() => {
   if (route.name === 'Dashboard') return 'Dashboard'
   if (route.name === 'Search') return 'Search Cards'
-  if (route.name === 'Sets') return 'Browse Sets'
+  if (route.name === 'Browse') return 'Browse Sets'
+  if (route.name === 'Sets') return 'Pokémon Sets'
+  if (route.name === 'TcgSets') return 'Browse Sets'
   if (route.name === 'Settings') return 'Settings'
   if (route.name === 'Terms') return 'Terms & Conditions'
   if (route.name === 'Portfolio') {
