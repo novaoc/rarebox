@@ -135,12 +135,12 @@
 
       <div class="settings-item">
         <div>
-          <div class="settings-item-label">Collectr CSV File</div>
-          <div class="settings-item-sub">Export from Collectr → Portfolios → Export as CSV</div>
+          <div class="settings-item-label">Collectr Export File</div>
+          <div class="settings-item-sub">Export from Collectr → Portfolios → Export as CSV or Excel</div>
         </div>
         <label class="btn btn-secondary btn-sm backup-import-btn">
-          ↑ Select CSV
-          <input type="file" accept=".csv" @change="handleCollectrImport" hidden />
+          ↑ Select File
+          <input type="file" accept=".csv,.xlsx,.xls" @change="handleCollectrImport" hidden />
         </label>
       </div>
 
@@ -251,7 +251,7 @@ import { useRouter } from 'vue-router'
 import { usePortfolioStore } from '../stores/portfolio'
 import { exportPortfolioToExcel, exportAllPortfolios } from '../utils/excel'
 import { exportBackup, validateBackup, importBackup } from '../utils/backup'
-import { importCollectrCsv } from '../utils/collectrImport'
+import { importCollectrFile } from '../utils/collectrImport'
 import { getActiveAlerts, getTriggeredAlerts, removeAlert, clearTriggeredAlerts, clearAllAlerts } from '../utils/alerts'
 import LocalSyncModal from '../components/LocalSyncModal.vue'
 const store = usePortfolioStore()
@@ -343,24 +343,15 @@ async function handleCollectrImport(e) {
   if (!file) return
   collectrError.value = ''
   collectrImporting.value = true
-  collectrImportStatus.value = 'reading file'
-
-  const reader = new FileReader()
-  reader.onload = async () => {
-    try {
-      collectrImportStatus.value = 'parsing and converting'
-      await importCollectrCsv(reader.result)
-      // page reloads on success — this line is never reached
-    } catch (err) {
-      collectrError.value = err.message || 'Import failed'
-      collectrImporting.value = false
-    }
-  }
-  reader.onerror = () => {
-    collectrError.value = 'Failed to read file'
+  const ext = (file.name || '').split('.').pop()?.toLowerCase() || ''
+  collectrImportStatus.value = ext === 'csv' ? 'reading CSV' : 'reading Excel'
+  try {
+    await importCollectrFile(file)
+    // page reloads on success — this line is never reached
+  } catch (err) {
+    collectrError.value = err.message || 'Import failed'
     collectrImporting.value = false
   }
-  reader.readAsText(file)
   e.target.value = ''
 }
 </script>

@@ -1,3 +1,10 @@
+/**
+ * Collectr → Rarebox import
+ * Handles both CSV and Excel (.xlsx) exports from Collectr.
+ * Built by Nova — GitHub: @novaoc
+ */
+import * as XLSX from 'xlsx'
+
 const GAME_MAP = {
   pokemon: 'pokemon',
   yugioh: 'yu-gi-oh',
@@ -138,6 +145,31 @@ export function convertRow(row) {
   return { portfolioName: pname || category || 'Uncategorized', item: base }
 }
 
+// ── CSV parsing ────────────────────────────────────────────────────────────
+
+function parseLine(line) {
+  const result = []
+  let current = ''
+  let inQuotes = false
+
+  for (const ch of line) {
+    if (ch === '"') {
+      inQuotes = !inQuotes
+    } else if (ch === ',' && !inQuotes) {
+      result.push(current)
+      current = ''
+    } else {
+      current += ch
+    }
+  }
+  result.push(current)
+
+  return result.map(f => {
+    if (f.startsWith('"') && f.endsWith('"')) return f.slice(1, -1)
+    return f
+  })
+}
+
 export function convertCsv(text, onlyPortfolio) {
   const lines = text.split('\n').filter(l => l.trim())
   if (lines.length < 2) throw new Error('CSV is empty or has no data rows')
@@ -169,28 +201,97 @@ export function convertCsv(text, onlyPortfolio) {
   return portfolios
 }
 
-function parseLine(line) {
+// ── Excel parsing ──────────────────────────────────────────────────────────
+
+function rowsToObjectArrays(rows) {
+  if (rows.length < 2) return []
+  const header = rows[0].map(h => String(h ?? '').trim())
   const result = []
-  let current = ''
-  let inQuotes = false
-
-  for (const ch of line) {
-    if (ch === '"') {
-      inQuotes = !inQuotes
-    } else if (ch === ',' && !inQuotes) {
-      result.push(current)
-      current = ''
-    } else {
-      current += ch
+  for (let i = 1; i < rows.length; i++) {
+    // Skip empty rows
+    if (rows[i].every(c => c == null || String(c).trim() === '')) continue
+    const entry = {}
+    for (let j = 0; j < header.length; j++) {
+      entry[header[j]] = String(rows[i][j] ?? '').trim()
     }
+    result.push(entry)
   }
-  result.push(current)
+  return result
+}
 
-  return result.map(f => {
-    if (f.startsWith('"') && f.endsWith('"')) return f.slice(1, -1)
-    return f
+function convertExcelRows(rows, onlyPortfolio) {
+  const entries = rowsToObjectArrays(rows)
+  if (entries.length === 0) throw new Error('Excel file has no data rows')
+
+  const groups = {}
+  for (const entry of entries) {
+    const { portfolioName, item } = convertRow(entry)
+    if (onlyPortfolio && portfolioName !== onlyPortfolio) continue
+    if (!groups[portfolioName]) groups[portfolioName] = []
+    groups[portfolioName].push(item)
+  }
+
+  return Object.entries(groups).map(([name, items], idx) => ({
+    id: uuid(),
+    name,
+    color: COLORS[idx % COLORS.length],
+    createdAt: new Date().toISOString(),
+    items,
+  }))
+}
+
+// ── Unified import entry point ─────────────────────────────────────────────
+
+/**
+ * Parse a Collectr file (CSV or Excel) and return an array of portfolio objects.
+ * @param {File} file - The file object from the file input
+ * @param {string} [onlyPortfolio] - If set, only include items from this portfolio name
+ * @returns {Promise<Array>} Array of portfolio objects
+ */
+export function parseCollectrFile(file, onlyPortfolio) {
+  return new Promise((resolve, reject) => {
+    const name = (file.name || '').toLowerCase()
+    const isExcel = name.endsWith('.xlsx') || name.endsWith('.xls')
+
+    if (isExcel) {
+      const reader = new FileReader()
+      reader.onload = () => {
+        try {
+          const wb = XLSX.read(reader.result, { type: 'array' })
+          // Collect rows from all sheets (or first sheet only)
+          const sheetName = wb.SheetNames[0]
+          if (!sheetName) {
+            reject(new Error('Excel file has no sheets'))
+            return
+          }
+          const rows = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], { header: 1, defval: '' })
+          // rows is an array of arrays — same shape as CSV rows
+          const portfolios = convertExcelRows(rows, onlyPortfolio)
+          resolve(portfolios)
+        } catch (e) {
+          reject(new Error('Failed to parse Excel file: ' + (e.message || e)))
+        }
+      }
+      reader.onerror = () => reject(new Error('Failed to read file'))
+      reader.readAsArrayBuffer(file)
+    } else {
+      // CSV
+      const reader = new FileReader()
+      reader.onload = () => {
+        try {
+          const portfolios = convertCsv(reader.result, onlyPortfolio)
+          resolve(portfolios)
+        } catch (e) {
+          reject(e)
+        }
+      }
+      reader.onerror = () => reject(new Error('Failed to read file'))
+      reader.readAsText(file)
+    }
   })
 }
+
+// ── Legacy: import from CSV text (kept for backward compat) ────────────────
 
 const STORAGE_KEYS = {
   portfolios: 'rarebox_portfolios',
@@ -198,10 +299,26 @@ const STORAGE_KEYS = {
   snapshots: 'rarebox_snapshots',
 }
 
+/**
+ * Import a Collectr CSV text string directly and reload the page.
+ * @deprecated Use parseCollectrFile() for new code.
+ */
 export async function importCollectrCsv(text) {
   const portfolios = convertCsv(text)
   if (portfolios.length === 0) throw new Error('No portfolios found in CSV')
+  await writeAndReload(portfolios)
+}
 
+/**
+ * Import a Collectr file (CSV or Excel) and reload the page.
+ */
+export async function importCollectrFile(file) {
+  const portfolios = await parseCollectrFile(file)
+  if (portfolios.length === 0) throw new Error('No portfolios found in file')
+  await writeAndReload(portfolios)
+}
+
+async function writeAndReload(portfolios) {
   const state = {
     portfolios,
     activePortfolioId: portfolios[0].id,
