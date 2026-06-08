@@ -144,10 +144,6 @@
         </label>
       </div>
 
-      <div v-if="collectrImporting" class="settings-item" style="border-bottom:none">
-        <div class="text-secondary" style="font-size:13px">Converting {{ collectrImportStatus }}…</div>
-      </div>
-
       <div v-if="collectrError" class="settings-item" style="border-bottom:none">
         <div class="import-result error">{{ collectrError }}</div>
       </div>
@@ -243,6 +239,50 @@
   </div>
 
   <LocalSyncModal v-if="showLocalSync" @close="showLocalSync = false" />
+
+  <!-- Collectr Import Overlay -->
+  <transition name="fade">
+    <div v-if="collectrImporting" class="import-overlay">
+      <div class="import-overlay-card">
+        <!-- Spinner -->
+        <div v-if="collectrPhase !== 'done'" class="import-spinner"></div>
+        <div v-else class="import-done-icon">✓</div>
+
+        <!-- Status text -->
+        <div class="import-status">{{ collectrImportStatus }}</div>
+
+        <!-- Progress bar (resolving phase) -->
+        <div v-if="collectrPhase === 'resolving' && collectrTotal > 0" class="import-progress-wrap">
+          <div class="import-progress-bar" :style="{ width: Math.round((collectrResolved / collectrTotal) * 100) + '%' }"></div>
+        </div>
+        <div v-if="collectrPhase === 'resolving' && collectrTotal > 0" class="import-progress-label">
+          {{ collectrResolved }} / {{ collectrTotal }}
+        </div>
+
+        <!-- Phase indicators -->
+        <div v-if="collectrPhase !== 'done'" class="import-phases">
+          <span :class="{ active: collectrPhase === 'parsing' || collectrPhase === 'importing' || collectrPhase === 'resolving' }">Parse</span>
+          <span class="import-phase-dot">·</span>
+          <span :class="{ active: collectrPhase === 'importing' || collectrPhase === 'resolving' }">Import</span>
+          <span class="import-phase-dot">·</span>
+          <span :class="{ active: collectrPhase === 'resolving' }">Resolve</span>
+        </div>
+
+        <!-- Done button -->
+        <button
+          v-if="collectrImportDone"
+          class="btn btn-primary btn-lg import-done-btn"
+          @click="goToDashboard"
+        >Go to Dashboard</button>
+
+        <!-- Error -->
+        <div v-if="collectrError" class="import-error">
+          {{ collectrError }}
+          <button class="btn btn-secondary btn-sm mt-2" @click="collectrImporting = false; collectrPhase = ''">Close</button>
+        </div>
+      </div>
+    </div>
+  </transition>
 </template>
 
 <script setup>
@@ -312,6 +352,10 @@ const importResult = ref(null)
 const collectrImporting = ref(false)
 const collectrImportStatus = ref('')
 const collectrError = ref('')
+const collectrPhase = ref('')     // 'parsing' | 'importing' | 'resolving' | 'done'
+const collectrResolved = ref(0)
+const collectrTotal = ref(0)
+const collectrImportDone = ref(false)
 
 function doExportBackup() {
   exportBackup()
@@ -343,24 +387,40 @@ async function handleCollectrImport(e) {
   if (!file) return
   collectrError.value = ''
   collectrImporting.value = true
+  collectrImportDone.value = false
   const ext = (file.name || '').split('.').pop()?.toLowerCase() || ''
-  collectrImportStatus.value = ext === 'csv' ? 'reading CSV' : 'reading Excel'
   try {
+    // Phase 1: Parse
+    collectrPhase.value = 'parsing'
+    collectrImportStatus.value = ext === 'csv' ? 'Reading CSV…' : 'Reading Excel…'
     const portfolios = await parseCollectrFile(file)
     if (portfolios.length === 0) throw new Error('No portfolios found in file')
-    // Import directly into the store
+    // Phase 2: Import into store
+    collectrPhase.value = 'importing'
+    const totalItems = portfolios.reduce((s, p) => s + p.items.length, 0)
+    collectrImportStatus.value = `Importing ${totalItems} items…`
     await store.importAll(portfolios)
-    // Resolve card images + prices in background (non-blocking)
-    collectrImportStatus.value = 'resolving cards…'
-    store.resolveImportedItems((done, total) => {
-      collectrImportStatus.value = `resolving ${done}/${total} cards…`
-    }).catch(() => {})
-    router.push('/')
+    // Phase 3: Resolve card images + prices (blocks until done)
+    collectrPhase.value = 'resolving'
+    collectrImportStatus.value = 'Resolving cards…'
+    const resolved = await store.resolveImportedItems((done, total) => {
+      collectrResolved.value = done
+      collectrTotal.value = total
+    })
+    // Phase 4: Done
+    collectrPhase.value = 'done'
+    collectrImportStatus.value = `Done! Resolved ${resolved} cards.`
+    collectrImportDone.value = true
   } catch (err) {
     collectrError.value = err.message || 'Import failed'
     collectrImporting.value = false
+    collectrPhase.value = ''
   }
   e.target.value = ''
+}
+
+function goToDashboard() {
+  window.location.href = '/'
 }
 </script>
 
@@ -445,5 +505,97 @@ async function handleCollectrImport(e) {
   .about-grid { grid-template-columns: 1fr; }
   .pc-key-input-row { flex-wrap: wrap; }
   .pc-key-input-row .input { min-width: 0; }
+}
+
+/* ── Import Overlay ─────────────────────────────────────────────────── */
+.import-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.import-overlay-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg, 16px);
+  padding: 48px 40px;
+  max-width: 420px;
+  width: 90vw;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+.import-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: import-spin 0.8s linear infinite;
+}
+@keyframes import-spin {
+  to { transform: rotate(360deg); }
+}
+.import-done-icon {
+  width: 48px;
+  height: 48px;
+  background: var(--success, #3fb950);
+  color: #fff;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  font-weight: 700;
+}
+.import-status {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+.import-progress-wrap {
+  width: 100%;
+  height: 6px;
+  background: var(--border);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.import-progress-bar {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+.import-progress-label {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+.import-phases {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.import-phases span.active {
+  color: var(--accent);
+  font-weight: 600;
+}
+.import-phase-dot { opacity: 0.4; }
+.import-done-btn {
+  margin-top: 8px;
+  min-width: 180px;
+}
+.import-error {
+  color: var(--danger, #f85149);
+  font-size: 13px;
+  text-align: center;
 }
 </style>
