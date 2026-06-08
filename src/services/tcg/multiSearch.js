@@ -138,27 +138,33 @@ async function searchOnePiece(query) {
 let _riftCards = null
 const PC_RIFTBOUND = 'https://www.pricecharting.com/search-products'
 // Fetch PriceCharting prices for a Riftbound set.
-// Returns map of "number|variant" → price.
+// Returns { normal: {num→price}, variants: {num→{variant→price}} }
 async function fetchPCPrices(setName) {
   try {
     const d = await fetchJson(`${PC_RIFTBOUND}?type=prices&q=${encodeURIComponent('riftbound ' + setName)}`)
     const products = d.products || []
-    const map = {}
+    const normal = {}
+    const variants = {}
     for (const p of products) {
       const name = p.productName || ''
       const numMatch = name.match(/#(\d+)/)
       if (!numMatch || !p.price1) continue
+      const n = numMatch[1]
       const price = typeof p.price1 === 'string'
         ? parseFloat(p.price1.replace(/[$,]/g, ''))
         : p.price1
       if (!(price > 0)) continue
       const variantMatch = name.match(/\[([^\]]+)\]/)
       const variant = variantMatch ? variantMatch[1].toLowerCase() : ''
-      map[`${numMatch[1]}|${variant}`] = price
-      if (!variant) map[`${numMatch[1]}|`] = price
+      if (variant) {
+        if (!variants[n]) variants[n] = {}
+        variants[n][variant] = price
+      } else {
+        normal[n] = price
+      }
     }
-    return map
-  } catch { return {} }
+    return { normal, variants }
+  } catch { return { normal: {}, variants: {} } }
 }
 
 async function getRiftboundCards() {
@@ -195,11 +201,10 @@ async function getRiftboundCards() {
       if (!card.number) continue
       const variantMatch = card.name.match(/\(([^)]+)\)/)
       const variant = variantMatch ? variantMatch[1].toLowerCase() : ''
-      const key = `${card.number}|${variant}`
-      if (priceMap[key] != null) {
-        card.price = priceMap[key]
-      } else if (!variant && priceMap[`${card.number}|`] != null) {
-        card.price = priceMap[`${card.number}|`]
+      if (variant && priceMap.variants[card.number]?.[variant]) {
+        card.price = priceMap.variants[card.number][variant]
+      } else if (priceMap.normal[card.number] != null) {
+        card.price = priceMap.normal[card.number]
       }
     }
     all.push(...setCards)

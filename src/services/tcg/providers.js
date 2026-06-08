@@ -198,13 +198,13 @@ const RIFTCODEX = 'https://api.riftcodex.com'
 const PC_SEARCH = 'https://www.pricecharting.com/search-products'
 
 // Fetch PriceCharting prices for a Riftbound set.
-// Returns map of "number|variant" → price, where variant is lowercase
-// ("signature", "alternate art", etc.) or "" for normal/foil.
+// Returns { normal: {num→price}, variants: {num→{variant→price}} }
 async function fetchRiftboundPrices(setName, signal) {
   const q = `riftbound ${setName}`
   const d = await getJson(`${PC_SEARCH}?type=prices&q=${encodeURIComponent(q)}`, { signal })
   const products = d.products || []
-  const priceMap = {}
+  const normal = {}   // "299" → price (plain cards)
+  const variants = {} // "299" → {"signature": price, "alternate art": price}
   for (const p of products) {
     const name = p.productName || ''
     const numMatch = name.match(/#(\d+)/)
@@ -214,14 +214,16 @@ async function fetchRiftboundPrices(setName, signal) {
       ? parseFloat(p.price1.replace(/[$,]/g, ''))
       : p.price1
     if (!(price > 0)) continue
-    // Extract variant from PriceCharting name: [Signature], [Alternate Art], [Foil], etc.
     const variantMatch = name.match(/\[([^\]]+)\]/)
     const variant = variantMatch ? variantMatch[1].toLowerCase() : ''
-    priceMap[`${n}|${variant}`] = price
-    // Also store a plain-number fallback for cards with no variant
-    if (!variant) priceMap[`${n}|`] = price
+    if (variant) {
+      if (!variants[n]) variants[n] = {}
+      variants[n][variant] = price
+    } else {
+      normal[n] = price
+    }
   }
-  return priceMap
+  return { normal, variants }
 }
 
 const riftbound = {
@@ -270,20 +272,16 @@ const riftbound = {
         return fetchRiftboundPrices(setName, sig)
       })
 
-      // 3. Merge prices by collector number + variant
-      // Riftcodex names: "Kai'Sa - Daughter of the Void (Signature)"
-      // Extract variant from parentheses and match against PriceCharting key.
+      // 3. Merge prices — normal cards get normal price, variants get variant price
       for (const card of cards) {
         if (!card.number) continue
         // Extract variant from riftcodex name: "(Signature)" → "signature"
         const variantMatch = card.name.match(/\(([^)]+)\)/)
         const variant = variantMatch ? variantMatch[1].toLowerCase() : ''
-        const key = `${card.number}|${variant}`
-        if (priceMap[key] != null) {
-          card.price = priceMap[key]
-        } else if (!variant && priceMap[`${card.number}|`] != null) {
-          // Fallback: normal card with no variant
-          card.price = priceMap[`${card.number}|`]
+        if (variant && priceMap.variants[card.number]?.[variant]) {
+          card.price = priceMap.variants[card.number][variant]
+        } else if (priceMap.normal[card.number] != null) {
+          card.price = priceMap.normal[card.number]
         }
       }
 
