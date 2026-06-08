@@ -39,7 +39,7 @@
         </router-link>
         <router-link to="/trade" class="nav-item" @click="sidebarOpen = false">
           <span class="nav-icon">
-            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-arrow-left-right" aria-hidden="true"><path d="M17 2 21 6 17 10"/><path d="M7 22 3 18 7 14"/><path d="M21 6H3"/><path d="M3 18h18"/></svg>
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-arrow-left-right" aria-hidden="true"><path d="M8 3 4 7l4 4"/><path d="M4 7h16"/><path d="m16 21 4-4-4-4"/><path d="M20 17H4"/></svg>
           </span> Trade
         </router-link>
       </nav>
@@ -199,7 +199,7 @@ const currentPageTitle = computed(() => {
   if (route.name === 'TcgSets') return 'Browse Sets'
   if (route.name === 'Settings') return 'Settings'
   if (route.name === 'Terms') return 'Terms & Conditions'
-  if (route.name === 'TradeLanding' || route.name === 'TradeAnalyzer') return 'Trade Analyzer'
+  if (route.name === 'TradeAnalyzer' || route.name === 'TradeLanding') return 'Trade Analyzer'
   if (route.name === 'Portfolio') {
     const p = store.portfolios.find(p => p.id === route.params.id)
     return p?.name || 'Portfolio'

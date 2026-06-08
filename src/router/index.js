@@ -13,7 +13,7 @@ const routes = [
   { path: '/decks/:id', name: 'DeckBuilder', component: () => import('../views/DeckBuilderView.vue'), meta: { title: 'Deck Builder', description: 'Build your deck, track card ownership, and calculate costs.' } },
   { path: '/settings', name: 'Settings', component: () => import('../views/SettingsView.vue'), meta: { title: 'Settings', description: 'Export data, manage backups, transfer to device, and configure alerts.' } },
   { path: '/trade', name: 'TradeLanding', component: () => import('../views/TradeLanding.vue'), meta: { title: 'Trade Analyzer', description: 'Compare card values and analyze trades side-by-side. Add cards by searching or scanning.' } },
-  { path: '/trade/analyzer', name: 'TradeAnalyzer', component: () => import('../views/TradeAnalyzerView.vue'), meta: { title: 'Trade Analyzer', description: 'Compare card values side-by-side to find fair trades.' } },
+  { path: '/trade/analyzer', name: 'TradeAnalyzer', component: () => import('../views/TradeAnalyzerView.vue'), meta: { title: 'Trade Analyzer', description: 'Compare cards side-by-side. Scan or add cards to each side and see the price difference instantly.' } },
   { path: '/terms', name: 'Terms', component: () => import('../views/TermsView.vue'), meta: { title: 'Terms & Conditions', description: 'Terms & Conditions and Privacy Policy for Rarebox.' } },
 ]
 
