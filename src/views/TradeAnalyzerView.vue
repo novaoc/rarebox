@@ -3,6 +3,7 @@ import { ref, computed, onMounted } from 'vue'
 import CameraViewfinder from '../components/scanner/CameraViewfinder.vue'
 import { useTradeStore } from '../stores/trade'
 import { multiSearch } from '../services/tcg/multiSearch'
+import { scanCard } from '../utils/scanPipeline'
 
 interface SearchResult {
   id: string
@@ -22,7 +23,10 @@ const activeSide = ref<'A' | 'B'>('A')
 const searchQuery = ref('')
 const searchResults = ref<SearchResult[]>([])
 const searchBusy = ref(false)
+const scanStatus = ref('')
 let searchTimer: ReturnType<typeof setTimeout> | null = null
+
+const searchCache = new Map<string, SearchResult[]>()
 
 const deltaFormatted = computed(() => {
   const d = tradeStore.priceDelta
@@ -53,29 +57,42 @@ function openSearch(side: 'A' | 'B') {
   searchResults.value = []
 }
 
-function onCapture(imageData: string) {
-  showScanner.value = false
-  const mockCard = {
-    id: `mock-${Date.now()}`,
-    name: 'Scanned Card',
-    setName: 'Unknown Set',
-    number: '??/??',
-    imageUrl: imageData,
-    marketPrice: parseFloat((Math.random() * 50 + 1).toFixed(2)),
-    game: 'pokemon',
+async function onCapture(imageData: string) {
+  scanStatus.value = 'Reading card…'
+  try {
+    const result = await scanCard(imageData)
+    if (result) {
+      tradeStore.addToSide(activeSide.value, {
+        id: result.id,
+        name: result.name,
+        setName: result.setName,
+        number: result.number,
+        imageUrl: result.image,
+        marketPrice: result.price || 0,
+        game: result.game,
+      })
+    }
+  } catch {
+    // fall through to empty state
   }
-  tradeStore.addToSide(activeSide.value, mockCard)
+  scanStatus.value = ''
+  showScanner.value = false
 }
 
 function onScannerClose() {
   showScanner.value = false
+  scanStatus.value = ''
 }
 
 function onSearchInput() {
   if (searchTimer) clearTimeout(searchTimer)
   const q = searchQuery.value.trim()
   if (q.length < 2) { searchResults.value = []; return }
-  searchTimer = setTimeout(doSearch, 300)
+  if (searchCache.has(q)) {
+    searchResults.value = searchCache.get(q)!
+    return
+  }
+  searchTimer = setTimeout(doSearch, 150)
 }
 
 async function doSearch() {
@@ -83,8 +100,14 @@ async function doSearch() {
   if (q.length < 2) return
   searchBusy.value = true
   try {
-    const res = await multiSearch(q, { page: 1, pageSize: 20 })
-    searchResults.value = (res.cards || []) as SearchResult[]
+    const res = await multiSearch(q, { page: 1, pageSize: 15 })
+    const cards = (res.cards || []) as SearchResult[]
+    searchCache.set(q, cards)
+    if (searchCache.size > 50) {
+      const first = searchCache.keys().next().value
+      if (first) searchCache.delete(first)
+    }
+    searchResults.value = cards
   } catch {
     searchResults.value = []
   } finally {
@@ -117,6 +140,10 @@ onMounted(async () => {
     <transition name="fade">
       <div v-if="showScanner" class="modal-overlay" style="padding:0;align-items:stretch;background:#000" @click.self="onScannerClose">
         <CameraViewfinder @capture="onCapture" @close="onScannerClose" />
+        <div v-if="scanStatus" class="scan-status-overlay">
+          <div class="spinner" />
+          <span>{{ scanStatus }}</span>
+        </div>
       </div>
     </transition>
   </Teleport>
@@ -586,6 +613,21 @@ onMounted(async () => {
   font-size: 10px;
   color: var(--text-muted);
   margin-top: 1px;
+}
+
+.scan-status-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  background: rgba(0,0,0,0.85);
+  color: var(--text-primary);
+  font-size: 15px;
+  font-weight: 500;
 }
 
 /* Responsive */

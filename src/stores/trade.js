@@ -71,9 +71,7 @@ export const useTradeStore = defineStore('trade', () => {
   function calculateTotal(items) {
     return items.reduce((sum, item) => {
       const qty = item.quantity || 1
-      const val = item.type === 'card'
-        ? (item.currentMarketPrice || item.purchasePrice || 0)
-        : (item.currentValue || item.purchasePrice || 0)
+      const val = item.currentMarketPrice ?? item.marketPrice ?? item.purchasePrice ?? 0
       return sum + val * qty
     }, 0)
   }
