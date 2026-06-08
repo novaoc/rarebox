@@ -218,7 +218,7 @@ const types = [
 const game = ref(props.tcgCard?.game || 'pokemon')
 const games = SUPPORTED_GAMES
 const isPokemon = computed(() => game.value === 'pokemon')
-// Sealed is Pokémon-only (uses PriceCharting); graded works for all TCGs
+// All TCGs get card/graded/sealed. Riftbound hides graded.
 const visibleTypes = computed(() => {
   if (game.value === 'riftbound') return types.filter(t => t.value !== 'graded')
   return types

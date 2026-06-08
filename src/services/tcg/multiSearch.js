@@ -132,19 +132,34 @@ async function searchOnePiece(query) {
   }
 }
 
-// ── Riftbound: search client-side from exported JSON ─────────────────────────
+// ── Riftbound: client-side search from riftcodex.com ─────────────────────────
+// Fetches all cards (paginated), caches in memory, searches client-side.
 let _riftCards = null
 async function getRiftboundCards() {
   if (_riftCards) return _riftCards
-  const res = await fetch('https://raw.githubusercontent.com/novaoc/riftbound-prices/main/riftbound-cards.json', {
-    signal: AbortSignal.timeout(12000),
-  })
-  if (!res.ok) throw new Error(`http_${res.status}`)
-  const d = await res.json()
   const all = []
-  for (const s of (d.sets || [])) {
-    for (const c of (s.cards || [])) {
-      all.push({ ...c, set: c.set || s.name })
+  const sets = await fetchJson('https://api.riftcodex.com/sets')
+  for (const s of (sets.items || [])) {
+    let page = 1
+    let total = Infinity
+    while (all.length < total && page <= 20) {
+      const d = await fetchJson(`https://api.riftcodex.com/cards?set_id=${encodeURIComponent(s.set_id)}&limit=50&page=${page}`)
+      const items = d.items || []
+      total = d.total || 0
+      for (const c of items) {
+        all.push({
+          id: c.id,
+          name: c.name,
+          number: String(c.collector_number || ''),
+          set: c.set?.label || s.name,
+          image: c.media?.image_url || '',
+          price: null,
+          rarity: c.classification?.rarity || '',
+          game: 'riftbound',
+          _raw: c,
+        })
+      }
+      page++
     }
   }
   _riftCards = all
@@ -156,22 +171,10 @@ async function searchRiftbound(query) {
   const q = query.toLowerCase()
   const matches = cards.filter(c =>
     (c.name || '').toLowerCase().includes(q) ||
-    (c.number || '').toLowerCase().includes(q)
+    (c.number || '').toLowerCase().includes(q) ||
+    (c.set || '').toLowerCase().includes(q)
   ).slice(0, 50)
-  return {
-    cards: matches.map(c => ({
-      id: c.id,
-      name: c.name,
-      number: c.number || '',
-      set: c.set || '',
-      image: '',
-      price: c.price || null,
-      rarity: c.rarity || '',
-      game: 'riftbound',
-      _raw: c,
-    })),
-    total: matches.length,
-  }
+  return { cards: matches, total: matches.length }
 }
 
 // ── Main search ─────────────────────────────────────────────────────────────
