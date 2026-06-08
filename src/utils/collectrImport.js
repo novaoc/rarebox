@@ -170,7 +170,15 @@ function parseLine(line) {
   })
 }
 
+/**
+ * Strip BOM (Byte Order Mark) from text — Windows CSV exports often include this.
+ */
+function stripBom(text) {
+  return text.charCodeAt(0) === 0xFEFF ? text.slice(1) : text
+}
+
 export function convertCsv(text, onlyPortfolio) {
+  text = stripBom(text)
   const lines = text.split('\n').filter(l => l.trim())
   if (lines.length < 2) throw new Error('CSV is empty or has no data rows')
 
@@ -258,14 +266,12 @@ export function parseCollectrFile(file, onlyPortfolio) {
       reader.onload = () => {
         try {
           const wb = XLSX.read(reader.result, { type: 'array' })
-          // Collect rows from all sheets (or first sheet only)
           const sheetName = wb.SheetNames[0]
           if (!sheetName) {
             reject(new Error('Excel file has no sheets'))
             return
           }
           const rows = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], { header: 1, defval: '' })
-          // rows is an array of arrays — same shape as CSV rows
           const portfolios = convertExcelRows(rows, onlyPortfolio)
           resolve(portfolios)
         } catch (e) {
@@ -289,51 +295,4 @@ export function parseCollectrFile(file, onlyPortfolio) {
       reader.readAsText(file)
     }
   })
-}
-
-// ── Legacy: import from CSV text (kept for backward compat) ────────────────
-
-const STORAGE_KEYS = {
-  portfolios: 'rarebox_portfolios',
-  settings: 'rarebox_settings',
-  snapshots: 'rarebox_snapshots',
-}
-
-/**
- * Import a Collectr CSV text string directly and reload the page.
- * @deprecated Use parseCollectrFile() for new code.
- */
-export async function importCollectrCsv(text) {
-  const portfolios = convertCsv(text)
-  if (portfolios.length === 0) throw new Error('No portfolios found in CSV')
-  await writeAndReload(portfolios)
-}
-
-/**
- * Import a Collectr file (CSV or Excel) and reload the page.
- */
-export async function importCollectrFile(file) {
-  const portfolios = await parseCollectrFile(file)
-  if (portfolios.length === 0) throw new Error('No portfolios found in file')
-  await writeAndReload(portfolios)
-}
-
-async function writeAndReload(portfolios) {
-  const state = {
-    portfolios,
-    activePortfolioId: portfolios[0].id,
-    settings: { currency: 'USD', defaultPortfolioId: null },
-    snapshots: {},
-  }
-
-  // Write to localStorage (migration path)
-  localStorage.setItem(STORAGE_KEYS.portfolios, JSON.stringify(state))
-  localStorage.setItem(STORAGE_KEYS.settings, JSON.stringify(state.settings))
-  localStorage.removeItem(STORAGE_KEYS.snapshots)
-
-  // Clear IDB so init() falls through to localStorage on reload
-  const { default: db } = await import('../db')
-  try { await db.state.clear() } catch (e) { console.error('IDB clear failed:', e) }
-
-  window.location.replace(window.location.pathname)
 }

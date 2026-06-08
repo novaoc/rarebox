@@ -251,7 +251,7 @@ import { useRouter } from 'vue-router'
 import { usePortfolioStore } from '../stores/portfolio'
 import { exportPortfolioToExcel, exportAllPortfolios } from '../utils/excel'
 import { exportBackup, validateBackup, importBackup } from '../utils/backup'
-import { importCollectrFile } from '../utils/collectrImport'
+import { parseCollectrFile } from '../utils/collectrImport'
 import { getActiveAlerts, getTriggeredAlerts, removeAlert, clearTriggeredAlerts, clearAllAlerts } from '../utils/alerts'
 import LocalSyncModal from '../components/LocalSyncModal.vue'
 const store = usePortfolioStore()
@@ -346,8 +346,13 @@ async function handleCollectrImport(e) {
   const ext = (file.name || '').split('.').pop()?.toLowerCase() || ''
   collectrImportStatus.value = ext === 'csv' ? 'reading CSV' : 'reading Excel'
   try {
-    await importCollectrFile(file)
-    // page reloads on success — this line is never reached
+    const portfolios = await parseCollectrFile(file)
+    if (portfolios.length === 0) throw new Error('No portfolios found in file')
+    // Import directly into the store
+    store.portfolios = portfolios
+    store.activePortfolioId = portfolios[0].id
+    await store.persistNow()
+    router.push('/')
   } catch (err) {
     collectrError.value = err.message || 'Import failed'
     collectrImporting.value = false
