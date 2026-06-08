@@ -191,7 +191,7 @@ export async function searchSealed(query, game = 'pokemon') {
   if (!q) throw new Error('empty_query')
 
   const cacheKey = `sealed:${game}:${q.toLowerCase()}`
-  const cached = cacheGet(key)
+  const cached = cacheGet(cacheKey)
   if (cached) return { results: cached, cached: true }
 
   let products = []
@@ -222,27 +222,29 @@ export async function searchSealed(query, game = 'pokemon') {
   }
 
   const skip = ['sleeve', 'portfolio', 'binder', 'dice', 'coin']
-  const results = products
-    .filter(p => {
-      const name = (p.productName || '').toLowerCase()
-      const consoleName = (p.consoleName || '').toLowerCase()
-      
-      let matchesGame = false
-      if (game === 'magic') matchesGame = consoleName.includes('magic')
-      else if (game === 'one-piece') matchesGame = consoleName.includes('one piece')
-      else if (game === 'riftbound') matchesGame = consoleName.includes('riftbound')
-      else matchesGame = consoleName.includes('pokemon')
+  const notSkipped = (p) => !skip.some(s => (p.productName || '').toLowerCase().includes(s))
+  const matchesGame = (p) => {
+    const consoleName = (p.consoleName || '').toLowerCase()
+    if (game === 'magic') return consoleName.includes('magic')
+    if (game === 'one-piece') return consoleName.includes('one piece')
+    if (game === 'riftbound') return consoleName.includes('riftbound')
+    return consoleName.includes('pokemon')
+  }
 
-      return matchesGame && !skip.some(s => name.includes(s))
-    })
-    .map(p => ({
-      name: p.productName || '',
-      set: p.consoleName || '',
-      url: p.id ? `${PC_BASE}/game/${p.id}` : '',
-      slug: p.id || '',
-      price: parsePrice(p.price1),
-      image: p.imageUri || '',
-    }))
+  // Prefer game-matched results; fall back to skip-only filtering if the
+  // consoleName game filter drops everything (PriceCharting doesn't always
+  // put the game name in consoleName for sealed products).
+  let filtered = products.filter(p => matchesGame(p) && notSkipped(p))
+  if (filtered.length === 0) filtered = products.filter(notSkipped)
+
+  const results = filtered.map(p => ({
+    name: p.productName || '',
+    set: p.consoleName || '',
+    url: p.id ? `${PC_BASE}/game/${p.id}` : '',
+    slug: p.id || '',
+    price: parsePrice(p.price1),
+    image: p.imageUri || '',
+  }))
 
   cacheSet(cacheKey, results)
   return { results, cached: false }
