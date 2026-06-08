@@ -72,6 +72,19 @@ function uuid() {
   return crypto.randomUUID()
 }
 
+/**
+ * Find a column value by prefix match (handles date-stamped columns
+ * like "Market Price (As of 2026-03-31)").
+ */
+function colByPrefix(row, prefix) {
+  for (const key of Object.keys(row)) {
+    if (key.toLowerCase().startsWith(prefix.toLowerCase())) {
+      return (row[key] || '').trim()
+    }
+  }
+  return ''
+}
+
 export function convertRow(row) {
   const pname = (row['Portfolio Name'] || '').trim()
   const category = (row['Category'] || '').trim()
@@ -81,8 +94,11 @@ export function convertRow(row) {
   const rarity = (row['Rarity'] || '').trim()
   const variance = (row['Variance'] || '').trim()
   const gradeRaw = (row['Grade'] || '').trim()
+  const condition = (row['Card Condition'] || '').trim()
   const costStr = (row['Average Cost Paid'] || '').trim()
   const qtyStr = (row['Quantity'] || '').trim()
+  const marketPriceStr = colByPrefix(row, 'Market Price')
+  const priceOverrideStr = (row['Price Override'] || '').trim()
   const dateAdded = (row['Date Added'] || '').trim()
   const notes = (row['Notes'] || '').trim()
 
@@ -94,6 +110,10 @@ export function convertRow(row) {
   const hasCardNumber = cardNumber.length > 0
   const [gradingCompany, grade] = parseGrade(gradeRaw)
   const now = new Date().toISOString()
+
+  // Price override takes precedence over market price
+  const overridePrice = parseCost(priceOverrideStr)
+  const marketPrice = overridePrice > 0 ? overridePrice : parseCost(marketPriceStr)
 
   const base = {
     id: uuid(),
@@ -108,18 +128,21 @@ export function convertRow(row) {
   if (!isPkmn) base.game = game
 
   if (!hasCardNumber) {
+    // ── Sealed product ───────────────────────────────────────────────────
     base.type = 'sealed'
     base.name = productName
     base.setName = setName
     base.sealedType = 'booster_box'
-    base.currentValue = null
+    base.currentValue = marketPrice || null
     base.pcUrl = ''
     base.imageUrl = ''
+    if (condition) base.condition = condition
   } else if (gradingCompany) {
+    // ── Graded slab ──────────────────────────────────────────────────────
     base.type = 'graded'
     base.gradingCompany = gradingCompany
     base.grade = grade || '10'
-    base.currentValue = null
+    base.currentValue = marketPrice || null
     base.cardData = {
       name: productName,
       number: cardNumber,
@@ -128,10 +151,12 @@ export function convertRow(row) {
       images: { small: '', large: '' },
     }
     if (isPkmn) base._lang = jp ? 'ja' : null
+    if (condition) base.condition = condition
   } else {
+    // ── Raw card ─────────────────────────────────────────────────────────
     base.type = 'card'
     base.priceVariant = mapVariance(variance)
-    base.currentMarketPrice = null
+    base.currentMarketPrice = marketPrice || null
     base.cardData = {
       name: productName,
       number: cardNumber,
@@ -140,6 +165,7 @@ export function convertRow(row) {
       images: { small: '', large: '' },
     }
     if (isPkmn) base._lang = jp ? 'ja' : null
+    if (condition) base.condition = condition
   }
 
   return { portfolioName: pname || 'Uncategorized', item: base }
@@ -216,7 +242,6 @@ function rowsToObjectArrays(rows) {
   const header = rows[0].map(h => String(h ?? '').trim())
   const result = []
   for (let i = 1; i < rows.length; i++) {
-    // Skip empty rows
     if (rows[i].every(c => c == null || String(c).trim() === '')) continue
     const entry = {}
     for (let j = 0; j < header.length; j++) {
@@ -281,7 +306,6 @@ export function parseCollectrFile(file, onlyPortfolio) {
       reader.onerror = () => reject(new Error('Failed to read file'))
       reader.readAsArrayBuffer(file)
     } else {
-      // CSV
       const reader = new FileReader()
       reader.onload = () => {
         try {
