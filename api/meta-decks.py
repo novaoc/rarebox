@@ -225,7 +225,7 @@ def scrape_pokemon() -> list[dict]:
         return []
 
     raw_decks = []
-    for deck_meta in deck_list[:5]:
+    for deck_meta in deck_list[:10]:
         try:
             deck_html = fetch(f"https://limitlesstcg.com/decks/{deck_meta['id']}", delay=0.3)
             cards = parse_deck_cards(deck_html)
@@ -331,7 +331,7 @@ def scrape_mtg() -> list[dict]:
     archetypes.sort(key=lambda a: a["share"], reverse=True)
 
     decks = []
-    for arch in archetypes[:3]:
+    for arch in archetypes[:10]:
         try:
             arch_html = fetch(arch["url"], delay=1.5)
             arch_soup = BeautifulSoup(arch_html, "html.parser")
@@ -451,10 +451,12 @@ def scrape_lorcana() -> list[dict]:
         name = link.get_text(strip=True)
         if not name or not href or href.startswith("http"):
             continue
-        # Deduplicate by URL
         if href in seen:
             continue
         seen.add(href)
+
+        if len(decks) >= 10:
+            break
 
         try:
             deck_html = fetch(f"https://inkdecks.com{href}", delay=1.5)
@@ -566,6 +568,9 @@ def scrape_one_piece() -> list[dict]:
             continue
         seen.add(href)
 
+        if len(decks) >= 10:
+            break
+
         try:
             deck_url = href if href.startswith("http") else f"https://optcg.one{href}"
             deck_html = fetch(deck_url, delay=1.5)
@@ -612,8 +617,6 @@ def scrape_one_piece() -> list[dict]:
                     "cards": cards,
                 })
 
-            if len(decks) >= 3:
-                break
         except Exception:
             continue
 
@@ -678,6 +681,9 @@ def scrape_riftbound() -> list[dict]:
             continue
         seen.add(href)
 
+        if len(decks) >= 10:
+            break
+
         try:
             deck_url = href if href.startswith("http") else f"https://riftdecks.com{href}"
             deck_html = fetch(deck_url, delay=1.5)
@@ -724,23 +730,55 @@ def scrape_riftbound() -> list[dict]:
                     "cards": cards,
                 })
 
-            if len(decks) >= 3:
-                break
         except Exception:
             continue
 
     return decks
 
 
+def _fetch_riftbound_prices(sets_data: list) -> dict:
+    """Fetch Riftbound prices from PriceCharting for each set.
+    Returns { collector_number: price } across all sets."""
+    prices = {}
+    for s in sets_data:
+        set_name = s.get("name", "")
+        if not set_name:
+            continue
+        try:
+            url = f"https://www.pricecharting.com/search-products?type=prices&q={urllib.parse.quote('riftbound ' + set_name)}"
+            data = fetch_json(url, delay=1.0)
+            products = data.get("products") or []
+            for p in products:
+                name = p.get("productName", "") or ""
+                num_match = re.search(r"#(\d+)", name)
+                if not num_match:
+                    continue
+                num = num_match.group(1)
+                price_raw = p.get("price1")
+                if not price_raw:
+                    continue
+                try:
+                    price_val = float(str(price_raw).replace("$", "").replace(",", ""))
+                except (ValueError, TypeError):
+                    continue
+                # Only use non-variant prices (no brackets in name)
+                if "[" not in name:
+                    prices[num] = price_val
+        except Exception:
+            continue
+    return prices
+
+
 def resolve_riftbound_cards(decks: list[dict]) -> list[dict]:
-    """Resolve Riftbound card names via riftcodex API."""
+    """Resolve Riftbound card names via riftcodex API + PriceCharting prices."""
     try:
         sets = fetch_json("https://api.riftcodex.com/sets", delay=0.3)
     except Exception:
         sets = {"items": []}
 
+    sets_items = sets.get("items") or []
     all_cards = {}
-    for s in (sets.get("items") or []):
+    for s in sets_items:
         try:
             d = fetch_json(
                 f"https://api.riftcodex.com/cards?set_id={urllib.parse.quote(s['set_id'])}&limit=200",
@@ -748,23 +786,40 @@ def resolve_riftbound_cards(decks: list[dict]) -> list[dict]:
             )
             for c in (d.get("items") or []):
                 name = (c.get("name") or "").lower()
+                num = str(c.get("collector_number", ""))
                 if name:
+                    # Index by both name and collector_number
                     all_cards[name] = c
+                    if num:
+                        all_cards[f"#{num}"] = c
         except Exception:
             continue
+
+    # Fetch prices from PriceCharting
+    price_map = _fetch_riftbound_prices(sets_items)
 
     for deck in decks:
         resolved = []
         for card in deck["cards"]:
-            info = all_cards.get(card["name"].lower())
+            card_name_lower = card["name"].lower()
+            info = all_cards.get(card_name_lower)
+            # Fallback: try matching by collector number if name fails
+            if not info:
+                num = None
+                # Check if card has a number field
+                if "number" in card:
+                    num = card.get("number", "")
+                if num and all_cards.get(f"#{num}"):
+                    info = all_cards.get(f"#{num}")
             if info:
+                cnum = str(info.get("collector_number", ""))
                 resolved.append({
                     "cardId": info.get("id", ""),
                     "name": info.get("name", card["name"]),
                     "setName": (info.get("set") or {}).get("label", ""),
                     "setCode": (info.get("set") or {}).get("set_id", ""),
-                    "number": str(info.get("collector_number", "")),
-                    "price": None,
+                    "number": cnum,
+                    "price": price_map.get(cnum),
                     "image": (info.get("media") or {}).get("image_url", ""),
                     "quantity": card["quantity"],
                 })
@@ -795,6 +850,9 @@ def scrape_yugioh() -> list[dict]:
         if href in seen:
             continue
         seen.add(href)
+
+        if len(decks) >= 10:
+            break
 
         try:
             deck_url = href if href.startswith("http") else f"https://ygoprodeck.com{href}"
@@ -841,8 +899,6 @@ def scrape_yugioh() -> list[dict]:
                     "cards": cards,
                 })
 
-            if len(decks) >= 3:
-                break
         except Exception:
             continue
 

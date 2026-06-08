@@ -40,12 +40,15 @@
 
     <!-- Deck grid -->
     <div v-else class="deck-grid">
-      <router-link
+      <div
         v-for="deck in filteredDecks"
         :key="deck.id"
-        :to="`/decks/${deck.id}`"
         class="deck-card"
+        @click="router.push(`/decks/${deck.id}`)"
       >
+        <div class="deck-card-delete" @click.stop="deleteDeck(deck)">
+          <span class="delete-icon">✕</span>
+        </div>
         <div class="deck-card-top">
           <div class="deck-card-name">{{ deck.name }}</div>
           <div class="deck-card-meta">
@@ -85,7 +88,7 @@
           />
           <span v-if="deck.cards.length > 5" class="deck-preview-more">+{{ deck.cards.length - 5 }}</span>
         </div>
-      </router-link>
+      </div>
     </div>
 
     <!-- New deck modal -->
@@ -174,6 +177,12 @@ function gameLabel(game) {
   return GAME_LABELS[game] || game
 }
 
+function deleteDeck(deck) {
+  const msg = `Delete "${deck.name}"? This cannot be undone.`
+  if (!confirm(msg)) return
+  deckStore.deleteDeck(deck.id)
+}
+
 function createDeck() {
   if (!newDeckName.value.trim()) return
   const deck = deckStore.createDeck(newDeckName.value.trim(), newDeckGame.value)
@@ -222,12 +231,46 @@ function createDeck() {
   flex-direction: column;
   gap: 12px;
   transition: all 0.2s;
+  cursor: pointer;
+  position: relative;
 }
 .deck-card:hover {
   border-color: var(--accent);
   transform: translateY(-2px);
   box-shadow: 0 8px 24px rgba(0,0,0,0.3);
   text-decoration: none;
+}
+
+.deck-card-delete {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--bg-hover);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.2s, background 0.2s;
+  cursor: pointer;
+  z-index: 2;
+}
+.deck-card:hover .deck-card-delete {
+  opacity: 0.7;
+}
+.deck-card-delete:hover {
+  opacity: 1 !important;
+  background: var(--danger) !important;
+}
+.delete-icon {
+  font-size: 12px;
+  line-height: 1;
+  color: var(--text-secondary);
+}
+.deck-card-delete:hover .delete-icon {
+  color: #fff;
 }
 
 .deck-card-name { font-size: 16px; font-weight: 700; }
