@@ -168,7 +168,7 @@ export function convertRow(row) {
     if (condition) base.condition = condition
   }
 
-  return { portfolioName: pname || category || 'Uncategorized', item: base }
+  return { portfolioName: pname || 'Uncategorized', item: base }
 }
 
 // ── CSV parsing ────────────────────────────────────────────────────────────

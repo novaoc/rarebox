@@ -3,7 +3,7 @@
 // Yu-Gi-Oh! (YGOPRODeck) in parallel.
 // Results are normalised to a common shape so the search UI works for all.
 
-const TIMEOUT = 12000
+const TIMEOUT = 8000
 
 async function fetchJson(url) {
   const res = await fetch(url, {
@@ -252,18 +252,51 @@ async function searchRiftbound(query) {
   return { cards: matches, total: matches.length }
 }
 
+// ── Sealed products: PriceCharting ──────────────────────────────────────────
+
+const PC_BASE = 'https://www.pricecharting.com/search-products'
+
+async function searchSealed(query) {
+  const url = `${PC_BASE}?type=prices&q=${encodeURIComponent(query)}`
+  const d = await fetchJson(url)
+  const products = d.products || []
+  return {
+    cards: products.map(p => ({
+      id: p.id || '',
+      name: `${p.productName || ''} — ${p.consoleName || ''}`,
+      number: '',
+      set: p.consoleName || '',
+      image: p.imageUri || '',
+      price: num(p.price1),
+      rarity: '',
+      game: 'sealed',
+    })),
+    total: products.length,
+  }
+}
+
 // ── Main search ─────────────────────────────────────────────────────────────
 // Searches all TCGs in parallel, merges + sorts by relevance (name match first).
 
-export async function multiSearch(query, { page = 1, pageSize = 20 } = {}) {
-  const searches = [
-    searchPokemon(query, page, pageSize).catch(() => ({ cards: [], total: 0 })),
-    searchMtg(query, page, pageSize).catch(() => ({ cards: [], total: 0 })),
-    searchLorcana(query).catch(() => ({ cards: [], total: 0 })),
-    searchOnePiece(query).catch(() => ({ cards: [], total: 0 })),
-    searchRiftbound(query).catch(() => ({ cards: [], total: 0 })),
-    searchYugioh(query).catch(() => ({ cards: [], total: 0 })),
-  ]
+const ALL_PROVIDERS = {
+  pokemon: (q, p, ps) => searchPokemon(q, p, ps),
+  mtg: (q, p, ps) => searchMtg(q, p, ps),
+  lorcana: (q) => searchLorcana(q),
+  'one-piece': (q) => searchOnePiece(q),
+  riftbound: (q) => searchRiftbound(q),
+  yugioh: (q) => searchYugioh(q),
+}
+
+export async function multiSearch(query, { page = 1, pageSize = 20, category = 'cards', providers } = {}) {
+  if (category === 'sealed') {
+    const result = await searchSealed(query).catch(() => ({ cards: [], total: 0 }))
+    return result
+  }
+
+  const active = providers || Object.keys(ALL_PROVIDERS)
+  const searches = active.map(k =>
+    ALL_PROVIDERS[k](query, page, pageSize).catch(() => ({ cards: [], total: 0 })),
+  )
 
   const results = await Promise.all(searches)
   const allCards = results.flatMap(r => r.cards)
