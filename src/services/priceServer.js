@@ -137,14 +137,24 @@ export async function fetchPrice(query, grade = 'ungraded') {
     throw new Error('server_down')
   }
 
-  // Prefer Pokemon products; fall back to all results
-  let pokemon = products.filter(p =>
-    (p.consoleName || '').toLowerCase().includes('pokemon')
-  )
-  if (!pokemon.length) pokemon = products
-  if (!pokemon.length) throw new Error('no_results')
+  const lq = q.toLowerCase()
+  const isMtg = lq.includes('magic') || lq.includes('mtg')
+  const isOnePiece = lq.includes('one piece') || lq.includes('op0')
+  const isRiftbound = lq.includes('riftbound')
 
-  const product = pokemon[0]
+  // Prefer relevant products; fall back to all results
+  let filtered = products.filter(p => {
+    const consoleName = (p.consoleName || '').toLowerCase()
+    if (isMtg) return consoleName.includes('magic')
+    if (isOnePiece) return consoleName.includes('one piece')
+    if (isRiftbound) return consoleName.includes('riftbound')
+    return consoleName.includes('pokemon')
+  })
+
+  if (!filtered.length) filtered = products
+  if (!filtered.length) throw new Error('no_results')
+
+  const product = filtered[0]
   const price = priceForGrade(product, grade)
   if (!price) throw new Error('no_results')
 
@@ -172,24 +182,33 @@ export async function fetchPrice(query, grade = 'ungraded') {
 export const fetchEbayPrice = fetchPrice
 
 /**
- * Search for sealed Pokemon products.
+ * Search for sealed products.
  * @param {string} query - e.g. "Fusion Strike booster box"
+ * @param {string} game - "pokemon", "magic", "one-piece", or "riftbound"
  */
-export async function searchSealed(query) {
+export async function searchSealed(query, game = 'pokemon') {
   const q = query.trim()
   if (!q) throw new Error('empty_query')
 
-  const cacheKey = `sealed:${q.toLowerCase()}`
+  const cacheKey = `sealed:${game}:${q.toLowerCase()}`
   const cached = cacheGet(cacheKey)
   if (cached) return { results: cached, cached: true }
 
   let products = []
+  let suffix = 'sealed pokemon'
+  if (game === 'magic') suffix = 'magic'
+  else if (game === 'one-piece') suffix = 'one piece'
+  else if (game === 'riftbound') suffix = 'riftbound'
+
+  const searchQuery = `${q} ${suffix}`
+  
   try {
-    products = await searchPC(`${q} sealed pokemon`)
+    products = await searchPC(searchQuery)
+    
     // If query mentions "case", also search without "sealed" to find case listings
     if (q.toLowerCase().includes('case')) {
       try {
-        const caseProducts = await searchPC(`${q} pokemon`)
+        const caseProducts = await searchPC(`${q} ${game.replace('-', ' ')}`)
         // Merge, dedup by slug
         const seen = new Set(products.map(p => p.id))
         for (const p of caseProducts) {
@@ -203,19 +222,29 @@ export async function searchSealed(query) {
   }
 
   const skip = ['sleeve', 'portfolio', 'binder', 'dice', 'coin']
-  const results = products
-    .filter(p => {
-      const name = (p.productName || '').toLowerCase()
-      return !skip.some(s => name.includes(s))
-    })
-    .map(p => ({
-      name: p.productName || '',
-      set: p.consoleName || '',
-      url: p.id ? `${PC_BASE}/game/${p.id}` : '',
-      slug: p.id || '',
-      price: parsePrice(p.price1),
-      image: p.imageUri || '',
-    }))
+  const notSkipped = (p) => !skip.some(s => (p.productName || '').toLowerCase().includes(s))
+  const matchesGame = (p) => {
+    const consoleName = (p.consoleName || '').toLowerCase()
+    if (game === 'magic') return consoleName.includes('magic')
+    if (game === 'one-piece') return consoleName.includes('one piece')
+    if (game === 'riftbound') return consoleName.includes('riftbound')
+    return consoleName.includes('pokemon')
+  }
+
+  // Prefer game-matched results; fall back to skip-only filtering if the
+  // consoleName game filter drops everything (PriceCharting doesn't always
+  // put the game name in consoleName for sealed products).
+  let filtered = products.filter(p => matchesGame(p) && notSkipped(p))
+  if (filtered.length === 0) filtered = products.filter(notSkipped)
+
+  const results = filtered.map(p => ({
+    name: p.productName || '',
+    set: p.consoleName || '',
+    url: p.id ? `${PC_BASE}/game/${p.id}` : '',
+    slug: p.id || '',
+    price: parsePrice(p.price1),
+    image: p.imageUri || '',
+  }))
 
   cacheSet(cacheKey, results)
   return { results, cached: false }
