@@ -1,202 +1,212 @@
 <template>
   <div class="portfolio-view" v-if="portfolio">
-    <!-- Header -->
-    <div class="portfolio-header">
-      <div class="portfolio-title-row">
-        <span class="portfolio-dot-lg" :style="{ background: portfolio.color }"></span>
-        <div>
-          <h2 class="portfolio-name" v-if="!editingName" @click="startEditName">
-            {{ portfolio.name }}
-            <span class="edit-icon text-muted" style="font-size:13px;margin-left:6px">✎</span>
-          </h2>
-          <div v-else class="name-edit-row">
-            <input v-model="editName" class="input name-input" @keyup.enter="saveName" @keyup.escape="editingName = false" ref="nameInputRef" />
-            <button class="btn btn-primary btn-sm" @click="saveName">Save</button>
-            <button class="btn btn-ghost btn-sm" @click="editingName = false">Cancel</button>
-          </div>
-          <div class="portfolio-meta text-muted">{{ portfolio.items.length }} items · Created {{ formatDate(portfolio.createdAt) }}</div>
-        </div>
-      </div>
-      <div class="portfolio-header-actions">
-        <router-link to="/search" class="btn btn-primary btn-sm">+ Add Card</router-link>
-        <button class="btn btn-secondary btn-sm" @click="showAddSealed = true">+ Sealed</button>
-        <button class="btn btn-secondary btn-sm" @click="showBulkImport = true">↑ Import</button>
-        <button class="btn btn-secondary btn-sm" :disabled="refreshing" @click="refreshPrices">
-          <span v-if="refreshing" class="spinner spinner-sm"></span>
-          <span v-else>↻ Prices</span>
-        </button>
-        <span v-if="refreshStatus" class="text-muted" style="font-size:12px;align-self:center">{{ refreshStatus }}</span>
-        <button class="btn btn-secondary btn-sm" @click="exportPortfolio">↓ Export</button>
-        <button class="btn btn-danger btn-sm" @click="confirmDelete = true">Delete</button>
-      </div>
-    </div>
-
-    <!-- Stats -->
-    <div class="stats-row">
-      <div class="stat-tile">
-        <div class="label">Total Value</div>
-        <div class="value text-accent">${{ stats.totalValue.toFixed(2) }}</div>
-        <div class="sub">{{ stats.itemCount }} items</div>
-      </div>
-      <div class="stat-tile">
-        <div class="label">Cost Basis</div>
-        <div class="value">${{ stats.totalCost.toFixed(2) }}</div>
-      </div>
-      <div class="stat-tile">
-        <div class="label">Total Gain/Loss</div>
-        <div class="value" :class="stats.gain >= 0 ? 'text-success' : 'text-danger'">
-          {{ stats.gain >= 0 ? '+' : '' }}${{ Math.abs(stats.gain).toFixed(2) }}
-        </div>
-        <div class="sub" :class="stats.gainPct >= 0 ? 'text-success' : 'text-danger'">
-          {{ stats.gainPct >= 0 ? '+' : '' }}{{ stats.gainPct.toFixed(1) }}%
-        </div>
-      </div>
-      <div class="stat-tile" v-if="stats.topGainer">
-        <div class="label">Top Gainer</div>
-        <div class="value" style="font-size:16px">{{ stats.topGainer.item.cardData?.name || stats.topGainer.item.name }}</div>
-        <div class="sub text-success">+{{ stats.topGainer.gain.toFixed(1) }}%</div>
-      </div>
-    </div>
-
-    <!-- Portfolio chart -->
-    <div class="card mb-4">
-      <div class="section-header">
-        <div>
-          <div class="section-title">Portfolio Value</div>
-          <div class="section-subtitle">Historical value over time</div>
-        </div>
-      </div>
-      <PortfolioChart :portfolios="[portfolio]" :height="280" :label="portfolio.name" />
-    </div>
-
-    <!-- Items table -->
-    <div class="card">
-      <div class="section-header">
-        <div>
-          <div class="section-title">Items</div>
-          <div class="section-subtitle">{{ filteredItems.length }} of {{ portfolio.items.length }}</div>
-        </div>
-        <div class="flex gap-2">
-          <div class="filter-tabs">
-            <button
-              v-for="f in filters"
-              :key="f.value"
-              class="filter-tab"
-              :class="{ active: activeFilter === f.value }"
-              @click="activeFilter = f.value"
-            >{{ f.label }} <span class="filter-count">{{ filterCount(f.value) }}</span></button>
-          </div>
-          <div class="search-mini-wrap">
-            <input v-model="itemSearch" class="input input-sm" placeholder="Filter items..." />
+    <PullToRefresh :refreshing="refreshing" @refresh="refreshPrices" aria-label="Pull to refresh">
+      <!-- Header -->
+      <div class="portfolio-header">
+        <div class="portfolio-title-row">
+          <span class="portfolio-dot-lg" :style="{ background: portfolio.color }"></span>
+          <div>
+            <h2 class="portfolio-name" v-if="!editingName" @click="startEditName">
+              {{ portfolio.name }}
+              <span class="edit-icon text-muted" style="font-size:13px;margin-left:6px">✎</span>
+            </h2>
+            <div v-else class="name-edit-row">
+              <input v-model="editName" class="input name-input" @keyup.enter="saveName" @keyup.escape="editingName = false" ref="nameInputRef" />
+              <button class="btn btn-primary btn-sm" @click="saveName">Save</button>
+              <button class="btn btn-ghost btn-sm" @click="editingName = false">Cancel</button>
+            </div>
+            <div class="portfolio-meta text-muted">{{ portfolio.items.length }} items · Created {{ formatDate(portfolio.createdAt) }}</div>
           </div>
         </div>
+        <div class="portfolio-header-actions">
+          <router-link to="/search" class="btn btn-primary btn-sm">+ Add Card</router-link>
+          <button class="btn btn-secondary btn-sm" @click="showAddSealed = true">+ Sealed</button>
+          <button class="btn btn-secondary btn-sm" @click="showBulkImport = true">↑ Import</button>
+          <button class="btn btn-secondary btn-sm" :disabled="refreshing" @click="refreshPrices">
+            <span v-if="refreshing" class="spinner spinner-sm"></span>
+            <span v-else>↻ Prices</span>
+          </button>
+          <span v-if="refreshStatus" class="text-muted" style="font-size:12px;align-self:center">{{ refreshStatus }}</span>
+          <button class="btn btn-secondary btn-sm" @click="exportPortfolio">↓ Export</button>
+          <button class="btn btn-danger btn-sm" @click="confirmDelete = true">Delete</button>
+        </div>
       </div>
 
-      <div v-if="filteredItems.length === 0" class="empty-state">
-        <div class="icon">📭</div>
-        <h3>No items here</h3>
-        <p>Add cards, sealed products, or graded slabs to this portfolio</p>
-        <router-link to="/search" class="btn btn-primary mt-3">Search Cards</router-link>
+      <!-- Stats -->
+      <div class="stats-row">
+        <div class="stat-tile" :class="{ 'shimmer-active': refreshing }">
+          <div class="label">Total Value</div>
+          <div class="value text-accent" :class="{ 'shimmer': refreshing }">
+            <template v-if="!refreshing">${{ stats.totalValue.toFixed(2) }}</template>
+            <template v-else>&nbsp;</template>
+          </div>
+          <div class="sub">{{ stats.itemCount }} items</div>
+        </div>
+        <div class="stat-tile" :class="{ 'shimmer-active': refreshing }">
+          <div class="label">Cost Basis</div>
+          <div class="value" :class="{ 'shimmer': refreshing }">
+            <template v-if="!refreshing">${{ stats.totalCost.toFixed(2) }}</template>
+            <template v-else>&nbsp;</template>
+          </div>
+        </div>
+        <div class="stat-tile" :class="{ 'shimmer-active': refreshing }">
+          <div class="label">Total Gain/Loss</div>
+          <div class="value" :class="[stats.gain >= 0 ? 'text-success' : 'text-danger', { 'shimmer': refreshing }]">
+            <template v-if="!refreshing">{{ stats.gain >= 0 ? '+' : '' }}${{ Math.abs(stats.gain).toFixed(2) }}</template>
+            <template v-else>&nbsp;</template>
+          </div>
+          <div class="sub" :class="[stats.gainPct >= 0 ? 'text-success' : 'text-danger', { 'shimmer': refreshing }]">
+            <template v-if="!refreshing">{{ stats.gainPct >= 0 ? '+' : '' }}{{ stats.gainPct.toFixed(1) }}%</template>
+            <template v-else>&nbsp;</template>
+          </div>
+        </div>
+        <div class="stat-tile" v-if="stats.topGainer">
+          <div class="label">Top Gainer</div>
+          <div class="value" style="font-size:16px">{{ stats.topGainer.item.cardData?.name || stats.topGainer.item.name }}</div>
+          <div class="sub text-success">+{{ stats.topGainer.gain.toFixed(1) }}%</div>
+        </div>
       </div>
 
-      <div v-else>
-        <div class="table-wrap">
-        <table class="table">
-          <thead>
-            <tr>
-              <th class="checkbox-col">
-                <div class="checkbox-wrapper">
-                  <input
-                    type="checkbox"
-                    :checked="isAllSelected"
-                    :indeterminate="isPartiallySelected"
-                    @change="toggleSelectAll"
-                    aria-label="Select all items"
-                  />
-                </div>
-              </th>
-              <th>Item</th>
-              <th class="hide-mobile">Type</th>
-              <th>Qty</th>
-              <th>Paid</th>
-              <th>Value</th>
-              <th class="hide-small">Gain/Loss</th>
-              <th class="hide-mobile"></th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr
-              v-for="item in filteredItems"
-              :key="item.id"
-              class="item-row"
-              :class="{ selected: selectedIds.has(item.id) }"
-              @click="selectItem(item)"
-            >
-              <td class="checkbox-col" @click.stop>
-                <div class="checkbox-wrapper">
-                  <input
-                    type="checkbox"
-                    :checked="selectedIds.has(item.id)"
-                    @change="toggleItemSelection(item.id)"
-                    :aria-label="'Select ' + getItemName(item)"
-                  />
-                </div>
-              </td>
-              <td>
-                <div class="item-name-cell">
-                  <img
-                    v-if="item.cardData?.images?.small"
-                    :src="item.cardData.images.small"
-                    class="item-thumb"
-                    loading="lazy"
-                    draggable="false"
-                  />
-                  <img
-                    v-else-if="item.imageUrl"
-                    :src="item.imageUrl"
-                    class="item-thumb item-thumb-sealed"
-                    loading="lazy"
-                    draggable="false"
-                  />
-                  <div class="item-sealed-icon" v-else>📦</div>
-                  <div>
-                    <div class="item-name">{{ getItemName(item) }}</div>
-                    <div class="item-sub">{{ getItemSub(item) }}</div>
+      <!-- Portfolio chart -->
+      <div class="card mb-4">
+        <div class="section-header">
+          <div>
+            <div class="section-title">Portfolio Value</div>
+            <div class="section-subtitle">Historical value over time</div>
+          </div>
+        </div>
+        <PortfolioChart :portfolios="[portfolio]" :height="280" :label="portfolio.name" />
+      </div>
+
+      <!-- Items table -->
+      <div class="card">
+        <div class="section-header">
+          <div>
+            <div class="section-title">Items</div>
+            <div class="section-subtitle">{{ filteredItems.length }} of {{ portfolio.items.length }}</div>
+          </div>
+          <div class="flex gap-2">
+            <div class="filter-tabs">
+              <button
+                v-for="f in filters"
+                :key="f.value"
+                class="filter-tab"
+                :class="{ active: activeFilter === f.value }"
+                @click="activeFilter = f.value"
+              >{{ f.label }} <span class="filter-count">{{ filterCount(f.value) }}</span></button>
+            </div>
+            <div class="search-mini-wrap">
+              <input v-model="itemSearch" class="input input-sm" placeholder="Filter items..." />
+            </div>
+          </div>
+        </div>
+
+        <div v-if="filteredItems.length === 0" class="empty-state">
+          <div class="icon">📭</div>
+          <h3>No items here</h3>
+          <p>Add cards, sealed products, or graded slabs to this portfolio</p>
+          <router-link to="/search" class="btn btn-primary mt-3">Search Cards</router-link>
+        </div>
+
+        <div v-else>
+          <div class="table-wrap">
+          <table class="table">
+            <thead>
+              <tr>
+                <th class="checkbox-col">
+                  <div class="checkbox-wrapper">
+                    <input
+                      type="checkbox"
+                      :checked="isAllSelected"
+                      :indeterminate="isPartiallySelected"
+                      @change="toggleSelectAll"
+                      aria-label="Select all items"
+                    />
                   </div>
-                </div>
-              </td>
-              <td class="hide-mobile">
-                <span class="badge" :class="typeBadgeClass(item.type)">{{ item.type }}</span>
-              </td>
-              <td class="font-mono">{{ item.quantity || 1 }}</td>
-              <td class="font-mono">${{ ((item.purchasePrice || 0) * (item.quantity || 1)).toFixed(2) }}</td>
-              <td class="font-mono">
-                <span class="text-accent">${{ (getCurrentValue(item) * (item.quantity || 1)).toFixed(2) }}</span>
-              </td>
-              <td class="hide-small">
-                <div class="gain-cell">
-                  <span :class="getGain(item) >= 0 ? 'text-success' : 'text-danger'">
-                    {{ getGain(item) >= 0 ? '+' : '' }}${{ Math.abs(getGain(item)).toFixed(2) }}
-                  </span>
-                  <span class="gain-pct text-muted">({{ getGainPct(item) >= 0 ? '+' : '' }}{{ getGainPct(item).toFixed(1) }}%)</span>
-                </div>
-              </td>
-              <td class="hide-mobile">
-                <div class="actions flex gap-2">
-                  <button class="btn btn-ghost btn-icon btn-sm" @click.stop="editItem(item)" aria-label="Edit item">
-                    <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-pencil"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
-                  </button>
-                  <button class="btn btn-ghost btn-icon btn-sm" @click.stop="removeItem(item)" aria-label="Remove item" style="color:var(--danger)">
-                    <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-x"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
-                  </button>
-                </div>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-        </div><!-- end table-wrap -->
+                </th>
+                <th>Item</th>
+                <th class="hide-mobile">Type</th>
+                <th>Qty</th>
+                <th>Paid</th>
+                <th>Value</th>
+                <th class="hide-small">Gain/Loss</th>
+                <th class="hide-mobile"></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                v-for="item in filteredItems"
+                :key="item.id"
+                class="item-row"
+                :class="{ selected: selectedIds.has(item.id) }"
+                @click="selectItem(item)"
+              >
+                <td class="checkbox-col" @click.stop>
+                  <div class="checkbox-wrapper">
+                    <input
+                      type="checkbox"
+                      :checked="selectedIds.has(item.id)"
+                      @change="toggleItemSelection(item.id)"
+                      :aria-label="'Select ' + getItemName(item)"
+                    />
+                  </div>
+                </td>
+                <td>
+                  <div class="item-name-cell">
+                    <img
+                      v-if="item.cardData?.images?.small"
+                      :src="item.cardData.images.small"
+                      class="item-thumb"
+                      loading="lazy"
+                      draggable="false"
+                    />
+                    <img
+                      v-else-if="item.imageUrl"
+                      :src="item.imageUrl"
+                      class="item-thumb item-thumb-sealed"
+                      loading="lazy"
+                      draggable="false"
+                    />
+                    <div class="item-sealed-icon" v-else>📦</div>
+                    <div>
+                      <div class="item-name">{{ getItemName(item) }}</div>
+                      <div class="item-sub">{{ getItemSub(item) }}</div>
+                    </div>
+                  </div>
+                </td>
+                <td class="hide-mobile">
+                  <span class="badge" :class="typeBadgeClass(item.type)">{{ item.type }}</span>
+                </td>
+                <td class="font-mono">{{ item.quantity || 1 }}</td>
+                <td class="font-mono">${{ ((item.purchasePrice || 0) * (item.quantity || 1)).toFixed(2) }}</td>
+                <td class="font-mono">
+                  <span class="text-accent">${{ (getCurrentValue(item) * (item.quantity || 1)).toFixed(2) }}</span>
+                </td>
+                <td class="hide-small">
+                  <div class="gain-cell">
+                    <span :class="getGain(item) >= 0 ? 'text-success' : 'text-danger'">
+                      {{ getGain(item) >= 0 ? '+' : '' }}${{ Math.abs(getGain(item)).toFixed(2) }}
+                    </span>
+                    <span class="gain-pct text-muted">({{ getGainPct(item) >= 0 ? '+' : '' }}{{ getGainPct(item).toFixed(1) }}%)</span>
+                  </div>
+                </td>
+                <td class="hide-mobile">
+                  <div class="actions flex gap-2">
+                    <button class="btn btn-ghost btn-icon btn-sm" @click.stop="editItem(item)" aria-label="Edit item">
+                      <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-pencil"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
+                    </button>
+                    <button class="btn btn-ghost btn-icon btn-sm" @click.stop="removeItem(item)" aria-label="Remove item" style="color:var(--danger)">
+                      <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-x"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+          </div><!-- end table-wrap -->
+        </div>
       </div>
-    </div>
+    </PullToRefresh>
 
     <!-- Bulk Action Bar -->
     <transition name="slide-up">
@@ -410,6 +420,7 @@ import PriceChart from '../components/PriceChart.vue'
 import PortfolioChart from '../components/PortfolioChart.vue'
 import AddItemModal from '../components/AddItemModal.vue'
 import BulkImportModal from '../components/BulkImportModal.vue'
+import PullToRefresh from '../components/PullToRefresh.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -837,6 +848,50 @@ function deletePortfolio() {
 
 .gain-cell { display: flex; flex-direction: column; font-size: 13px; font-variant-numeric: tabular-nums; }
 .gain-pct { font-size: 11px; }
+
+/* Shimmer Loading Effect */
+.shimmer-active {
+  position: relative;
+  overflow: hidden;
+  border-color: var(--border-subtle) !important;
+}
+
+.shimmer {
+  background: var(--bg-hover);
+  border-radius: 4px;
+  position: relative;
+  overflow: hidden;
+  min-height: 24px;
+  width: 80%;
+}
+
+.shimmer::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(245, 166, 35, 0.05),
+    transparent
+  );
+  animation: shimmer 1.5s infinite;
+}
+
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shimmer::after {
+    animation: none;
+    background: rgba(245, 166, 35, 0.02);
+  }
+}
 
 /* Bulk Action Bar */
 .bulk-action-bar {
