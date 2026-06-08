@@ -4,7 +4,10 @@
   https://rarebox.io
 -->
 <template>
-  <div class="app-layout">
+  <!-- Card database loader (first visit only) -->
+  <CardDatabaseLoader v-if="showLoader" @ready="onLoaderReady" />
+
+  <div class="app-layout" v-else>
     <aside class="sidebar" :class="{ open: sidebarOpen }">
       <a href="/" class="sidebar-logo" @click.prevent="hardRefresh">
         <span class="logo-icon">
@@ -157,12 +160,15 @@ import { useRoute, useRouter } from 'vue-router'
 import { usePortfolioStore } from './stores/portfolio'
 import InstallPrompt from './components/InstallPrompt.vue'
 import TourModal from './components/TourModal.vue'
+import CardDatabaseLoader from './components/CardDatabaseLoader.vue'
+import { isCardDatabaseReady } from './services/tcg/cardCache.js'
 
 const store = usePortfolioStore()
 const route = useRoute()
 const router = useRouter()
 
 const sidebarOpen = ref(false)
+const showLoader = ref(false)
 const showNewPortfolioModal = ref(false)
 const newPortfolioName = ref('')
 const newPortfolioColor = ref('#f5a623')
@@ -219,7 +225,19 @@ function createPortfolio() {
   router.push(`/portfolio/${p.id}`)
 }
 
+async function onLoaderReady() {
+  showLoader.value = false
+  await store.init()
+  store.autoSnapshot()
+}
+
 onMounted(async () => {
+  // Show card database loader on first visit
+  if (!isCardDatabaseReady()) {
+    showLoader.value = true
+    return // loader handles everything, app renders when done
+  }
+
   await store.init()
   store.autoSnapshot() // record daily price snapshot for chart history
 })

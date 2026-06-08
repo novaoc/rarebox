@@ -2,6 +2,11 @@
 // Lorcana (Lorcast), One Piece (optcgapi), Riftbound (riftcodex), and
 // Yu-Gi-Oh! (YGOPRODeck) in parallel.
 // Results are normalised to a common shape so the search UI works for all.
+//
+// When the IndexedDB card cache is populated, searches are served from the
+// local database for instant results. Falls back to live APIs otherwise.
+
+import { searchCache, isCardCacheReady } from './cardCache.js'
 
 const TIMEOUT = 8000
 
@@ -288,11 +293,19 @@ const ALL_PROVIDERS = {
 }
 
 export async function multiSearch(query, { page = 1, pageSize = 20, category = 'cards', providers } = {}) {
+  // Sealed products always hit PriceCharting (not in card cache)
   if (category === 'sealed') {
     const result = await searchSealed(query).catch(() => ({ cards: [], total: 0 }))
     return result
   }
 
+  // If the card database is ready, search locally (instant)
+  const cacheReady = await isCardCacheReady()
+  if (cacheReady) {
+    return searchCache(query, { page, pageSize, category })
+  }
+
+  // Fallback: hit live APIs (slow first time, used when cache isn't loaded yet)
   const active = providers || Object.keys(ALL_PROVIDERS)
   const searches = active.map(k =>
     ALL_PROVIDERS[k](query, page, pageSize).catch(() => ({ cards: [], total: 0 })),

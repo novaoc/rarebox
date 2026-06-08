@@ -34,6 +34,37 @@
       </div>
     </div>
 
+    <!-- Card Database -->
+    <div class="settings-section card mb-4">
+      <h3 class="settings-section-title">Card Database</h3>
+      <p class="settings-desc">All TCG card data is cached locally for instant search. Refresh to update prices.</p>
+
+      <template v-for="(count, game) in cardCounts" :key="game">
+        <div v-if="game !== 'total'" class="settings-item">
+          <div>
+            <div class="settings-item-label">{{ gameLabels[game] || game }}</div>
+            <div class="settings-item-sub">{{ count.toLocaleString() }} cards cached</div>
+          </div>
+        </div>
+      </template>
+
+      <div class="settings-item" v-if="cardCounts.total">
+        <div>
+          <div class="settings-item-label" style="font-weight:600">Total</div>
+          <div class="settings-item-sub">{{ cardCounts.total.toLocaleString() }} cards</div>
+        </div>
+        <button class="btn btn-primary btn-sm" @click="refreshCardDb" :disabled="refreshing">
+          {{ refreshing ? 'Refreshing…' : 'Refresh Prices' }}
+        </button>
+      </div>
+
+      <div v-if="refreshStatus" class="settings-item">
+        <div class="settings-item-sub" :style="{ color: refreshError ? 'var(--danger)' : 'var(--success)' }">
+          {{ refreshStatus }}
+        </div>
+      </div>
+    </div>
+
     <!-- Price Data Sources -->
     <div class="settings-section card mb-4">
       <h3 class="settings-section-title">Price Data Sources</h3>
@@ -286,7 +317,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { usePortfolioStore } from '../stores/portfolio'
 import { exportPortfolioToExcel, exportAllPortfolios } from '../utils/excel'
@@ -294,6 +325,8 @@ import { exportBackup, validateBackup, importBackup } from '../utils/backup'
 import { parseCollectrFile } from '../utils/collectrImport'
 import { getActiveAlerts, getTriggeredAlerts, removeAlert, clearTriggeredAlerts, clearAllAlerts } from '../utils/alerts'
 import LocalSyncModal from '../components/LocalSyncModal.vue'
+import { getCardCounts, clearCardCache, saveCardDatabaseReady } from '../services/tcg/cardCache'
+import { refreshPrices } from '../services/tcg/cardPreloader'
 const store = usePortfolioStore()
 const router = useRouter()
 
@@ -311,6 +344,42 @@ const triggeredCount = computed(() => getTriggeredAlerts().length)
 
 function removeAlertById(id) { removeAlert(id) }
 function doClearTriggered() { clearTriggeredAlerts() }
+
+// Card database state
+const cardCounts = ref({})
+const refreshing = ref(false)
+const refreshStatus = ref('')
+const refreshError = ref(false)
+const gameLabels = {
+  pokemon: 'Pokémon',
+  mtg: 'Magic: The Gathering',
+  lorcana: 'Disney Lorcana',
+  'one-piece': 'One Piece',
+  riftbound: 'Riftbound',
+  yugioh: 'Yu-Gi-Oh!',
+}
+
+async function loadCardCounts() {
+  cardCounts.value = await getCardCounts()
+}
+
+async function refreshCardDb() {
+  refreshing.value = true
+  refreshStatus.value = 'Refreshing prices…'
+  refreshError.value = false
+  try {
+    const counts = await refreshPrices()
+    cardCounts.value = await getCardCounts()
+    refreshStatus.value = `Updated! ${counts.total || 0} cards refreshed.`
+  } catch (err) {
+    refreshStatus.value = `Refresh failed: ${err.message}`
+    refreshError.value = true
+  } finally {
+    refreshing.value = false
+  }
+}
+
+onMounted(loadCardCounts)
 
 const totalItems = computed(() => store.portfolios.reduce((s, p) => s + p.items.length, 0))
 
