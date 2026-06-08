@@ -32,6 +32,22 @@
           </div>
         </div>
 
+        <!-- Condition selector for Raw Cards -->
+        <div v-if="itemType === 'card'" class="form-group mt-3">
+          <label class="form-label">Card Condition</label>
+          <div class="condition-chips">
+            <button
+              v-for="c in conditions"
+              :key="c.value"
+              class="condition-chip"
+              :class="{ active: form.condition === c.value }"
+              @click="form.condition = c.value"
+            >
+              {{ c.label }}
+            </button>
+          </div>
+        </div>
+
         <!-- Graded specific -->
         <div v-if="itemType === 'graded'" class="form-row mt-3">
           <div class="form-group">
@@ -200,6 +216,14 @@ const types = [
   { value: 'sealed', label: 'Sealed Product', icon: '📦' },
 ]
 
+const conditions = [
+  { value: 'NM', label: 'NM' },
+  { value: 'LP', label: 'LP' },
+  { value: 'MP', label: 'MP' },
+  { value: 'HP', label: 'HP' },
+  { value: 'DMG', label: 'DMG' },
+]
+
 const gradesByCompany = {
   PSA:   ['10', '9', '8', '7', '6', '5', '4', '3', '2', '1'],
   BGS:   ['10', '9.5', '9', '8.5', '8', '7.5', '7', '6', '5', '4', '3', '2', '1'],
@@ -259,6 +283,7 @@ const form = ref({
   priceVariant: '',
   gradingCompany: 'PSA',
   grade: '10',
+  condition: 'NM',
   purchasePrice: null,
   currentValue: null,
   quantity: 1,
@@ -314,6 +339,7 @@ function submit() {
         subtypes: props.card.subtypes,
       },
       priceVariant: form.value.priceVariant,
+      condition: form.value.condition,
       currentMarketPrice: currentPrice.value,
     }
   } else if (itemType.value === 'graded') {
@@ -389,6 +415,30 @@ watch(() => props.card, () => {
 }
 .type-tab:hover { background: var(--bg-hover); color: var(--text-primary); }
 .type-tab.active { background: var(--accent-dim); color: var(--accent); border-color: var(--accent); }
+
+.condition-chips {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+.condition-chip {
+  flex: 1;
+  padding: 6px 4px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.condition-chip:hover { border-color: var(--text-muted); }
+.condition-chip.active {
+  background: var(--accent);
+  color: white;
+  border-color: var(--accent);
+}
 
 .card-preview {
   display: flex;
