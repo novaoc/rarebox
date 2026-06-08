@@ -259,7 +259,7 @@ const PC_BASE = 'https://www.pricecharting.com/search-products'
 async function searchSealed(query) {
   const url = `${PC_BASE}?type=prices&q=${encodeURIComponent(query)}`
   const d = await fetchJson(url)
-  const products = d.products || []
+  const products = (d.products || []).filter(p => !/#\d/.test(p.productName || ''))
   return {
     cards: products.map(p => ({
       id: p.id || '',

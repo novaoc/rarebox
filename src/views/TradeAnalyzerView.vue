@@ -43,6 +43,12 @@ const GRADES: Record<string, string[]> = {
   SGC: ['10', '9.5', '9', '8', '7', '6', '5', '4', '3', '2', '1'],
 }
 
+// Grading prompt state
+const pendingCard = ref<SearchResult | null>(null)
+const pendingGraded = ref(false)
+const pendingGradeCompany = ref('PSA')
+const pendingGrade = ref('9')
+
 function effectivePrice(card: any): number {
   const base = card.currentMarketPrice ?? card.marketPrice ?? card.purchasePrice ?? 0
   if (!card.graded) return base
@@ -222,6 +228,33 @@ async function doSearch() {
 }
 
 function addCard(card: SearchResult) {
+  // Sealed products don't get graded — add directly
+  if (card.game === 'sealed') {
+    tradeStore.addToSide(activeSide.value, {
+      id: card.id,
+      name: card.name,
+      setName: card.set,
+      number: card.number,
+      imageUrl: card.image,
+      marketPrice: card.price || 0,
+      game: card.game,
+    })
+    searchQuery.value = ''
+    searchResults.value = []
+    return
+  }
+  // Cards: show grading prompt
+  pendingCard.value = card
+  pendingGraded.value = false
+  pendingGradeCompany.value = 'PSA'
+  pendingGrade.value = '9'
+  searchQuery.value = ''
+  searchResults.value = []
+}
+
+function confirmAddCard() {
+  const card = pendingCard.value
+  if (!card) return
   tradeStore.addToSide(activeSide.value, {
     id: card.id,
     name: card.name,
@@ -230,9 +263,15 @@ function addCard(card: SearchResult) {
     imageUrl: card.image,
     marketPrice: card.price || 0,
     game: card.game,
+    graded: pendingGraded.value,
+    gradeCompany: pendingGraded.value ? pendingGradeCompany.value : undefined,
+    grade: pendingGraded.value ? pendingGrade.value : undefined,
   })
-  searchQuery.value = ''
-  searchResults.value = []
+  pendingCard.value = null
+}
+
+function cancelAddCard() {
+  pendingCard.value = null
 }
 
 onMounted(async () => {
@@ -718,6 +757,44 @@ onMounted(async () => {
       </div>
     </transition>
 
+    <!-- Grading prompt modal -->
+    <transition name="fade">
+      <div v-if="pendingCard" class="modal-overlay" @click.self="cancelAddCard">
+        <div class="modal" style="max-width:400px">
+          <div class="modal-header">
+            <h3>Add Card</h3>
+            <button class="btn btn-ghost btn-icon" @click="cancelAddCard">✕</button>
+          </div>
+          <div class="modal-body">
+            <div class="grade-pending-preview">
+              <img v-if="pendingCard.image" :src="pendingCard.image" class="grade-pending-thumb" />
+              <div>
+                <div style="font-weight:500;font-size:14px">{{ pendingCard.name }}</div>
+                <div style="font-size:12px;color:var(--text-muted)">{{ pendingCard.set }} · #{{ pendingCard.number }}</div>
+                <div style="font-size:14px;font-weight:600;margin-top:4px">${{ (pendingCard.price || 0).toFixed(2) }}</div>
+              </div>
+            </div>
+            <label class="grade-toggle" style="margin-top:12px">
+              <input type="checkbox" v-model="pendingGraded" />
+              This card is graded
+            </label>
+            <div v-if="pendingGraded" class="grade-selects" style="margin-top:8px">
+              <select v-model="pendingGradeCompany">
+                <option v-for="c in GRADE_COMPANIES" :key="c" :value="c">{{ c }}</option>
+              </select>
+              <select v-model="pendingGrade">
+                <option v-for="g in GRADES[pendingGradeCompany] || []" :key="g" :value="g">{{ g }}</option>
+              </select>
+            </div>
+          </div>
+          <div class="modal-footer" style="gap:8px">
+            <button class="btn btn-secondary" @click="cancelAddCard">Cancel</button>
+            <button class="btn btn-primary" @click="confirmAddCard">Add to Side {{ activeSide }}</button>
+          </div>
+        </div>
+      </div>
+    </transition>
+
     <!-- Reset button -->
     <div v-if="tradeStore.sideA.items.length > 0 || tradeStore.sideB.items.length > 0" class="mt-4 text-center">
       <button class="btn btn-secondary" @click="tradeStore.resetTrade()">Reset Trade</button>
@@ -1020,6 +1097,24 @@ onMounted(async () => {
   border-radius: var(--radius);
   background: var(--bg-primary);
   color: var(--text-primary);
+}
+
+/* Grade pending preview */
+.grade-pending-preview {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px;
+  background: var(--bg-hover);
+  border-radius: var(--radius);
+  border: 1px solid var(--border-subtle);
+}
+.grade-pending-thumb {
+  width: 48px;
+  height: 68px;
+  border-radius: var(--radius);
+  object-fit: cover;
+  flex-shrink: 0;
 }
 
 /* Search category toggle */
