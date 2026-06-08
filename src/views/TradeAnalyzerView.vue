@@ -1,17 +1,15 @@
-<script setup lang="ts">
+<script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useTradeStore } from '../stores/trade'
-import { useScannerStore } from '../stores/scanner'
-import CameraViewfinder from '../components/scanner/CameraViewfinder.vue'
-import { scanCardFromImage } from '../services/scanPipeline'
-import { imageElementToImageData } from '../services/ocrWorker'
+import { multiSearch } from '../services/tcg/multiSearch'
 
 const tradeStore = useTradeStore()
-const scannerStore = useScannerStore()
 
-const activeSide = ref<'A' | 'B'>('A')
-
-// ─── Computed ─────────────────────────────────────────────────────────────────
+const activeSide = ref('A')
+const searchQuery = ref('')
+const searchResults = ref([])
+const searchBusy = ref(false)
+let searchTimer = null
 
 const deltaFormatted = computed(() => {
   const delta = tradeStore.priceDelta
@@ -22,108 +20,81 @@ const deltaFormatted = computed(() => {
 })
 
 const deltaClass = computed(() => {
-  const delta = tradeStore.priceDelta
-  if (delta > 0.01) return 'text-rb-success'
-  if (delta < -0.01) return 'text-rb-danger'
+  const d = tradeStore.priceDelta
+  if (d > 0.01) return 'text-rb-success'
+  if (d < -0.01) return 'text-rb-danger'
   return 'text-rb-accent'
 })
 
 const deltaBgClass = computed(() => {
-  const delta = tradeStore.priceDelta
-  if (delta > 0.01) return 'bg-rb-success-dim'
-  if (delta < -0.01) return 'bg-rb-danger-dim'
+  const d = tradeStore.priceDelta
+  if (d > 0.01) return 'bg-rb-success-dim'
+  if (d < -0.01) return 'bg-rb-danger-dim'
   return 'bg-rb-accent-dim'
 })
 
 const deltaLabel = computed(() => {
-  const delta = tradeStore.priceDelta
-  if (delta > 0.01) return 'You\'re winning'
-  if (delta < -0.01) return 'You\'re losing'
+  const d = tradeStore.priceDelta
+  if (d > 0.01) return "You're winning"
+  if (d < -0.01) return "You're losing"
   return 'Even trade'
 })
 
-// ─── Actions ──────────────────────────────────────────────────────────────────
-
-function openScanner(side: 'A' | 'B') {
-  activeSide.value = side
-  scannerStore.openCamera()
+function onSearchInput() {
+  clearTimeout(searchTimer)
+  const q = searchQuery.value.trim()
+  if (q.length < 2) { searchResults.value = []; return }
+  searchTimer = setTimeout(doSearch, 300)
 }
 
-async function onCapture(imageDataUrl: string) {
-  scannerStore.isProcessing = true
-  
+async function doSearch() {
+  const q = searchQuery.value.trim()
+  if (q.length < 2) return
+  searchBusy.value = true
   try {
-    // 1. Create temporary image to convert to ImageData
-    const img = new Image()
-    const imageData = await new Promise<ImageData>((resolve, reject) => {
-      img.onload = () => resolve(imageElementToImageData(img))
-      img.onerror = reject
-      img.src = imageDataUrl
-    })
-
-    // 2. Run through identification pipeline
-    const result = await scanCardFromImage(imageData)
-    
-    if (result.success && result.card) {
-      // 3. Map to Trade Card format
-      const card = {
-        id: result.card.id,
-        name: result.card.name,
-        setName: result.card.set.name,
-        number: result.card.number,
-        imageUrl: result.card.images.small,
-        marketPrice: result.card.prices?.market || 0
-      }
-      
-      tradeStore.addToSide(activeSide.value, card)
-      scannerStore.addScanResult(result)
-      scannerStore.closeCamera()
-    } else {
-      alert(result.status || 'Could not identify card. Please try again with better lighting.')
-    }
-  } catch (err) {
-    console.error('Scan failed:', err)
-    alert('An error occurred during scanning.')
+    const res = await multiSearch(q, { page: 1, pageSize: 20 })
+    searchResults.value = res.cards || []
+  } catch {
+    searchResults.value = []
   } finally {
-    scannerStore.isProcessing = false
+    searchBusy.value = false
   }
 }
 
-onMounted(() => {
-  // Ensure trade store is initialized for IDB persistence
-  // In a real app, this would be handled by a global init
+function openSearch(side) {
+  activeSide.value = side
+  searchQuery.value = ''
+  searchResults.value = []
+}
+
+function addCard(card) {
+  tradeStore.addToSide(activeSide.value, {
+    id: card.id,
+    name: card.name,
+    setName: card.set,
+    number: card.number,
+    imageUrl: card.image,
+    marketPrice: card.price || 0,
+    game: card.game,
+  })
+  searchQuery.value = ''
+  searchResults.value = []
+}
+
+onMounted(async () => {
+  if (!tradeStore.initialized) await tradeStore.init()
 })
 </script>
 
 <template>
-  <!-- Full-screen scanner overlay -->
-  <Teleport to="body">
-    <Transition name="scanner">
-      <div
-        v-if="scannerStore.isCameraOpen"
-        class="fixed inset-0 z-50 bg-black"
-      >
-        <div v-if="scannerStore.isProcessing" class="absolute inset-0 z-[60] flex flex-col items-center justify-center bg-black/60 backdrop-blur-sm">
-          <div class="spinner-lg mb-4"></div>
-          <p class="text-white font-medium">Identifying card...</p>
-        </div>
-        
-        <CameraViewfinder
-          @capture="onCapture"
-          @close="scannerStore.closeCamera"
-        />
-      </div>
-    </Transition>
-  </Teleport>
-
   <div class="min-h-screen bg-rb-bg">
     <!-- Header -->
     <div class="sticky top-0 z-40 bg-rb-surface border-b border-rb-border px-4 py-3">
       <div class="max-w-5xl mx-auto flex items-center justify-between">
         <div class="flex items-center gap-3">
           <router-link
-            to="/"
-            aria-label="Back to dashboard"
+            to="/trade"
+            aria-label="Back to trade landing"
             class="flex items-center justify-center w-9 h-9 rounded-lg hover:bg-rb-hover transition-colors text-rb-text-secondary"
           >
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -133,7 +104,6 @@ onMounted(() => {
           <h1 class="text-lg font-semibold text-rb-text">Trade Analyzer</h1>
         </div>
 
-        <!-- Delta badge -->
         <div
           class="flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-bold"
           :class="[deltaBgClass, deltaClass]"
@@ -179,7 +149,6 @@ onMounted(() => {
         <!-- Side A: My Cards -->
         <div class="flex-1 min-w-0">
           <div class="bg-rb-card rounded-xl border border-rb-border overflow-hidden">
-            <!-- Side A header -->
             <div class="flex items-center justify-between px-4 py-3 border-b border-rb-border">
               <div class="flex items-center gap-2">
                 <span class="text-xs font-bold uppercase tracking-wider text-rb-accent">Side A</span>
@@ -208,11 +177,11 @@ onMounted(() => {
               >
                 <div class="text-3xl mb-2">📦</div>
                 <p class="text-rb-text-secondary text-sm">No cards added</p>
-                <p class="text-rb-text-muted text-xs mt-1">Tap scan to add cards</p>
+                <p class="text-rb-text-muted text-xs mt-1">Search below to add cards</p>
               </div>
               <div
-                v-for="(card, index) in tradeStore.sideA.items"
-                :key="card.id"
+                v-for="card in tradeStore.sideA.items"
+                :key="card.tradeId"
                 class="flex items-center gap-3 px-4 py-3 hover:bg-rb-hover transition-colors"
               >
                 <img
@@ -229,9 +198,8 @@ onMounted(() => {
                   <p class="text-sm font-semibold text-rb-text">${{ card.marketPrice.toFixed(2) }}</p>
                 </div>
                 <button
-                  :aria-label="\`Remove \${card.name} from Side A\`"
                   class="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded text-rb-text-muted hover:text-rb-danger hover:bg-rb-danger-dim transition-colors"
-                  @click="tradeStore.removeFromSide('A', card.id)"
+                  @click="tradeStore.removeFromSide('A', card.tradeId)"
                 >
                   <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
@@ -240,24 +208,46 @@ onMounted(() => {
               </div>
             </div>
 
-            <!-- Scan button -->
-            <div class="px-4 py-3 border-t border-rb-border">
+            <!-- Search bar (shown only when Side A is active) -->
+            <div class="px-4 py-3 border-t border-rb-border" v-if="activeSide === 'A'">
+              <input
+                v-model="searchQuery"
+                @input="onSearchInput"
+                placeholder="Search cards to add to Side A..."
+                class="input w-full"
+              />
+              <div v-if="searchBusy" class="mt-2 text-xs text-rb-text-muted">Searching...</div>
+              <div v-if="searchResults.length > 0" class="mt-2 max-h-48 overflow-y-auto divide-y divide-rb-border rounded-lg border border-rb-border">
+                <div
+                  v-for="card in searchResults"
+                  :key="card.id"
+                  class="flex items-center gap-2 px-3 py-2 hover:bg-rb-hover cursor-pointer transition-colors"
+                  @click="addCard(card)"
+                >
+                  <img :src="card.image" class="w-7 h-10 rounded object-cover flex-shrink-0" />
+                  <div class="flex-1 min-w-0">
+                    <p class="text-xs font-medium text-rb-text truncate">{{ card.name }}</p>
+                    <p class="text-[10px] text-rb-text-muted">{{ card.set }} · #{{ card.number }}</p>
+                  </div>
+                  <span class="text-xs font-semibold text-rb-text">${{ (card.price || 0).toFixed(2) }}</span>
+                </div>
+              </div>
+            </div>
+            <div v-else class="px-4 py-3 border-t border-rb-border">
               <button
-                aria-label="Scan a card to add to Side A"
-                class="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg bg-rb-accent/10 text-rb-accent font-medium text-sm hover:bg-rb-accent/20 transition-colors min-h-[44px]"
-                @click="openScanner('A')"
+                class="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg bg-rb-accent/10 text-rb-accent font-medium text-sm hover:bg-rb-accent/20 transition-colors"
+                @click="openSearch('A')"
               >
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>
                 </svg>
-                Scan Card
+                Add Cards to Side A
               </button>
             </div>
           </div>
         </div>
 
-        <!-- Divider (desktop) -->
+        <!-- Divider -->
         <div class="hidden md:flex items-start justify-center pt-16">
           <div class="flex flex-col items-center gap-2">
             <div class="w-px h-8 bg-rb-border" />
@@ -265,7 +255,6 @@ onMounted(() => {
             <div class="w-px h-8 bg-rb-border" />
           </div>
         </div>
-        <!-- Divider (mobile) -->
         <div class="md:hidden flex items-center gap-3 px-4">
           <div class="flex-1 h-px bg-rb-border" />
           <span class="text-xs font-bold text-rb-text-muted">VS</span>
@@ -275,7 +264,6 @@ onMounted(() => {
         <!-- Side B: Their Cards -->
         <div class="flex-1 min-w-0">
           <div class="bg-rb-card rounded-xl border border-rb-border overflow-hidden">
-            <!-- Side B header -->
             <div class="flex items-center justify-between px-4 py-3 border-b border-rb-border">
               <div class="flex items-center gap-2">
                 <span class="text-xs font-bold uppercase tracking-wider text-rb-info">Side B</span>
@@ -304,11 +292,11 @@ onMounted(() => {
               >
                 <div class="text-3xl mb-2">📦</div>
                 <p class="text-rb-text-secondary text-sm">No cards added</p>
-                <p class="text-rb-text-muted text-xs mt-1">Tap scan to add cards</p>
+                <p class="text-rb-text-muted text-xs mt-1">Search below to add cards</p>
               </div>
               <div
-                v-for="(card, index) in tradeStore.sideB.items"
-                :key="card.id"
+                v-for="card in tradeStore.sideB.items"
+                :key="card.tradeId"
                 class="flex items-center gap-3 px-4 py-3 hover:bg-rb-hover transition-colors"
               >
                 <img
@@ -325,9 +313,8 @@ onMounted(() => {
                   <p class="text-sm font-semibold text-rb-text">${{ card.marketPrice.toFixed(2) }}</p>
                 </div>
                 <button
-                  :aria-label="\`Remove \${card.name} from Side B\`"
                   class="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded text-rb-text-muted hover:text-rb-danger hover:bg-rb-danger-dim transition-colors"
-                  @click="tradeStore.removeFromSide('B', card.id)"
+                  @click="tradeStore.removeFromSide('B', card.tradeId)"
                 >
                   <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
@@ -336,31 +323,54 @@ onMounted(() => {
               </div>
             </div>
 
-            <!-- Scan button -->
-            <div class="px-4 py-3 border-t border-rb-border">
+            <!-- Search bar (shown only when Side B is active) -->
+            <div class="px-4 py-3 border-t border-rb-border" v-if="activeSide === 'B'">
+              <input
+                v-model="searchQuery"
+                @input="onSearchInput"
+                placeholder="Search cards to add to Side B..."
+                class="input w-full"
+              />
+              <div v-if="searchBusy" class="mt-2 text-xs text-rb-text-muted">Searching...</div>
+              <div v-if="searchResults.length > 0" class="mt-2 max-h-48 overflow-y-auto divide-y divide-rb-border rounded-lg border border-rb-border">
+                <div
+                  v-for="card in searchResults"
+                  :key="card.id"
+                  class="flex items-center gap-2 px-3 py-2 hover:bg-rb-hover cursor-pointer transition-colors"
+                  @click="addCard(card)"
+                >
+                  <img :src="card.image" class="w-7 h-10 rounded object-cover flex-shrink-0" />
+                  <div class="flex-1 min-w-0">
+                    <p class="text-xs font-medium text-rb-text truncate">{{ card.name }}</p>
+                    <p class="text-[10px] text-rb-text-muted">{{ card.set }} · #{{ card.number }}</p>
+                  </div>
+                  <span class="text-xs font-semibold text-rb-text">${{ (card.price || 0).toFixed(2) }}</span>
+                </div>
+              </div>
+            </div>
+            <div v-else class="px-4 py-3 border-t border-rb-border">
               <button
-                aria-label="Scan a card to add to Side B"
-                class="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg bg-rb-info/10 text-rb-info font-medium text-sm hover:bg-rb-info/20 transition-colors min-h-[44px]"
-                @click="openScanner('B')"
+                class="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg bg-rb-info/10 text-rb-info font-medium text-sm hover:bg-rb-info/20 transition-colors"
+                @click="openSearch('B')"
               >
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>
                 </svg>
-                Scan Card
+                Add Cards to Side B
               </button>
             </div>
           </div>
         </div>
 
       </div>
+
+      <!-- Reset button -->
+      <div v-if="tradeStore.sideA.items.length > 0 || tradeStore.sideB.items.length > 0" class="flex justify-center mt-6">
+        <button class="btn btn-secondary btn-sm" @click="tradeStore.resetTrade()">Reset Trade</button>
+      </div>
     </div>
   </div>
 </template>
 
 <style scoped>
-/* Scanner overlay transitions */
-.scanner-enter-active { transition: opacity 0.2s ease-out; }
-.scanner-leave-active { transition: opacity 0.15s ease-in; }
-.scanner-enter-from, .scanner-leave-to { opacity: 0; }
 </style>

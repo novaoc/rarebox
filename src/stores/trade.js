@@ -96,6 +96,12 @@ export const useTradeStore = defineStore('trade', () => {
     persist()
   }
 
+  function clearSide(side) {
+    if (side === 'A') sideA.value = { items: [], totalValue: 0 }
+    else sideB.value = { items: [], totalValue: 0 }
+    persist()
+  }
+
   function resetTrade() {
     sideA.value = { items: [], totalValue: 0 }
     sideB.value = { items: [], totalValue: 0 }
@@ -111,6 +117,7 @@ export const useTradeStore = defineStore('trade', () => {
     init,
     addToSide,
     removeFromSide,
+    clearSide,
     resetTrade
   }
 })
