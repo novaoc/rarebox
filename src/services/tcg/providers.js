@@ -133,12 +133,65 @@ const lorcana = {
   },
 }
 
-// One Piece: deferred. The only free sources are optcgapi (no CORS + Cloudflare
-// blocks datacenter IPs, so neither browser nor a serverless proxy can reach it)
-// and apitcg.com (requires a registered API key). Wire it up once a key/source
-// is available — the provider just needs getSets()/getSetCards() like the others.
+// ── One Piece: OPTCG API ────────────────────────────────────────────────────
+const OPT = 'https://optcgapi.com/api'
+// The /allSetCards/ endpoint returns ALL cards in one call (~3300 cards).
+// We cache aggressively because the data changes infrequently.
+let _allCards = null
+async function fetchAllOptCards() {
+  if (_allCards) return _allCards
+  const d = await getJson(`${OPT}/allSetCards/`)
+  _allCards = Array.isArray(d) ? d : []
+  return _allCards
+}
 
-const PROVIDERS = { mtg, lorcana }
+const OPT_SET_ORDER = [
+  'OP-01','OP-02','OP-03','OP-04','OP-05','OP-06','OP-07','OP-08','OP-09','OP-10',
+  'OP-11','OP-12','OP-13','OP-15-EB04','OP14-EB04','EB-01','EB-02','EB-03','PRB-01','PRB-02',
+]
+
+const onePiece = {
+  id: 'one-piece',
+  async getSets() {
+    return cached('opt:sets', 3600_000, async (signal) => {
+      const d = await getJson(`${OPT}/allSets/`, { signal })
+      const sets = Array.isArray(d) ? d : []
+      // Count cards per set from the full card list
+      const allCards = await fetchAllOptCards()
+      const counts = {}
+      for (const c of allCards) {
+        const sid = c.set_id
+        counts[sid] = (counts[sid] || 0) + 1
+      }
+      return sets.map((s, i) => ({
+        id: s.set_id,
+        name: s.set_name,
+        code: s.set_id,
+        releaseDate: null, // API doesn't provide dates
+        total: counts[s.set_id] || null,
+        logo: '',
+        _order: OPT_SET_ORDER.indexOf(s.set_id),
+      })).sort((a, b) => (a._order === -1 ? 99 : a._order) - (b._order === -1 ? 99 : b._order))
+    })
+  },
+  async getSetCards(setId, opts) {
+    return cached(`opt:cards:${setId}`, 600_000, async (signal) => {
+      const allCards = await fetchAllOptCards()
+      return allCards
+        .filter(c => c.set_id === setId)
+        .map(c => ({
+          id: c.card_set_id,
+          name: c.card_name,
+          number: c.card_set_id,
+          image: c.card_image || '',
+          price: c.market_price || c.inventory_price || null,
+          rarity: c.rarity || '',
+        }))
+    })
+  },
+}
+
+const PROVIDERS = { mtg, lorcana, 'one-piece': onePiece }
 
 export function getProvider(id) {
   return PROVIDERS[id] || null
@@ -147,9 +200,9 @@ export function getProvider(id) {
 // Registry powering the browse landing page. `available:false` = no open data
 // source yet (shown as "coming soon"). Brand colors drive the logo tiles.
 export const TCGS = [
-  { id: 'pokemon',   name: 'Pokémon',             tagline: 'Cards, sets & live prices', emoji: '⚡', c1: '#ffcb05', c2: '#2a75bb', route: '/sets/pokemon', available: true },
-  { id: 'mtg',       name: 'Magic: The Gathering', tagline: 'Every English set · USD prices', emoji: '🔥', c1: '#f8991c', c2: '#c0202a', route: '/sets/mtg', available: true },
-  { id: 'lorcana',   name: 'Disney Lorcana',       tagline: 'Sets & USD prices', emoji: '✨', c1: '#7b2c9e', c2: '#0f9b8e', route: '/sets/lorcana', available: true },
-  { id: 'one-piece', name: 'One Piece Card Game',  tagline: 'Coming soon — needs a keyed API', emoji: '🏴‍☠️', c1: '#d7263d', c2: '#1b1b3a', route: '', available: false },
-  { id: 'riftbound', name: 'Riftbound (LoL TCG)',  tagline: 'Coming soon', emoji: '🛡️', c1: '#0bc6e3', c2: '#0a2540', route: '', available: false },
+  { id: 'pokemon',   name: 'Pokémon',             tagline: 'Cards, sets & live prices', emoji: '⚡', logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/9/98/Pok%C3%A9mon_Trading_Card_Game_logo.svg/300px-Pok%C3%A9mon_Trading_Card_Game_logo.svg.png', c1: '#ffcb05', c2: '#2a75bb', route: '/sets/pokemon', available: true },
+  { id: 'mtg',       name: 'Magic: The Gathering', tagline: 'Every English set · USD prices', emoji: '🔥', logo: 'https://upload.wikimedia.org/wikipedia/en/thumb/a/aa/Magic_the_gathering-card_back.jpg/250px-Magic_the_gathering-card_back.jpg', c1: '#f8991c', c2: '#c0202a', route: '/sets/mtg', available: true },
+  { id: 'lorcana',   name: 'Disney Lorcana',       tagline: 'Sets & USD prices', emoji: '✨', logo: 'https://lorcana.disney.com/images/lorcana-logo.png', c1: '#7b2c9e', c2: '#0f9b8e', route: '/sets/lorcana', available: true },
+  { id: 'one-piece', name: 'One Piece Card Game',  tagline: '20 sets · 3300+ cards · USD prices', emoji: '🏴‍☠️', logo: 'https://assets.onepiece-cardgame.dev/images/onepiece_logo.png', c1: '#d7263d', c2: '#1b1b3a', route: '/sets/one-piece', available: true },
+  { id: 'riftbound', name: 'Riftbound (LoL TCG)',  tagline: 'Coming soon', emoji: '🛡️', logo: '', c1: '#0bc6e3', c2: '#0a2540', route: '', available: false },
 ]
