@@ -367,6 +367,14 @@ export const usePortfolioStore = defineStore('portfolio', () => {
     return points
   }
 
+  // ── Bulk import (Collectr etc.) ─────────────────────────────────────
+
+  async function importAll(newPortfolios) {
+    portfolios.value = newPortfolios
+    activePortfolioId.value = newPortfolios[0]?.id || null
+    await persistNow()
+  }
+
   // ── Reset ────────────────────────────────────────────────────────────
 
   async function resetAll() {
@@ -436,6 +444,7 @@ export const usePortfolioStore = defineStore('portfolio', () => {
     isPriceStale,
     hasNeverPriced,
     resetAll,
+    importAll,
     cleanupSnapshots,
     autoSnapshot,
   }

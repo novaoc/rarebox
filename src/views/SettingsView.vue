@@ -349,9 +349,7 @@ async function handleCollectrImport(e) {
     const portfolios = await parseCollectrFile(file)
     if (portfolios.length === 0) throw new Error('No portfolios found in file')
     // Import directly into the store
-    store.portfolios = portfolios
-    store.activePortfolioId = portfolios[0].id
-    await store.persistNow()
+    await store.importAll(portfolios)
     router.push('/')
   } catch (err) {
     collectrError.value = err.message || 'Import failed'
