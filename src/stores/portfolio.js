@@ -375,6 +375,203 @@ export const usePortfolioStore = defineStore('portfolio', () => {
     await persistNow()
   }
 
+  /**
+   * Resolve imported items that have no cardId — look up each card by
+   * name + number via the appropriate TCG API, update with images + price.
+   * Runs silently in the background after a Collectr import.
+   */
+  async function resolveImportedItems(onProgress) {
+    let resolved = 0
+
+    // Collect all items that need resolving (no cardId, have cardData)
+    const tasks = []
+    for (const portfolio of portfolios.value) {
+      for (const item of portfolio.items) {
+        if (item.cardId) continue
+        if (!item.cardData?.name || !item.cardData?.number) continue
+        tasks.push({ portfolioId: portfolio.id, item })
+      }
+    }
+
+    if (tasks.length === 0) return 0
+
+    // ── Pokemon EN: pokemontcg.io ────────────────────────────────────
+    const PKM_BASE = 'https://api.pokemontcg.io/v2/cards'
+    const pkmCache = new Map()
+
+    // ── MTG: Scryfall ────────────────────────────────────────────────
+    const SCRY_BASE = 'https://api.scryfall.com/cards/named'
+    const mtgCache = new Map()
+
+    // ── Reverse mapping: JP English set name → tcgdex set ID ─────────
+    const JP_NAME_TO_ID = {}
+    const JP_EN = {
+      PMCG1:'Base Set',PMCG2:'Jungle',PMCG3:'Fossil',
+      neo1:'Neo Genesis',neo2:'Neo Discovery',neo3:'Neo Revelation',neo4:'Neo Destiny',
+      S1:'Sword & Shield',S2:'Rebel Clash',S3:'Darkness Ablaze',
+      S4:'Vivid Voltage',S4a:'Shiny Star V',S5a:'Battle Region',
+      S5I:'Evolving Skies (JP)',S5R:'Fusion Arts',
+      S6:'Silver Tempest (JP)',S6a:'Eevee Heroes',S6H:'Lost Origin (JP)',
+      S7:'Brilliant Stars (JP)',S7R:'Dark Phantasma',S7D:'Paradigm Trigger (JP)',
+      S8:'Fusion Arts',S8a:'25th Anniversary',S8b:'VMAX Climax',
+      S9:'Star Birth',S9a:'Battle Region',
+      S10:'Space Juggler',S10a:'Dark Fantasma',S10b:'Pokémon GO',
+      S10D:'Time Gazer',S10P:'Space Juggler',
+      S11:'Triplet Beat',S11a:'Heat Red Arcana',S12:'Paradigm Trigger',
+      S12a:'VSTAR Universe',
+      SV1:'Scarlet & Violet',SV1a:'Triplet Beat',SV1S:'Scarlet ex',
+      SV1V:'Violet ex',SV2:'Snow Hazard',SV2a:'Clay Burst',
+      SV2D:'Snow Hazard',SV2P:'Clay Burst',
+      SV3:'Ruler of the Black Flame',SV3a:'Raging Surf',
+      SV4:'Ancient Roar',SV4a:'Raging Surf',
+      SV4K:'Ancient Roar',SV4M:'Future Flash',
+      SV5:'Cyber Judge',SV5a:'Wild Force',
+      SV5K:'Wild Force',SV6:'Stellar Miracle',
+      SV7:'Super Electric Breaker',SV7a:'Paradise Dragona',
+      SV8:'Terastal Festival',SV8a:'Terastal Festival ex',
+      SV9:'Battle Partners',SV9a:'Glory of Team Rocket',
+      SV10:'Heat Wave Arena',SV10a:'Glory of Team Rocket',
+      SVK:'Shiny Treasure',SVLN:'Legendary Heartbeat',
+      SVLS:'Stellar Type Starter Set',SV11:'Destined Rivals',
+      SV11B:'Destined Rivals (Leaf)',SV11W:'Destined Rivals (Wind)',
+      M1S:'Mega Symphonia',M3:'Munice Zero',
+    }
+    // Build reverse: lowercase English name → tcgdex ID
+    for (const [id, enName] of Object.entries(JP_EN)) {
+      const key = enName.toLowerCase().replace(/\s*\(.*\)/, '').trim()
+      if (!JP_NAME_TO_ID[key]) JP_NAME_TO_ID[key] = id
+    }
+
+    // tcgdex series prefix from set ID
+    function jpSetToSeries(setId) {
+      if (!setId) return null
+      if (setId.startsWith('SV')) return 'sv'
+      if (setId.startsWith('S') && !setId.startsWith('SV')) return 'swsh'
+      if (setId.startsWith('SM')) return 'sm'
+      if (setId.startsWith('XY')) return 'xy'
+      if (setId.startsWith('B')) return 'bw'
+      if (setId.startsWith('DP')) return 'dp'
+      if (setId.startsWith('EX') || setId.startsWith('e')) return 'ex'
+      if (setId.startsWith('neo')) return 'neo'
+      if (setId.startsWith('PM')) return 'base'
+      return 'sv' // default
+    }
+
+    for (let i = 0; i < tasks.length; i++) {
+      const { portfolioId, item } = tasks[i]
+      if (onProgress) onProgress(i + 1, tasks.length, resolved)
+
+      const game = item.game || 'pokemon'
+      const isJP = item._lang === 'ja' || (item.cardData?.name || '').includes('(JP)')
+
+      try {
+        if (game === 'pokemon' && !isJP) {
+          // ── Pokemon EN via pokemontcg.io ──────────────────────────
+          const name = item.cardData.name.trim()
+          const number = item.cardData.number.replace(/\/.*/, '').replace(/^[A-Z]+/i, '').trim()
+          const q = `name:"${name}" number:${number}`
+
+          if (!pkmCache.has(q)) {
+            const res = await fetch(`${PKM_BASE}?q=${encodeURIComponent(q)}&pageSize=5`)
+            pkmCache.set(q, res.ok ? (await res.json()).data || [] : [])
+          }
+
+          const candidates = pkmCache.get(q) || []
+          const setName = (item.cardData.set?.name || '').toLowerCase()
+          let match = candidates.find(c =>
+            c.set?.name?.toLowerCase() === setName ||
+            c.set?.id?.toLowerCase() === setName.replace(/\s+/g, '')
+          )
+          if (!match && candidates.length > 0) match = candidates[0]
+
+          if (match) {
+            const updates = {
+              cardId: match.id,
+              _lang: null,
+              cardData: {
+                name: match.name,
+                number: match.number,
+                images: match.images || { small: '', large: '' },
+                set: { id: match.set?.id, name: match.set?.name },
+                rarity: match.rarity || item.cardData.rarity,
+              },
+              lastPriceUpdate: new Date().toISOString(),
+            }
+            if (match.tcgplayer?.prices) {
+              const variant = item.priceVariant || 'holofoil'
+              const prices = match.tcgplayer.prices[variant] ||
+                             match.tcgplayer.prices.normal ||
+                             match.tcgplayer.prices['reverse holofoil'] ||
+                             Object.values(match.tcgplayer.prices)[0]
+              if (prices?.market) updates.currentMarketPrice = prices.market
+              else if (prices?.mid) updates.currentMarketPrice = prices.mid
+            }
+            updateItem(portfolioId, item.id, updates)
+            resolved++
+          }
+        } else if (game === 'pokemon' && isJP) {
+          // ── Pokemon JP via tcgdex CDN (no API call — construct URL) ──
+          const setName = (item.cardData.set?.name || '').toLowerCase().replace(/\s*\(jp\)/i, '').trim()
+          const tcgdexId = JP_NAME_TO_ID[setName]
+          const localId = item.cardData.number.replace(/\/.*/, '').trim()
+
+          if (tcgdexId && localId) {
+            const series = jpSetToSeries(tcgdexId)
+            const imgBase = `https://assets.tcgdex.net/ja/${series}/${tcgdexId}/${localId}`
+            const updates = {
+              _lang: 'ja',
+              cardData: {
+                ...item.cardData,
+                images: { small: imgBase + '/low.webp', large: imgBase + '/high.webp' },
+                set: { id: tcgdexId, name: item.cardData.set?.name },
+              },
+              lastPriceUpdate: new Date().toISOString(),
+            }
+            updateItem(portfolioId, item.id, updates)
+            resolved++
+          }
+        } else if (game === 'magic') {
+          // ── MTG via Scryfall ─────────────────────────────────────
+          const name = item.cardData.name.replace(/\s*\(.*\)/i, '').trim()
+          if (!mtgCache.has(name.toLowerCase())) {
+            try {
+              const res = await fetch(`${SCRY_BASE}?exact=${encodeURIComponent(name)}`)
+              mtgCache.set(name.toLowerCase(), res.ok ? await res.json() : null)
+            } catch {
+              mtgCache.set(name.toLowerCase(), null)
+            }
+          }
+
+          const card = mtgCache.get(name.toLowerCase())
+          if (card) {
+            const updates = {
+              cardId: card.id,
+              cardData: {
+                name: card.name,
+                number: card.collector_number || item.cardData.number,
+                images: { small: card.image_uris?.small || '', large: card.image_uris?.large || '' },
+                set: { id: card.set, name: card.set_name },
+                rarity: card.rarity || item.cardData.rarity,
+              },
+              lastPriceUpdate: new Date().toISOString(),
+            }
+            const price = card.prices?.usd || card.prices?.eur || null
+            if (price) updates.currentMarketPrice = parseFloat(price)
+            updateItem(portfolioId, item.id, updates)
+            resolved++
+          }
+        }
+        // Other TCGs (one-piece, lorcana, riftbound, yu-gi-oh) — keep CSV prices, skip API for now
+      } catch {}
+
+      // 80ms delay between requests
+      await new Promise(r => setTimeout(r, 80))
+    }
+
+    if (resolved > 0) persistNow()
+    return resolved
+  }
+
   // ── Reset ────────────────────────────────────────────────────────────
 
   async function resetAll() {
@@ -445,6 +642,7 @@ export const usePortfolioStore = defineStore('portfolio', () => {
     hasNeverPriced,
     resetAll,
     importAll,
+    resolveImportedItems,
     cleanupSnapshots,
     autoSnapshot,
   }

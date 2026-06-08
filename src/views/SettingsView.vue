@@ -350,6 +350,11 @@ async function handleCollectrImport(e) {
     if (portfolios.length === 0) throw new Error('No portfolios found in file')
     // Import directly into the store
     await store.importAll(portfolios)
+    // Resolve card images + prices in background (non-blocking)
+    collectrImportStatus.value = 'resolving cards…'
+    store.resolveImportedItems((done, total) => {
+      collectrImportStatus.value = `resolving ${done}/${total} cards…`
+    }).catch(() => {})
     router.push('/')
   } catch (err) {
     collectrError.value = err.message || 'Import failed'
