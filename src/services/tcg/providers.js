@@ -317,7 +317,7 @@ const yugioh = {
   },
   async getSetCards(setName) {
     return cached(`yugioh:cards:${setName}`, 600_000, async (signal) => {
-      const d = await getJson(`${YGO_API}/cardinfo.php?set=${encodeURIComponent(setName)}`, { signal })
+      const d = await getJson(`${YGO_API}/cardinfo.php?cardset=${encodeURIComponent(setName)}`, { signal })
       const cards = d.data || []
       return cards.map(c => {
         const setInfo = (c.card_sets || []).find(s => s.set_name === setName) || {}
