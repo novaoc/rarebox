@@ -52,7 +52,6 @@
                 <template v-if="set.releaseDate"><span class="set-dot">·</span><span class="set-date">{{ formatDate(set.releaseDate) }}</span></template>
               </div>
             </div>
-            <button class="btn btn-ghost btn-sm set-sealed-btn" @click.stop="startBulkAdd(set)" title="Add entire set to portfolio">📋</button>
             <span class="set-go" aria-hidden="true">→</span>
           </div>
         </div>
@@ -69,6 +68,9 @@
         </div>
         <div class="set-browse-filters">
           <input v-model="cardFilter" class="input input-sm" placeholder="Filter cards..." style="width:160px" />
+          <button class="btn btn-primary btn-sm" @click="startBulkAddFromHeader" :disabled="bulkLoading">
+            {{ bulkLoading ? 'Loading...' : '+ Add Set' }}
+          </button>
         </div>
       </div>
 
@@ -320,6 +322,11 @@ async function startBulkAdd(set) {
   } finally {
     bulkLoading.value = false
   }
+}
+
+function startBulkAddFromHeader() {
+  if (!selectedSet.value) return
+  startBulkAdd(selectedSet.value)
 }
 
 function toggleBulkCard(idx) {
