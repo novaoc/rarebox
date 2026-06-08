@@ -128,6 +128,31 @@
       </div>
     </div>
 
+    <!-- Collectr Import -->
+    <div class="settings-section card mb-4">
+      <h3 class="settings-section-title">Import from Collectr</h3>
+      <p class="settings-desc">Upload a Collectr portfolio export CSV to create portfolios in Rarebox. Maps card types, variants, grades, and sealed products automatically.</p>
+
+      <div class="settings-item">
+        <div>
+          <div class="settings-item-label">Collectr CSV File</div>
+          <div class="settings-item-sub">Export from Collectr → Portfolios → Export as CSV</div>
+        </div>
+        <label class="btn btn-secondary btn-sm backup-import-btn">
+          ↑ Select CSV
+          <input type="file" accept=".csv" @change="handleCollectrImport" hidden />
+        </label>
+      </div>
+
+      <div v-if="collectrImporting" class="settings-item" style="border-bottom:none">
+        <div class="text-secondary" style="font-size:13px">Converting {{ collectrImportStatus }}…</div>
+      </div>
+
+      <div v-if="collectrError" class="settings-item" style="border-bottom:none">
+        <div class="import-result error">{{ collectrError }}</div>
+      </div>
+    </div>
+
     <!-- Price Alerts -->
     <div class="settings-section card mb-4">
       <h3 class="settings-section-title">Price Alerts</h3>
@@ -226,6 +251,7 @@ import { useRouter } from 'vue-router'
 import { usePortfolioStore } from '../stores/portfolio'
 import { exportPortfolioToExcel, exportAllPortfolios } from '../utils/excel'
 import { exportBackup, validateBackup, importBackup } from '../utils/backup'
+import { importCollectrCsv } from '../utils/collectrImport'
 import { getActiveAlerts, getTriggeredAlerts, removeAlert, clearTriggeredAlerts, clearAllAlerts } from '../utils/alerts'
 import LocalSyncModal from '../components/LocalSyncModal.vue'
 const store = usePortfolioStore()
@@ -283,16 +309,19 @@ function exportAll() {
 }
 
 const importResult = ref(null)
+const collectrImporting = ref(false)
+const collectrImportStatus = ref('')
+const collectrError = ref('')
 
 function doExportBackup() {
   exportBackup()
 }
 
-function handleImport(e) {
+async function handleImport(e) {
   const file = e.target.files?.[0]
   if (!file) return
   const reader = new FileReader()
-  reader.onload = () => {
+  reader.onload = async () => {
     try {
       const data = JSON.parse(reader.result)
       const error = validateBackup(data)
@@ -300,13 +329,39 @@ function handleImport(e) {
         importResult.value = { error }
         return
       }
-      importResult.value = importBackup(data)
+      importResult.value = await importBackup(data)
     } catch {
       importResult.value = { error: 'Invalid JSON file' }
     }
   }
   reader.readAsText(file)
-  e.target.value = '' // reset so re-selecting same file works
+  e.target.value = ''
+}
+
+async function handleCollectrImport(e) {
+  const file = e.target.files?.[0]
+  if (!file) return
+  collectrError.value = ''
+  collectrImporting.value = true
+  collectrImportStatus.value = 'reading file'
+
+  const reader = new FileReader()
+  reader.onload = async () => {
+    try {
+      collectrImportStatus.value = 'parsing and converting'
+      await importCollectrCsv(reader.result)
+      // page reloads on success — this line is never reached
+    } catch (err) {
+      collectrError.value = err.message || 'Import failed'
+      collectrImporting.value = false
+    }
+  }
+  reader.onerror = () => {
+    collectrError.value = 'Failed to read file'
+    collectrImporting.value = false
+  }
+  reader.readAsText(file)
+  e.target.value = ''
 }
 </script>
 

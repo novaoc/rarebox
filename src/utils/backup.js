@@ -1,26 +1,28 @@
+import db from '../db'
+import { loadState } from '../db'
+
 const STORAGE_KEYS = {
   portfolios: 'rarebox_portfolios',
   settings: 'rarebox_settings',
   snapshots: 'rarebox_snapshots',
 }
 
-export function exportBackup() {
+export async function exportBackup() {
+  const state = await loadState()
+
   const backup = {
     version: 1,
     exportedAt: new Date().toISOString(),
     app: 'rarebox',
-    data: {},
+    data: {
+      portfolios: state || { portfolios: [], activePortfolioId: null, settings: { currency: 'USD' } },
+    },
   }
 
-  for (const [label, key] of Object.entries(STORAGE_KEYS)) {
-    const raw = localStorage.getItem(key)
-    if (raw) {
-      try { backup.data[label] = JSON.parse(raw) }
-      catch { backup.data[label] = raw }
-    }
+  if (state?.snapshots) {
+    backup.data.snapshots = state.snapshots
   }
 
-  // Include price caches
   const cacheKeys = Object.keys(localStorage).filter(k => k.startsWith('ph_cache_'))
   if (cacheKeys.length > 0) {
     backup.data.priceCache = {}
@@ -60,27 +62,24 @@ export function validateBackup(data) {
 }
 
 /**
- * Restore a backup into localStorage and reload the page.
+ * Restore a backup and reload the page.
  *
- * This replaces ALL rarebox data atomically:
- * - Clears existing portfolios, settings, snapshots, and price caches
- * - Writes the backup data
- * - Reloads so the Pinia store reinitializes cleanly
- *
- * Deleted/changed items are fully reflected because we wipe first,
- * then write only what's in the backup. No stale data survives.
+ * Rarebox now stores state in IndexedDB (Dexie), with localStorage as a
+ * fallback migration path.  This function writes to both, then clears IDB
+ * so that on reload the store's `init()` falls through to the localStorage
+ * data and migrates it back into IDB.
  */
-export function importBackup(data) {
+export async function importBackup(data) {
   const result = { portfolios: 0, snapshots: 0, caches: 0 }
 
-  // 1. Clear all existing rarebox data
+  // 1. Clear localStorage
   for (const key of Object.values(STORAGE_KEYS)) {
     localStorage.removeItem(key)
   }
   const oldCacheKeys = Object.keys(localStorage).filter(k => k.startsWith('ph_cache_'))
   oldCacheKeys.forEach(k => localStorage.removeItem(k))
 
-  // 2. Write backup data
+  // 2. Write to localStorage (migration path for init())
   if (data.data.portfolios) {
     localStorage.setItem(STORAGE_KEYS.portfolios, JSON.stringify(data.data.portfolios))
     result.portfolios = data.data.portfolios.portfolios?.length || 0
@@ -96,7 +95,6 @@ export function importBackup(data) {
     result.snapshots = portfolioIds.reduce((s, id) => s + (data.data.snapshots[id]?.length || 0), 0)
   }
 
-  // Only restore price caches from the backup — don't keep stale ones
   if (data.data.priceCache) {
     for (const [key, val] of Object.entries(data.data.priceCache)) {
       localStorage.setItem(key, typeof val === 'string' ? val : JSON.stringify(val))
@@ -104,8 +102,14 @@ export function importBackup(data) {
     }
   }
 
-  // 3. Reload so the store picks up the restored state cleanly
-  //    Using replace() avoids adding a history entry
+  // 3. Clear IDB app_state so init() picks up localStorage on reload
+  try {
+    await db.state.clear()
+  } catch (e) {
+    console.error('Failed to clear IDB:', e)
+  }
+
+  // 4. Reload
   window.location.replace(window.location.pathname)
 
   return result

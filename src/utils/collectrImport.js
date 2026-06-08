@@ -1,0 +1,222 @@
+const GAME_MAP = {
+  pokemon: 'pokemon',
+  yugioh: 'yu-gi-oh',
+  'magic: the gathering': 'magic',
+  mtg: 'magic',
+  magic: 'magic',
+  'one piece': 'one-piece',
+  lorcana: 'lorcana',
+  riftbound: 'riftbound',
+}
+
+const VARIANCE_MAP = {
+  normal: 'normal',
+  holofoil: 'holofoil',
+  'reverse holo': 'reverseHolofoil',
+  'reverse holofoil': 'reverseHolofoil',
+  'master ball reverse holo': 'reverseHolofoil',
+  'poke ball reverse holo': 'reverseHolofoil',
+}
+
+const GRADE_RE = /^(PSA|BGS|CGC|ACE)\s+(\d+(?:\.\d+)?)/
+
+const COLORS = ['#58a6ff', '#f5a623', '#3fb950', '#da3633', '#a371f7', '#f778ba', '#7ee787', '#d2a8ff']
+
+function normalizeGame(raw) {
+  const c = raw.trim().toLowerCase()
+  for (const [key, val] of Object.entries(GAME_MAP)) {
+    if (c.includes(key)) return val
+  }
+  return null
+}
+
+function isJapanese(productName, setName) {
+  const text = (productName + ' ' + setName).toLowerCase()
+  return text.includes('(jp)')
+}
+
+function parseCost(val) {
+  if (val == null || val === '') return 0
+  const cleaned = String(val).replace(/[$,"]/g, '')
+  const n = parseFloat(cleaned)
+  return Number.isFinite(n) ? Math.round(n * 100) / 100 : 0
+}
+
+function parseGrade(raw) {
+  if (!raw || raw.trim().toLowerCase() === 'ungraded') return [null, null]
+  const m = GRADE_RE.exec(raw.trim())
+  if (m) return [m[1], m[2]]
+  for (const company of ['PSA', 'BGS', 'CGC', 'ACE']) {
+    if (raw.trim().toUpperCase().startsWith(company)) {
+      const rest = raw.trim().slice(company.length).trim()
+      const g = rest.match(/(\d+(?:\.\d+)?)/)
+      return [company, g ? g[1] : '10']
+    }
+  }
+  return [null, null]
+}
+
+function mapVariance(v) {
+  if (!v) return null
+  return VARIANCE_MAP[v.trim().toLowerCase()] || null
+}
+
+function uuid() {
+  return crypto.randomUUID()
+}
+
+export function convertRow(row) {
+  const pname = (row['Portfolio Name'] || '').trim()
+  const category = (row['Category'] || '').trim()
+  const setName = (row['Set'] || '').trim()
+  const productName = (row['Product Name'] || '').trim()
+  const cardNumber = (row['Card Number'] || '').trim()
+  const rarity = (row['Rarity'] || '').trim()
+  const variance = (row['Variance'] || '').trim()
+  const gradeRaw = (row['Grade'] || '').trim()
+  const costStr = (row['Average Cost Paid'] || '').trim()
+  const qtyStr = (row['Quantity'] || '').trim()
+  const dateAdded = (row['Date Added'] || '').trim()
+  const notes = (row['Notes'] || '').trim()
+
+  const game = normalizeGame(category)
+  const isPkmn = game === 'pokemon'
+  const jp = isPkmn && isJapanese(productName, setName)
+  const cost = parseCost(costStr)
+  const quantity = Math.max(1, parseInt(qtyStr, 10) || 1)
+  const hasCardNumber = cardNumber.length > 0
+  const [gradingCompany, grade] = parseGrade(gradeRaw)
+  const now = new Date().toISOString()
+
+  const base = {
+    id: uuid(),
+    quantity,
+    purchasePrice: cost,
+    purchaseDate: dateAdded || null,
+    notes,
+    addedAt: now,
+    lastPriceUpdate: now,
+  }
+
+  if (!isPkmn) base.game = game
+
+  if (!hasCardNumber) {
+    base.type = 'sealed'
+    base.name = productName
+    base.setName = setName
+    base.sealedType = 'booster_box'
+    base.currentValue = null
+    base.pcUrl = ''
+    base.imageUrl = ''
+  } else if (gradingCompany) {
+    base.type = 'graded'
+    base.gradingCompany = gradingCompany
+    base.grade = grade || '10'
+    base.currentValue = null
+    base.cardData = {
+      name: productName,
+      number: cardNumber,
+      set: { name: setName },
+      rarity,
+      images: { small: '', large: '' },
+    }
+    if (isPkmn) base._lang = jp ? 'ja' : null
+  } else {
+    base.type = 'card'
+    base.priceVariant = mapVariance(variance)
+    base.currentMarketPrice = null
+    base.cardData = {
+      name: productName,
+      number: cardNumber,
+      set: { name: setName },
+      rarity,
+      images: { small: '', large: '' },
+    }
+    if (isPkmn) base._lang = jp ? 'ja' : null
+  }
+
+  return { portfolioName: pname || category || 'Uncategorized', item: base }
+}
+
+export function convertCsv(text, onlyPortfolio) {
+  const lines = text.split('\n').filter(l => l.trim())
+  if (lines.length < 2) throw new Error('CSV is empty or has no data rows')
+
+  const header = parseLine(lines[0])
+  const groups = {}
+
+  for (let i = 1; i < lines.length; i++) {
+    const row = parseLine(lines[i])
+    const entry = {}
+    for (let j = 0; j < header.length; j++) {
+      entry[header[j].trim()] = (row[j] || '').trim()
+    }
+
+    const { portfolioName, item } = convertRow(entry)
+    if (onlyPortfolio && portfolioName !== onlyPortfolio) continue
+    if (!groups[portfolioName]) groups[portfolioName] = []
+    groups[portfolioName].push(item)
+  }
+
+  const portfolios = Object.entries(groups).map(([name, items], idx) => ({
+    id: uuid(),
+    name,
+    color: COLORS[idx % COLORS.length],
+    createdAt: new Date().toISOString(),
+    items,
+  }))
+
+  return portfolios
+}
+
+function parseLine(line) {
+  const result = []
+  let current = ''
+  let inQuotes = false
+
+  for (const ch of line) {
+    if (ch === '"') {
+      inQuotes = !inQuotes
+    } else if (ch === ',' && !inQuotes) {
+      result.push(current)
+      current = ''
+    } else {
+      current += ch
+    }
+  }
+  result.push(current)
+
+  return result.map(f => {
+    if (f.startsWith('"') && f.endsWith('"')) return f.slice(1, -1)
+    return f
+  })
+}
+
+const STORAGE_KEYS = {
+  portfolios: 'rarebox_portfolios',
+  settings: 'rarebox_settings',
+  snapshots: 'rarebox_snapshots',
+}
+
+export async function importCollectrCsv(text) {
+  const portfolios = convertCsv(text)
+  if (portfolios.length === 0) throw new Error('No portfolios found in CSV')
+
+  const state = {
+    portfolios,
+    activePortfolioId: portfolios[0].id,
+    settings: { currency: 'USD', defaultPortfolioId: null },
+    snapshots: {},
+  }
+
+  // Write to localStorage (migration path)
+  localStorage.setItem(STORAGE_KEYS.portfolios, JSON.stringify(state))
+  localStorage.setItem(STORAGE_KEYS.settings, JSON.stringify(state.settings))
+  localStorage.removeItem(STORAGE_KEYS.snapshots)
+
+  // Clear IDB so init() falls through to localStorage on reload
+  const { default: db } = await import('../db')
+  try { await db.state.clear() } catch (e) { console.error('IDB clear failed:', e) }
+
+  window.location.replace(window.location.pathname)
+}
