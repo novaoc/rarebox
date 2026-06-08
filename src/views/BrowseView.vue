@@ -48,7 +48,7 @@ const tcgs = TCGS
   display: flex;
   align-items: center;
   gap: 16px;
-  padding: 18px;
+  padding: 20px;
   border-radius: var(--radius-lg);
   background: var(--bg-card);
   border: 1px solid var(--border);
@@ -62,9 +62,9 @@ const tcgs = TCGS
 .tcg-disabled:hover { transform: none; border-color: var(--border); box-shadow: none; }
 
 .tcg-logo {
-  width: 64px;
-  min-width: 64px;
-  height: 64px;
+  width: 80px;
+  min-width: 80px;
+  height: 80px;
   border-radius: 14px;
   display: flex;
   align-items: center;
@@ -73,7 +73,7 @@ const tcgs = TCGS
   box-shadow: inset 0 0 0 1px rgba(255,255,255,0.12);
   overflow: hidden;
 }
-.tcg-logo :deep(svg) { width: 52px; height: 52px; }
+.tcg-logo :deep(svg) { width: 100%; height: 100%; }
 
 .tcg-body { flex: 1; min-width: 0; }
 .tcg-name { font-size: 15px; font-weight: 700; }
