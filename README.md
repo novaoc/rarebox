@@ -153,6 +153,7 @@ getSetCards(id)  -> [{ id, name, number, image, price, rarity }]
 
 ## Releases
 
+- **[v1.1.0](https://github.com/novaoc/rarebox/releases/tag/v1.1.0)** — Multi-TCG Browse & Search: Magic (Scryfall), Lorcana (Lorcast), One Piece (optcgapi) with live prices. Unified search across all TCGs. Graded cards for all TCGs. Brand logos. API caching + abort-on-unmount.
 - **[v1.0.1](https://github.com/novaoc/rarebox/releases/tag/v1.0.1)** — Critical fix: Vue reactive proxies couldn't be serialized to IndexedDB
 - **[v1.0.0](https://github.com/novaoc/rarebox/releases/tag/v1.0.0)** — First release. Full feature set: collections, decks, meta decks, pricing, charts, PWA, SEO, bulk import, backup/transfer, IndexedDB persistence
 
