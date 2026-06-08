@@ -191,10 +191,31 @@ const onePiece = {
   },
 }
 
-// ── Riftbound: riftcodex.com (open API, CORS *) ─────────────────────────────
-// Card data + images from Riot's CDN. No prices — PriceCharting handles that
-// via priceFeedService for portfolio items. Cards paginated at 50/page.
+// ── Riftbound: riftcodex.com + PriceCharting prices ─────────────────────────
+// Card data + images from riftcodex (CORS *). Prices from PriceCharting JSON
+// search — matches by collector number after fetching both sources.
 const RIFTCODEX = 'https://api.riftcodex.com'
+const PC_SEARCH = 'https://www.pricecharting.com/search-products'
+
+// Fetch PriceCharting prices for a Riftbound set. Returns map of "#NNN" → price.
+async function fetchRiftboundPrices(setName, signal) {
+  const q = `riftbound ${setName}`
+  const d = await getJson(`${PC_SEARCH}?type=prices&q=${encodeURIComponent(q)}`, { signal })
+  const products = d.products || []
+  const priceMap = {}
+  for (const p of products) {
+    const name = p.productName || ''
+    const numMatch = name.match(/#(\d+)/)
+    if (numMatch && p.price1) {
+      const n = numMatch[1]
+      const price = typeof p.price1 === 'string'
+        ? parseFloat(p.price1.replace(/[$,]/g, ''))
+        : p.price1
+      if (price > 0) priceMap[n] = price
+    }
+  }
+  return priceMap
+}
 
 const riftbound = {
   id: 'riftbound',
@@ -214,6 +235,7 @@ const riftbound = {
   },
   async getSetCards(setId, opts) {
     return cached(`riftbound:cards:${setId}`, 600_000, async (signal) => {
+      // 1. Fetch all cards from riftcodex (paginated)
       const cards = []
       let page = 1
       let total = Infinity
@@ -222,19 +244,32 @@ const riftbound = {
         const items = d.items || []
         total = d.total || 0
         for (const c of items) {
-          const img = c.media?.image_url || ''
           cards.push({
             id: c.id,
             name: c.name,
             number: String(c.collector_number || ''),
             set: c.set?.label || setId,
-            image: img,
-            price: null, // No prices from riftcodex — PriceCharting handles pricing
+            image: c.media?.image_url || '',
+            price: null,
             rarity: c.classification?.rarity || '',
           })
         }
         page++
       }
+
+      // 2. Fetch PriceCharting prices for this set (one request, cached)
+      const setName = cards[0]?.set || setId
+      const priceMap = await cached(`riftbound:prices:${setId}`, 600_000, async (sig) => {
+        return fetchRiftboundPrices(setName, sig)
+      })
+
+      // 3. Merge prices by collector number
+      for (const card of cards) {
+        if (card.number && priceMap[card.number]) {
+          card.price = priceMap[card.number]
+        }
+      }
+
       return cards
     })
   },

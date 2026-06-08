@@ -133,21 +133,44 @@ async function searchOnePiece(query) {
 }
 
 // ── Riftbound: client-side search from riftcodex.com ─────────────────────────
-// Fetches all cards (paginated), caches in memory, searches client-side.
+// Fetches all cards (paginated), fetches prices from PriceCharting per set,
+// merges prices by collector number, searches client-side.
 let _riftCards = null
+const PC_RIFTBOUND = 'https://www.pricecharting.com/search-products'
+
+async function fetchPCPrices(setName) {
+  try {
+    const d = await fetchJson(`${PC_RIFTBOUND}?type=prices&q=${encodeURIComponent('riftbound ' + setName)}`)
+    const products = d.products || []
+    const map = {}
+    for (const p of products) {
+      const numMatch = (p.productName || '').match(/#(\d+)/)
+      if (numMatch && p.price1) {
+        const price = typeof p.price1 === 'string'
+          ? parseFloat(p.price1.replace(/[$,]/g, ''))
+          : p.price1
+        if (price > 0) map[numMatch[1]] = price
+      }
+    }
+    return map
+  } catch { return {} }
+}
+
 async function getRiftboundCards() {
   if (_riftCards) return _riftCards
   const all = []
   const sets = await fetchJson('https://api.riftcodex.com/sets')
   for (const s of (sets.items || [])) {
+    // Fetch cards from riftcodex
     let page = 1
     let total = Infinity
-    while (all.length < total && page <= 20) {
+    const setCards = []
+    while (setCards.length < total && page <= 20) {
       const d = await fetchJson(`https://api.riftcodex.com/cards?set_id=${encodeURIComponent(s.set_id)}&limit=50&page=${page}`)
       const items = d.items || []
       total = d.total || 0
       for (const c of items) {
-        all.push({
+        setCards.push({
           id: c.id,
           name: c.name,
           number: String(c.collector_number || ''),
@@ -161,6 +184,14 @@ async function getRiftboundCards() {
       }
       page++
     }
+    // Fetch PriceCharting prices for this set (one request)
+    const priceMap = await fetchPCPrices(s.name)
+    for (const card of setCards) {
+      if (card.number && priceMap[card.number]) {
+        card.price = priceMap[card.number]
+      }
+    }
+    all.push(...setCards)
   }
   _riftCards = all
   return all
