@@ -1,7 +1,7 @@
 {
-  "name": "Rarebox — Pokémon Portfolio Tracker",
+  "name": "Rarebox — TCG Portfolio Tracker",
   "short_name": "Rarebox",
-  "description": "Track your Pokémon TCG collection with live prices and portfolio charts.",
+  "description": "Track your TCG collection — Pokémon, Magic, Lorcana, One Piece, and Riftbound. Live prices and portfolio charts.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0d1117",

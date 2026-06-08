@@ -8,7 +8,7 @@
         <div class="hero-content">
           <div class="hero-icon">⬡</div>
           <h1 class="hero-title">Rarebox</h1>
-          <p class="hero-sub">Track your Pokémon TCG collection with live prices, portfolio charts, and deck building tools. Compare meta decks against your collection. Free. Private. Runs in your browser.</p>
+          <p class="hero-sub">Track your TCG collection — Pokémon, Magic, Lorcana, One Piece, and Riftbound — with live prices, portfolio charts, and deck building tools. Free. Private. Runs in your browser.</p>
           <div class="hero-actions">
             <router-link to="/search" class="btn btn-primary btn-lg hero-cta">Get Started</router-link>
             <button class="btn btn-secondary btn-lg" @click="scrollToFeatures">See Features</button>
@@ -30,14 +30,14 @@
             <span class="feature-icon">🃏</span>
             <div>
               <h2>Collection Management</h2>
-              <p class="feature-sub">Add cards, sealed products, and graded slabs to organized portfolios.</p>
+              <p class="feature-sub">Add cards, sealed products, and graded slabs to organized portfolios. Supports Pokémon, Magic, Lorcana, One Piece, and Riftbound.</p>
             </div>
           </div>
           <div class="feature-grid">
             <div class="feature-card">
               <div class="feature-card-icon">🔍</div>
               <h3>Search Any Card</h3>
-              <p>Search across every Pokémon set ever printed. Live results with card images and current TCGPlayer market prices.</p>
+              <p>Search across every set for Pokémon, Magic, Lorcana, One Piece, and Riftbound. Live results with card images and market prices.</p>
             </div>
             <div class="feature-card">
               <div class="feature-card-icon">📦</div>
@@ -70,7 +70,7 @@
             <div class="feature-card">
               <div class="feature-card-icon">📚</div>
               <h3>Browse All Sets</h3>
-              <p>Browse every Pokémon TCG set with logos, card counts, and release dates. Click into any set to see the full card list.</p>
+              <p>Browse every set across 5 TCGs with logos, card counts, and release dates. Click into any set to see the full card list and add cards with one tap.</p>
             </div>
             <div class="feature-card">
               <div class="feature-card-icon">📈</div>
@@ -108,7 +108,7 @@
             <div class="feature-card">
               <div class="feature-card-icon">🃏</div>
               <h3>Meta Decks</h3>
-              <p>Import popular Standard decks with one click — Charizard ex, Gardevoir, Lost Zone, Chien-Pao, and more. Each card's market price is fetched automatically on import.</p>
+              <p>Import popular Standard Pokémon decks with one click — Charizard ex, Gardevoir, Lost Zone, Chien-Pao, and more. Each card's market price is fetched automatically on import.</p>
             </div>
             <div class="feature-card">
               <div class="feature-card-icon">✅</div>
@@ -129,7 +129,7 @@
             <span class="feature-icon">⚡</span>
             <div>
               <h2>Bulk Import</h2>
-              <p class="feature-sub">Add entire decks or collections in seconds.</p>
+              <p class="feature-sub">Import entire decks, sets, or collections in seconds.</p>
             </div>
           </div>
           <div class="feature-single">
@@ -147,7 +147,7 @@
                   <span class="text-muted">added instantly</span>
                 </div>
               </div>
-              <p class="mt-3">Paste a PTCGL or PTCGO deck list. Each card is looked up automatically with current market prices. Preview before importing.</p>
+              <p class="mt-3">Paste a PTCGL or PTCGO deck list, or add entire sets with one click. Each card is looked up automatically with current market prices. Preview before importing.</p>
             </div>
           </div>
         </div>
@@ -158,7 +158,7 @@
             <span class="feature-icon">📱</span>
             <div>
               <h2>Backup & Transfer</h2>
-              <p class="feature-sub">Your data, your devices, your control.</p>
+              <p class="feature-sub">Import from Collectr. Export to Excel. Move between devices. Your data, your control.</p>
             </div>
           </div>
           <div class="feature-grid">
@@ -181,6 +181,11 @@
               <div class="feature-card-icon">📊</div>
               <h3>Excel Export</h3>
               <p>Export individual portfolios or all portfolios to Excel. Summary sheet plus full item details with prices and gain/loss.</p>
+            </div>
+            <div class="feature-card">
+              <div class="feature-card-icon">📥</div>
+              <h3>Import from Collectr</h3>
+              <p>Switching from Collectr? Import your CSV or Excel export and all your portfolios, cards, sealed products, and graded slabs are converted automatically.</p>
             </div>
           </div>
         </div>
@@ -206,7 +211,7 @@
               <span class="privacy-check">✓</span>
               <div>
                 <strong>Direct API Fetches</strong>
-                <p>Price data comes directly from public APIs (pokemontcg.io, PriceCharting) — your browser is the client.</p>
+                <p>Price data comes directly from public APIs (pokemontcg.io, TCGDex, PriceCharting) — your browser is the client.</p>
               </div>
             </div>
             <div class="privacy-item">
