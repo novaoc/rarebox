@@ -404,6 +404,7 @@ import { usePortfolioStore } from '../stores/portfolio'
 import { exportPortfolioToExcel } from '../utils/excel'
 import { getCard, getJapaneseCardDetail, getMarketPrice } from '../services/pokemonApi'
 import { fetchPrice } from '../services/priceServer'
+import { getPrice as getTcgPrice } from '../services/priceFeedService'
 import { checkAlerts, notifyTriggered } from '../utils/alerts'
 import PriceChart from '../components/PriceChart.vue'
 import PortfolioChart from '../components/PortfolioChart.vue'
@@ -553,7 +554,15 @@ function getItemName(item) {
   return item.cardData?.name || '—'
 }
 
+const GAME_LABELS = { magic: 'Magic', 'one-piece': 'One Piece', lorcana: 'Lorcana', riftbound: 'Riftbound' }
+
 function getItemSub(item) {
+  // Non-Pokémon items have no card number/variant — show set + game tag instead.
+  if (item.game && item.game !== 'pokemon') {
+    const label = GAME_LABELS[item.game] || item.game
+    const set = item.type === 'sealed' ? (item.setName || '') : (item.cardData?.set?.name || '')
+    return set ? `${set} · ${label}` : label
+  }
   if (item.type === 'card') return `${item.cardData?.set?.name || ''} #${item.cardData?.number || ''} · ${item.priceVariant || ''}`
   if (item.type === 'graded') return `${item.gradingCompany} ${item.grade} · ${item.cardData?.set?.name || ''}`
   if (item.type === 'sealed') return item.setName || ''
@@ -673,8 +682,11 @@ async function refreshPrices() {
   refreshing.value = true
   refreshStatus.value = ''
 
-  const cardItems = portfolio.value.items.filter(i => i.type === 'card' && i.cardId)
-  const ebayItems = portfolio.value.items.filter(i => i.type === 'graded' || i.type === 'sealed')
+  const isPokemonItem = i => !i.game || i.game === 'pokemon'
+  const cardItems = portfolio.value.items.filter(i => i.type === 'card' && i.cardId && isPokemonItem(i))
+  const ebayItems = portfolio.value.items.filter(i => (i.type === 'graded' || i.type === 'sealed') && isPokemonItem(i))
+  // Non-Pokémon TCG items (cards + sealed) — priced via PriceCharting by name.
+  const otherTcgItems = portfolio.value.items.filter(i => i.game && i.game !== 'pokemon')
   let updated = 0
 
   await Promise.allSettled([
@@ -716,6 +728,17 @@ async function refreshPrices() {
         if (result.image) {
           updates.imageUrl = result.image
         }
+        store.updateItem(portfolio.value.id, item.id, updates)
+        updated++
+      }
+    }),
+    // Non-Pokémon TCGs (Magic, One Piece, …) — PriceCharting by product name
+    ...otherTcgItems.map(async item => {
+      const query = item.name || item.cardData?.name
+      if (!query) return
+      const price = await getTcgPrice(query, item.game)
+      if (price) {
+        const updates = item.type === 'card' ? { currentMarketPrice: price } : { currentValue: price }
         store.updateItem(portfolio.value.id, item.id, updates)
         updated++
       }
