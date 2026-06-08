@@ -9,62 +9,94 @@ export interface ScannedCard {
   image: string
   price: number | null
   game: string
-  confidence: number
 }
 
-export async function scanCard(imageData: string): Promise<ScannedCard | null> {
+export interface ScanResult {
+  card: ScannedCard | null
+  candidates: ScannedCard[]
+  ocrText: string
+  ocrConfidence: number
+}
+
+export async function scanCard(imageData: string): Promise<ScanResult> {
   const ocr = await recognizeCard(imageData)
-  if (!ocr.text || ocr.confidence < 10) return null
-
-  const query = ocr.cardName || ocr.text.slice(0, 80)
-
-  const res = await multiSearch(query, { page: 1, pageSize: 20 })
-  const cards = res.cards || []
-  if (cards.length === 0) return null
-
-  const matched = pickBestMatch(cards, ocr.cardName, ocr.cardNumber)
-  if (!matched) return null
-
-  return {
-    id: matched.id,
-    name: matched.name,
-    setName: matched.set,
-    number: matched.number,
-    image: matched.image,
-    price: matched.price,
-    game: matched.game,
-    confidence: ocr.confidence,
+  const result: ScanResult = {
+    card: null,
+    candidates: [],
+    ocrText: ocr.text,
+    ocrConfidence: ocr.confidence,
   }
+
+  // Try to search with the extracted query
+  let allCards: any[] = []
+  if (ocr.searchQuery) {
+    try {
+      const res = await multiSearch(ocr.searchQuery, { page: 1, pageSize: 15 })
+      allCards = (res.cards || [])
+    } catch {}
+  }
+
+  // If no results from the clean query, try the raw text as a last resort
+  if (allCards.length === 0 && ocr.text.length >= 5) {
+    const rawQuery = ocr.text
+      .replace(/[^a-zA-Z\s]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, 80)
+    if (rawQuery.length >= 5) {
+      try {
+        const res = await multiSearch(rawQuery, { page: 1, pageSize: 10 })
+        allCards = (res.cards || [])
+      } catch {}
+    }
+  }
+
+  result.candidates = allCards as ScannedCard[]
+
+  if (result.candidates.length > 0) {
+    result.card = pickBestMatch(result.candidates, ocr.searchQuery, ocr.cardNumber)
+  }
+
+  return result
 }
 
 function pickBestMatch(
-  cards: any[],
-  cardName: string | null,
+  candidates: ScannedCard[],
+  query: string | null,
   cardNumber: string | null,
-): any {
-  if (!cardNumber && !cardName) return cards[0]
+): ScannedCard {
+  if (!query && !cardNumber) return candidates[0]
 
-  let candidates = cards
+  let filtered = candidates
 
   if (cardNumber) {
     const num = cardNumber.split('/')[0]
-    const exact = candidates.filter(
+    const byNum = filtered.filter(
       (c: any) => String(c.number).split('/')[0] === num || c.number === cardNumber,
     )
-    if (exact.length > 0) candidates = exact
+    if (byNum.length > 0) filtered = byNum
   }
 
-  if (cardName && candidates.length > 1) {
-    const q = cardName.toLowerCase()
-    const exact = candidates.filter(
+  if (query && filtered.length > 1) {
+    const q = query.toLowerCase()
+    // Exact name match
+    const exact = filtered.filter(
       (c: any) => c.name.toLowerCase() === q,
     )
     if (exact.length === 1) return exact[0]
-    const starts = candidates.filter((c: any) =>
+    // Name starts with query
+    const starts = filtered.filter((c: any) =>
       c.name.toLowerCase().startsWith(q),
     )
     if (starts.length === 1) return starts[0]
+    // All words in query appear in name
+    const qWords = q.split(/\s+/)
+    const allMatch = filtered.filter((c: any) =>
+      qWords.every(w => c.name.toLowerCase().includes(w)),
+    )
+    if (allMatch.length === 1) return allMatch[0]
+    if (allMatch.length > 1) filtered = allMatch
   }
 
-  return candidates[0]
+  return filtered[0]
 }

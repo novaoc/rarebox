@@ -19,9 +19,11 @@ const tradeStore = useTradeStore()
 
 const showScanner = ref(false)
 const showSearch = ref<'A' | 'B' | null>(null)
+const showScanResults = ref(false)
 const activeSide = ref<'A' | 'B'>('A')
 const searchQuery = ref('')
 const searchResults = ref<SearchResult[]>([])
+const scanCandidates = ref<SearchResult[]>([])
 const searchBusy = ref(false)
 const scanStatus = ref('')
 let searchTimer: ReturnType<typeof setTimeout> | null = null
@@ -58,25 +60,49 @@ function openSearch(side: 'A' | 'B') {
 }
 
 async function onCapture(imageData: string) {
-  scanStatus.value = 'Reading card…'
+  scanStatus.value = 'Processing…'
   try {
     const result = await scanCard(imageData)
-    if (result) {
-      tradeStore.addToSide(activeSide.value, {
-        id: result.id,
-        name: result.name,
-        setName: result.setName,
-        number: result.number,
-        imageUrl: result.image,
-        marketPrice: result.price || 0,
-        game: result.game,
-      })
+    showScanner.value = false
+    scanStatus.value = ''
+
+    // Auto-add if only one candidate and confidence > 20
+    if (result.candidates.length === 1 && result.ocrConfidence > 20) {
+      addScannedCard(result.candidates[0])
+      return
+    }
+
+    // Show candidates for user to pick (or empty state if none found)
+    if (result.candidates.length > 0) {
+      scanCandidates.value = result.candidates.map((c: any) => ({
+        id: c.id,
+        name: c.name,
+        set: c.setName || c.set || '',
+        number: c.number,
+        image: c.image,
+        price: c.price,
+        game: c.game,
+      })) as SearchResult[]
+      showScanResults.value = true
     }
   } catch {
-    // fall through to empty state
+    showScanner.value = false
+    scanStatus.value = ''
   }
-  scanStatus.value = ''
-  showScanner.value = false
+}
+
+function addScannedCard(card: SearchResult | ScannedCard) {
+  tradeStore.addToSide(activeSide.value, {
+    id: card.id,
+    name: card.name,
+    setName: (card as any).setName || (card as any).set || '',
+    number: card.number,
+    imageUrl: card.image,
+    marketPrice: (card as any).price || 0,
+    game: card.game,
+  })
+  showScanResults.value = false
+  scanCandidates.value = []
 }
 
 function onScannerClose() {
@@ -432,6 +458,43 @@ onMounted(async () => {
 
     </div>
 
+    <!-- Scan results popup -->
+    <transition name="fade">
+      <div v-if="showScanResults" class="modal-overlay">
+        <div class="modal" style="max-width:480px">
+          <div class="modal-header">
+            <h3>Select Card</h3>
+            <button class="btn btn-ghost btn-icon" @click="showScanResults = false">✕</button>
+          </div>
+          <div class="modal-body">
+            <p class="text-secondary" style="font-size:13px;margin-bottom:12px">
+              {{ scanCandidates.length }} card{{ scanCandidates.length > 1 ? 's' : '' }} found. Tap the correct one.
+            </p>
+            <div class="scan-candidate-list">
+              <div
+                v-for="c in scanCandidates"
+                :key="c.id"
+                class="scan-candidate-row"
+                @click="addScannedCard(c)"
+              >
+                <img :src="c.image" class="search-result-thumb" />
+                <div class="search-result-info">
+                  <div class="search-result-name">{{ c.name }}</div>
+                  <div class="search-result-sub">{{ c.set }} &middot; #{{ c.number }}</div>
+                </div>
+                <span class="font-bold font-mono" style="font-size:12px;flex-shrink:0">
+                  ${{ (c.price || 0).toFixed(2) }}
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-secondary" @click="showScanResults = false">Not here</button>
+          </div>
+        </div>
+      </div>
+    </transition>
+
     <!-- Reset button -->
     <div v-if="tradeStore.sideA.items.length > 0 || tradeStore.sideB.items.length > 0" class="mt-4 text-center">
       <button class="btn btn-secondary" @click="tradeStore.resetTrade()">Reset Trade</button>
@@ -614,6 +677,26 @@ onMounted(async () => {
   color: var(--text-muted);
   margin-top: 1px;
 }
+
+.scan-candidate-list {
+  max-height: 320px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-primary);
+}
+
+.scan-candidate-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  cursor: pointer;
+  transition: background 0.15s;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.scan-candidate-row:last-child { border-bottom: none; }
+.scan-candidate-row:hover { background: var(--bg-hover); }
 
 .scan-status-overlay {
   position: absolute;

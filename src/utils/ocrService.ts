@@ -3,48 +3,82 @@ import Tesseract from 'tesseract.js'
 export interface OcrResult {
   text: string
   confidence: number
-  cardName: string | null
+  searchQuery: string | null
   cardNumber: string | null
 }
 
 export async function recognizeCard(imageData: string): Promise<OcrResult> {
-  const { data } = await Tesseract.recognize(imageData, 'eng', {
-    // PSM 6 assumes a uniform block of text (good for card layouts)
-    // PSM 3 is fully automatic — let Tesseract decide
-    // PSM 7 treats image as a single text line
-    // For trading cards, PSM 3 works well.
-  })
+  const { data } = await Tesseract.recognize(
+    imageData,
+    'eng',
+    { logger: () => {} },
+  )
 
-  const text = data.text.trim()
+  const text = data.text || ''
   const confidence = data.confidence
-  const cardName = extractCardName(text)
-  const cardNumber = extractCardNumber(text)
 
-  return { text, confidence, cardName, cardNumber }
+  return {
+    text,
+    confidence,
+    searchQuery: buildQuery(text),
+    cardNumber: extractCardNumber(text),
+  }
 }
 
-function extractCardName(text: string): string | null {
-  const lines = text.split('\n').map(l => l.trim()).filter(Boolean)
-  if (lines.length === 0) return null
+function cleanWord(w: string): string {
+  return w.replace(/^[^a-zA-Z0-9]+|[^a-zA-Z0-9]+$/g, '')
+}
 
-  // Try lines that look like card names (not numbers, not set codes)
-  for (const line of lines) {
-    const stripped = line.replace(/[«»"„“^°]/g, '').trim()
-    if (
-      stripped.length >= 3 &&
-      !/^\d/.test(stripped) &&
-      !/^\d{1,4}\/\d{1,4}$/.test(stripped) &&
-      !/^(energy|trainer|supporter|item|stadium|tool|pokemon)\b/i.test(stripped) &&
-      !/^(hp|type|stage|weakness|retreat)/i.test(stripped) &&
-      !/^[A-Z]{2,5}\s*$/.test(stripped)
-    ) {
-      return stripped
-    }
+function buildQuery(text: string): string | null {
+  const lines = text.split('\n').map(l => l.trim()).filter(Boolean)
+  const words = text.split(/\s+/).map(cleanWord).filter(Boolean)
+
+  // Find lines that contain capitalized words (likely card names)
+  const nameLines = lines.filter(line => {
+    const cleaned = line.replace(/[^a-zA-Z\s]/g, '').trim()
+    const capWords = cleaned.split(/\s+/).filter(w =>
+      /^[A-Z][a-z]/.test(w) && w.length >= 3
+    )
+    return capWords.length >= 1 && cleaned.length >= 4
+  })
+
+  // Score each line: prefer longer, more capitalized words
+  const scored = nameLines.map(line => {
+    const cleaned = line.replace(/[^a-zA-Z\s]/g, '').trim()
+    const capWords = cleaned.split(/\s+/).filter(w =>
+      /^[A-Z]/.test(w) && w.length >= 3
+    )
+    const score = capWords.length * 10 + cleaned.length
+    return { line, score, capWords }
+  })
+
+  scored.sort((a, b) => b.score - a.score)
+
+  if (scored.length > 0) {
+    const best = scored[0]
+    // Take the capitalized words as the query
+    const query = best.capWords.join(' ')
+    if (query.length >= 3) return query
   }
 
-  // Fallback: return the longest line (often the card name is prominent)
-  const longest = lines.reduce((a, b) => a.length >= b.length ? a : b, '')
-  return longest.length >= 3 ? longest.replace(/[«»"„“^°]/g, '').trim() : null
+  // Fallback: remove non-alpha chars, find longest meaningful fragment
+  const fragments = text
+    .split(/[^a-zA-Z\s]/)
+    .map(s => s.trim())
+    .filter(s => {
+      const words = s.split(/\s+/).filter(w => w.length >= 3)
+      return words.length >= 1
+    })
+    .sort((a, b) => b.length - a.length)
+
+  if (fragments.length > 0) {
+    const frag = fragments[0]
+    const meaningful = frag.split(/\s+/).filter(w => /^[A-Z][a-z]/.test(w) && w.length >= 3)
+    if (meaningful.length > 0) return meaningful.join(' ')
+    return frag.slice(0, 60)
+  }
+
+  return null
 }
 
 function extractCardNumber(text: string): string | null {
