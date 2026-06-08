@@ -199,10 +199,16 @@ export function getProvider(id) {
 
 // Registry powering the browse landing page. `available:false` = no open data
 // source yet (shown as "coming soon"). Brand colors drive the logo tiles.
+// Logos are inline SVGs so they never break from external URL issues.
 export const TCGS = [
-  { id: 'pokemon',   name: 'Pokémon',             tagline: 'Cards, sets & live prices', emoji: '⚡', logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/9/98/Pok%C3%A9mon_Trading_Card_Game_logo.svg/300px-Pok%C3%A9mon_Trading_Card_Game_logo.svg.png', c1: '#ffcb05', c2: '#2a75bb', route: '/sets/pokemon', available: true },
-  { id: 'mtg',       name: 'Magic: The Gathering', tagline: 'Every English set · USD prices', emoji: '🔥', logo: 'https://upload.wikimedia.org/wikipedia/en/thumb/a/aa/Magic_the_gathering-card_back.jpg/250px-Magic_the_gathering-card_back.jpg', c1: '#f8991c', c2: '#c0202a', route: '/sets/mtg', available: true },
-  { id: 'lorcana',   name: 'Disney Lorcana',       tagline: 'Sets & USD prices', emoji: '✨', logo: 'https://lorcana.disney.com/images/lorcana-logo.png', c1: '#7b2c9e', c2: '#0f9b8e', route: '/sets/lorcana', available: true },
-  { id: 'one-piece', name: 'One Piece Card Game',  tagline: '20 sets · 3300+ cards · USD prices', emoji: '🏴‍☠️', logo: 'https://assets.onepiece-cardgame.dev/images/onepiece_logo.png', c1: '#d7263d', c2: '#1b1b3a', route: '/sets/one-piece', available: true },
-  { id: 'riftbound', name: 'Riftbound (LoL TCG)',  tagline: 'Coming soon', emoji: '🛡️', logo: '', c1: '#0bc6e3', c2: '#0a2540', route: '', available: false },
+  { id: 'pokemon',   name: 'Pokémon',             tagline: 'Cards, sets & live prices', c1: '#ffcb05', c2: '#2a75bb', route: '/sets/pokemon', available: true,
+    logoSvg: `<svg viewBox="0 0 120 40" xmlns="http://www.w3.org/2000/svg"><text x="60" y="18" text-anchor="middle" fill="#ffcb05" font-family="Arial Black,sans-serif" font-size="11" font-weight="900" stroke="#1a1a2e" stroke-width="0.5">POKÉMON</text><text x="60" y="32" text-anchor="middle" fill="#fff" font-family="Arial,sans-serif" font-size="7" font-weight="700" letter-spacing="3">TRADING CARD GAME</text></svg>` },
+  { id: 'mtg',       name: 'Magic: The Gathering', tagline: 'Every English set · USD prices', c1: '#f8991c', c2: '#c0202a', route: '/sets/mtg', available: true,
+    logoSvg: `<svg viewBox="0 0 120 40" xmlns="http://www.w3.org/2000/svg"><text x="60" y="17" text-anchor="middle" fill="#f8991c" font-family="Georgia,serif" font-size="10" font-weight="700" font-style="italic">Magic</text><text x="60" y="30" text-anchor="middle" fill="#fff" font-family="Georgia,serif" font-size="6.5" letter-spacing="0.5">THE GATHERING</text></svg>` },
+  { id: 'lorcana',   name: 'Disney Lorcana',       tagline: 'Sets & USD prices', c1: '#7b2c9e', c2: '#0f9b8e', route: '/sets/lorcana', available: true,
+    logoSvg: `<svg viewBox="0 0 120 40" xmlns="http://www.w3.org/2000/svg"><text x="60" y="18" text-anchor="middle" fill="#c9a0dc" font-family="Georgia,serif" font-size="11" font-weight="700" font-style="italic">Lorcana</text><text x="60" y="30" text-anchor="middle" fill="#0f9b8e" font-family="Arial,sans-serif" font-size="6" letter-spacing="2">DISNEY</text></svg>` },
+  { id: 'one-piece', name: 'One Piece Card Game',  tagline: '20 sets · 3300+ cards · USD prices', c1: '#d7263d', c2: '#1b1b3a', route: '/sets/one-piece', available: true,
+    logoSvg: `<svg viewBox="0 0 120 40" xmlns="http://www.w3.org/2000/svg"><text x="60" y="17" text-anchor="middle" fill="#d7263d" font-family="Arial Black,sans-serif" font-size="10" font-weight="900">ONE PIECE</text><text x="60" y="30" text-anchor="middle" fill="#fff" font-family="Arial,sans-serif" font-size="6" letter-spacing="1.5">CARD GAME</text></svg>` },
+  { id: 'riftbound', name: 'Riftbound (LoL TCG)',  tagline: 'Coming soon', c1: '#0bc6e3', c2: '#0a2540', route: '', available: false,
+    logoSvg: `<svg viewBox="0 0 120 40" xmlns="http://www.w3.org/2000/svg"><text x="60" y="18" text-anchor="middle" fill="#0bc6e3" font-family="Arial Black,sans-serif" font-size="10" font-weight="900">RIFTBOUND</text><text x="60" y="30" text-anchor="middle" fill="#8899aa" font-family="Arial,sans-serif" font-size="6" letter-spacing="1">LEAGUE OF LEGENDS</text></svg>` },
 ]

@@ -42,7 +42,7 @@
             <div class="set-logo-wrap">
               <img v-if="set.logo" :src="set.logo" :alt="set.name" class="set-logo" loading="lazy" draggable="false"
                    @error="$event.target.style.display='none'" />
-              <span v-else class="set-logo-placeholder">{{ meta?.emoji || '◆' }}</span>
+              <span v-else class="set-logo-placeholder" :class="'set-badge-' + gameId">{{ set.code || meta?.emoji || '◆' }}</span>
             </div>
             <div class="set-info">
               <div class="set-name">{{ set.name }}</div>
@@ -256,6 +256,8 @@ onMounted(loadSets)
 .set-logo-wrap { width: 48px; min-width: 48px; display: flex; align-items: center; justify-content: center; }
 .set-logo { max-width: 48px; max-height: 40px; object-fit: contain; }
 .set-logo-placeholder { font-size: 26px; }
+.set-badge-lorcana { font-size: 11px; font-weight: 700; background: linear-gradient(135deg, #7b2c9e, #0f9b8e); color: #fff; padding: 4px 8px; border-radius: 6px; letter-spacing: 0.5px; }
+.set-badge-one-piece { font-size: 11px; font-weight: 700; background: linear-gradient(135deg, #d7263d, #1b1b3a); color: #fff; padding: 4px 8px; border-radius: 6px; letter-spacing: 0.5px; }
 .set-info { flex: 1; min-width: 0; }
 .set-name { font-size: 13px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .set-meta { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; margin-top: 3px; font-size: 11px; color: var(--text-muted); }

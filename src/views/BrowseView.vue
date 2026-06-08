@@ -15,11 +15,7 @@
         :class="{ 'tcg-disabled': !t.available }"
         :style="{ '--c1': t.c1, '--c2': t.c2 }"
       >
-        <div class="tcg-logo">
-          <img v-if="t.logo" :src="t.logo" :alt="t.name" class="tcg-logo-img" loading="lazy"
-               @error="$event.target.style.display='none'; $event.target.nextElementSibling.style.display='flex'" />
-          <span class="tcg-emoji" :style="t.logo ? 'display:none' : ''">{{ t.emoji }}</span>
-        </div>
+        <div class="tcg-logo" v-html="t.logoSvg"></div>
         <div class="tcg-body">
           <div class="tcg-name">{{ t.name }}</div>
           <div class="tcg-tagline">{{ t.tagline }}</div>
@@ -75,9 +71,9 @@ const tcgs = TCGS
   justify-content: center;
   background: linear-gradient(135deg, var(--c1), var(--c2));
   box-shadow: inset 0 0 0 1px rgba(255,255,255,0.12);
+  overflow: hidden;
 }
-.tcg-emoji { font-size: 30px; line-height: 1; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.4)); }
-.tcg-logo-img { max-width: 48px; max-height: 48px; object-fit: contain; filter: drop-shadow(0 1px 3px rgba(0,0,0,0.5)); }
+.tcg-logo :deep(svg) { width: 52px; height: 52px; }
 
 .tcg-body { flex: 1; min-width: 0; }
 .tcg-name { font-size: 15px; font-weight: 700; }
