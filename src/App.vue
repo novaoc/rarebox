@@ -161,14 +161,15 @@ import { usePortfolioStore } from './stores/portfolio'
 import InstallPrompt from './components/InstallPrompt.vue'
 import TourModal from './components/TourModal.vue'
 import CardDatabaseLoader from './components/CardDatabaseLoader.vue'
-import { isCardDatabaseReady } from './services/tcg/cardCache.js'
+import { isCardDatabaseReady, buildSearchIndex } from './services/tcg/cardCache.js'
+import { preloadSlow } from './services/tcg/cardPreloader.js'
 
 const store = usePortfolioStore()
 const route = useRoute()
 const router = useRouter()
 
 const sidebarOpen = ref(false)
-const showLoader = ref(false)
+const showLoader = ref(!isCardDatabaseReady()) // no flash — correct value from start
 const showNewPortfolioModal = ref(false)
 const newPortfolioName = ref('')
 const newPortfolioColor = ref('#f5a623')
@@ -229,17 +230,27 @@ async function onLoaderReady() {
   showLoader.value = false
   await store.init()
   store.autoSnapshot()
+  // Start background preloading of slow TCGs (Pokemon, MTG, Yu-Gi-Oh)
+  preloadSlow().then(() => {
+    buildSearchIndex() // rebuild index with new data
+    console.log('[Rarebox] Background preload complete')
+  }).catch(() => {})
 }
 
 onMounted(async () => {
-  // Show card database loader on first visit
-  if (!isCardDatabaseReady()) {
-    showLoader.value = true
-    return // loader handles everything, app renders when done
-  }
+  if (!isCardDatabaseReady()) return // loader handles init
+
+  // Returning visitor: build search index from cached IDB data
+  await buildSearchIndex()
 
   await store.init()
-  store.autoSnapshot() // record daily price snapshot for chart history
+  store.autoSnapshot()
+
+  // Background preload slow TCGs if not yet cached
+  preloadSlow().then(() => {
+    buildSearchIndex()
+    console.log('[Rarebox] Background preload complete')
+  }).catch(() => {})
 })
 </script>
 

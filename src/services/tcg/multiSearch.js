@@ -3,10 +3,10 @@
 // Yu-Gi-Oh! (YGOPRODeck) in parallel.
 // Results are normalised to a common shape so the search UI works for all.
 //
-// When the IndexedDB card cache is populated, searches are served from the
-// local database for instant results. Falls back to live APIs otherwise.
+// When the in-memory search index is ready, searches are instant (no network).
+// Falls back to live APIs otherwise.
 
-import { searchCache, isCardCacheReady } from './cardCache.js'
+import { searchCache, isSearchReady } from './cardCache.js'
 
 const TIMEOUT = 8000
 
@@ -299,13 +299,12 @@ export async function multiSearch(query, { page = 1, pageSize = 20, category = '
     return result
   }
 
-  // If the card database is ready, search locally (instant)
-  const cacheReady = await isCardCacheReady()
-  if (cacheReady) {
-    return searchCache(query, { page, pageSize, category })
+  // If the in-memory search index is ready, search instantly (no network)
+  if (isSearchReady()) {
+    return searchCache(query, { page, pageSize })
   }
 
-  // Fallback: hit live APIs (slow first time, used when cache isn't loaded yet)
+  // Fallback: hit live APIs (slow first time, used before preload completes)
   const active = providers || Object.keys(ALL_PROVIDERS)
   const searches = active.map(k =>
     ALL_PROVIDERS[k](query, page, pageSize).catch(() => ({ cards: [], total: 0 })),

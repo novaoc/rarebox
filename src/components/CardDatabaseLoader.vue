@@ -1,6 +1,7 @@
 <!--
-  CardDatabaseLoader — Shows during first-time card database setup.
-  Fetches all TCG card data into IndexedDB for instant local search.
+  CardDatabaseLoader — Brief loading screen for first-time setup.
+  Preloads fast TCGs (One Piece, Lorcana, Riftbound) in ~5 seconds.
+  Slow TCGs (Pokemon, MTG, Yu-Gi-Oh) preload in the background after app loads.
 -->
 <template>
   <div class="loader-overlay">
@@ -11,38 +12,21 @@
         </svg>
       </div>
       <h2 class="loader-title">Rarebox</h2>
-      <p class="loader-subtitle" v-if="!done">Setting up your card database…</p>
-      <p class="loader-subtitle" v-else>Ready to go!</p>
+      <p class="loader-subtitle" v-if="!done">Loading card databases…</p>
+      <p class="loader-subtitle" v-else-if="totalCards > 0">Loaded {{ totalCards.toLocaleString() }} cards</p>
+      <p class="loader-subtitle" v-else>Starting…</p>
 
-      <!-- Progress bar -->
-      <div class="loader-progress-wrap">
-        <div class="loader-progress-bar">
-          <div class="loader-progress-fill" :style="{ width: overallPct + '%' }" />
-        </div>
-        <div class="loader-progress-text">{{ overallPct }}%</div>
-      </div>
-
-      <!-- Game status list -->
+      <!-- Per-game status -->
       <div class="loader-games">
-        <div
-          v-for="g in gameList"
-          :key="g.id"
-          class="loader-game"
-          :class="{ active: currentGame === g.id && !done, done: g.done }"
-        >
+        <div v-for="g in games" :key="g.id" class="loader-game" :class="{ done: g.done }">
           <span class="loader-game-icon">{{ g.icon }}</span>
           <span class="loader-game-name">{{ g.name }}</span>
           <span class="loader-game-status">
             <template v-if="g.done">✓</template>
-            <template v-else-if="currentGame === g.id && !done">{{ status }}</template>
-            <template v-else>Queued</template>
+            <template v-else>{{ g.status || 'Queued' }}</template>
           </span>
         </div>
       </div>
-
-      <p v-if="totalCards > 0 && done" class="loader-total">
-        {{ totalCards.toLocaleString() }} cards loaded across {{ gamesLoaded }} TCGs
-      </p>
 
       <button v-if="done" class="btn btn-primary loader-start" @click="$emit('ready')">
         Start Browsing
@@ -52,60 +36,35 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
-import { preloadAll } from '../services/tcg/cardPreloader.js'
-import { saveCardDatabaseReady } from '../services/tcg/cardCache.js'
+import { ref, reactive, onMounted } from 'vue'
+import { preloadFast } from '../services/tcg/cardPreloader.js'
+import { saveCardDatabaseReady, buildSearchIndex } from '../services/tcg/cardCache.js'
 
 const emit = defineEmits(['ready'])
 
-const currentGame = ref('')
-const status = ref('')
-const gameProgress = ref({})
 const done = ref(false)
 const totalCards = ref(0)
-const gamesLoaded = ref(0)
 
-const GAMES = [
-  { id: 'pokemon', name: 'Pokémon', icon: '⚡' },
-  { id: 'mtg', name: 'Magic: The Gathering', icon: '🔮' },
-  { id: 'lorcana', name: 'Disney Lorcana', icon: '✨' },
-  { id: 'one-piece', name: 'One Piece', icon: '🏴‍☠️' },
-  { id: 'yugioh', name: 'Yu-Gi-Oh!', icon: '🃏' },
-  { id: 'riftbound', name: 'Riftbound', icon: '⚔️' },
-]
-
-const gameList = computed(() =>
-  GAMES.map(g => ({
-    ...g,
-    done: gameProgress.value[g.id]?.done || false,
-  }))
-)
-
-const overallPct = computed(() => {
-  if (done.value) return 100
-  const loaded = Object.keys(gameProgress.value).length
-  return Math.round((loaded / GAMES.length) * 100)
-})
+const games = reactive([
+  { id: 'one-piece', name: 'One Piece', icon: '🏴‍☠️', done: false, status: 'Queued' },
+  { id: 'lorcana', name: 'Disney Lorcana', icon: '✨', done: false, status: 'Queued' },
+  { id: 'riftbound', name: 'Riftbound', icon: '⚔️', done: false, status: 'Queued' },
+])
 
 onMounted(async () => {
-  const counts = await preloadAll(({ game, phase, loaded, total }) => {
-    currentGame.value = game
-    status.value = phase
-
-    if (!gameProgress.value[game]) {
-      gameProgress.value[game] = { done: false }
-    }
-
-    // Mark game as done when phase is 'Done'
-    if (phase === 'Done') {
-      gameProgress.value[game] = { done: true }
-      gamesLoaded.value++
-      totalCards.value += loaded
+  const counts = await preloadFast(({ game, phase }) => {
+    const g = games.find(x => x.id === game)
+    if (g) {
+      g.status = phase
+      if (phase === 'Done') g.done = true
     }
   })
 
-  totalCards.value = counts.total || totalCards.value
+  totalCards.value = Object.values(counts).reduce((a, b) => a + b, 0)
   done.value = true
+
+  // Build search index from what we have
+  await buildSearchIndex()
   saveCardDatabaseReady()
 })
 </script>
@@ -127,7 +86,7 @@ onMounted(async () => {
   border: 1px solid var(--border, #30363d);
   border-radius: 16px;
   padding: 40px 32px;
-  max-width: 420px;
+  max-width: 380px;
   width: 100%;
   text-align: center;
 }
@@ -156,43 +115,12 @@ onMounted(async () => {
   margin: 0 0 20px;
 }
 
-.loader-progress-wrap {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 20px;
-}
-
-.loader-progress-bar {
-  flex: 1;
-  height: 6px;
-  background: var(--bg-hover, #21262d);
-  border-radius: 3px;
-  overflow: hidden;
-}
-
-.loader-progress-fill {
-  height: 100%;
-  background: var(--accent, #f5a623);
-  border-radius: 3px;
-  transition: width 0.3s ease;
-}
-
-.loader-progress-text {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text-muted, #8b949e);
-  min-width: 36px;
-  text-align: right;
-  font-variant-numeric: tabular-nums;
-}
-
 .loader-games {
   display: flex;
   flex-direction: column;
   gap: 6px;
   text-align: left;
-  margin-bottom: 16px;
+  margin-bottom: 20px;
 }
 
 .loader-game {
@@ -204,11 +132,6 @@ onMounted(async () => {
   font-size: 13px;
   color: var(--text-muted, #8b949e);
   transition: all 0.2s;
-}
-
-.loader-game.active {
-  background: var(--accent-dim, rgba(245, 166, 35, 0.1));
-  color: var(--text-primary, #e6edf3);
 }
 
 .loader-game.done {
@@ -229,16 +152,10 @@ onMounted(async () => {
 .loader-game-status {
   font-size: 11px;
   color: var(--text-muted, #8b949e);
-  max-width: 140px;
+  max-width: 120px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.loader-total {
-  font-size: 12px;
-  color: var(--success, #3fb950);
-  margin: 8px 0 16px;
 }
 
 .loader-start {

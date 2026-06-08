@@ -325,8 +325,8 @@ import { exportBackup, validateBackup, importBackup } from '../utils/backup'
 import { parseCollectrFile } from '../utils/collectrImport'
 import { getActiveAlerts, getTriggeredAlerts, removeAlert, clearTriggeredAlerts, clearAllAlerts } from '../utils/alerts'
 import LocalSyncModal from '../components/LocalSyncModal.vue'
-import { getCardCounts, clearCardCache, saveCardDatabaseReady } from '../services/tcg/cardCache'
-import { refreshPrices } from '../services/tcg/cardPreloader'
+import { getCardCounts, clearCardCache, saveCardDatabaseReady, buildSearchIndex } from '../services/tcg/cardCache'
+import { refreshAll } from '../services/tcg/cardPreloader'
 const store = usePortfolioStore()
 const router = useRouter()
 
@@ -365,10 +365,11 @@ async function loadCardCounts() {
 
 async function refreshCardDb() {
   refreshing.value = true
-  refreshStatus.value = 'Refreshing prices…'
+  refreshStatus.value = 'Refreshing all TCGs…'
   refreshError.value = false
   try {
-    const counts = await refreshPrices()
+    const counts = await refreshAll()
+    await buildSearchIndex()
     cardCounts.value = await getCardCounts()
     refreshStatus.value = `Updated! ${counts.total || 0} cards refreshed.`
   } catch (err) {
