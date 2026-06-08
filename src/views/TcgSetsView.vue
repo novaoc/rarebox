@@ -121,7 +121,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { getProvider, TCGS } from '../services/tcg/providers'
 import AddItemModal from '../components/AddItemModal.vue'
@@ -144,6 +144,11 @@ const cardFilter = ref('')
 
 const addingCard = ref(null)
 
+// Abort in-flight API calls when navigating away
+let _abort = null
+function abortPending() { if (_abort) { _abort.abort(); _abort = null } }
+onUnmounted(abortPending)
+
 const filteredSets = computed(() => {
   const q = setFilter.value.trim().toLowerCase()
   if (!q) return sets.value
@@ -158,13 +163,17 @@ const filteredCards = computed(() => {
 
 async function loadSets() {
   if (!provider.value) return
+  abortPending()
+  const ac = new AbortController()
+  _abort = ac
   loadingSets.value = true
   setsError.value = ''
   try {
-    sets.value = await provider.value.getSets()
+    sets.value = await provider.value.getSets({ signal: ac.signal })
   } catch (e) {
-    setsError.value = 'Could not reach the card database. Please try again.'
+    if (e.name !== 'AbortError') setsError.value = 'Could not reach the card database. Please try again.'
   } finally {
+    if (_abort === ac) _abort = null
     loadingSets.value = false
   }
 }
@@ -176,14 +185,18 @@ async function openSet(set) {
 }
 
 async function loadSetCards(set) {
+  abortPending()
+  const ac = new AbortController()
+  _abort = ac
   loadingCards.value = true
   cardsError.value = ''
   try {
-    cards.value = await provider.value.getSetCards(set.id)
+    cards.value = await provider.value.getSetCards(set.id, { signal: ac.signal })
     if (cards.value.length === 0) cardsError.value = 'No cards found for this set.'
   } catch (e) {
-    cardsError.value = 'Could not load cards for this set. Please try again.'
+    if (e.name !== 'AbortError') cardsError.value = 'Could not load cards for this set. Please try again.'
   } finally {
+    if (_abort === ac) _abort = null
     loadingCards.value = false
   }
 }
