@@ -213,7 +213,28 @@ function createPortfolio() {
   router.push(`/portfolio/${p.id}`)
 }
 
+/**
+ * iOS Safari PWA Fallback Refresh
+ * Since iOS lacks the Periodic Background Sync API, PWAs often launch with stale data.
+ * This logic checks the last known activity time and triggers a refresh if the app
+ * has been inactive for more than 4 hours, ensuring users always see fresh prices.
+ */
+function checkStaleLaunch() {
+  const STALE_THRESHOLD = 1000 * 60 * 60 * 4 // 4 hours
+  const lastActive = localStorage.getItem('rarebox_last_active')
+  const now = Date.now()
+
+  if (lastActive && (now - parseInt(lastActive)) > STALE_THRESHOLD) {
+    console.log('[Rarebox] Stale launch detected on iOS, refreshing...')
+    hardRefresh()
+  }
+  localStorage.setItem('rarebox_last_active', now.toString())
+}
+
 onMounted(async () => {
+  if (window.navigator.standalone || window.matchMedia('(display-mode: standalone)').matches) {
+    checkStaleLaunch()
+  }
   await store.init()
   store.autoSnapshot() // record daily price snapshot for chart history
 })
