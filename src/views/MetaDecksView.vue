@@ -4,10 +4,21 @@
       <router-link to="/decks" class="btn btn-ghost btn-sm" style="margin-bottom:8px">← All Decks</router-link>
       <h2>Meta Decks</h2>
       <p class="text-muted" style="font-size:13px;margin-top:2px">
-        {{ source === 'live' ? 'Live tournament data from Limitless TCG.' : 'Static fallback decks.' }}
+        {{ source === 'live' ? 'Live tournament data from Limitless TCG.' : 'Top competitive decks across all TCGs.' }}
         Click "Add to My Decks" to import one and start tracking what you own.
         <span v-if="lastUpdated" class="text-muted"> · Updated {{ timeAgo(lastUpdated) }}</span>
       </p>
+    </div>
+
+    <!-- TCG filter -->
+    <div class="game-filter-bar">
+      <button
+        v-for="g in tcgOptions"
+        :key="g.key"
+        class="btn btn-sm"
+        :class="g.key === activeGame ? 'btn-primary' : 'btn-ghost'"
+        @click="switchGame(g.key)"
+      >{{ g.label }}</button>
     </div>
 
     <!-- Loading state -->
@@ -61,6 +72,12 @@ import { useRouter } from 'vue-router'
 import { useDeckStore } from '../stores/decks'
 import { fetchLiveMetaDecks, fallbackMetaDecks } from '../services/metaDecksApi'
 
+const GAME_LABELS = {
+  pokemon: 'Pokémon', mtg: 'MTG', lorcana: 'Lorcana',
+  'one-piece': 'One Piece', riftbound: 'Riftbound', yugioh: 'Yu-Gi-Oh',
+}
+const GAME_KEYS = ['pokemon', 'mtg', 'lorcana', 'one-piece', 'riftbound', 'yugioh']
+
 function timeAgo(date) {
   const seconds = Math.floor((Date.now() - date.getTime()) / 1000)
   if (seconds < 60) return 'just now'
@@ -69,6 +86,8 @@ function timeAgo(date) {
   return `${Math.floor(seconds / 86400)}d ago`
 }
 
+const tcgOptions = GAME_KEYS.map(k => ({ key: k, label: GAME_LABELS[k] }))
+
 const deckStore = useDeckStore()
 const router = useRouter()
 
@@ -76,24 +95,33 @@ const importing = ref(null)
 const expanded = ref(null)
 const metaDecks = ref([])
 const loading = ref(true)
-const source = ref('live') // 'live' or 'fallback'
+const source = ref('live')
 const lastUpdated = ref(null)
+const activeGame = ref('pokemon')
 
-onMounted(async () => {
+async function switchGame(game) {
+  activeGame.value = game
+  loading.value = true
+  metaDecks.value = []
   try {
-    metaDecks.value = await fetchLiveMetaDecks()
-    source.value = 'live'
-    // Read cache timestamp
-    try {
-      const cached = JSON.parse(localStorage.getItem('rarebox_meta_decks_cache'))
+    const decks = await fetchLiveMetaDecks(game)
+    if (decks?.length) {
+      metaDecks.value = decks
+      source.value = 'live'
+      const cached = JSON.parse(localStorage.getItem('rarebox_meta_decks_cache_' + game))
       if (cached?.timestamp) lastUpdated.value = new Date(cached.timestamp)
-    } catch {}
+    } else {
+      throw new Error('No decks')
+    }
   } catch {
-    // Fall back to hardcoded decks — resolve cards via the deck store
-    metaDecks.value = fallbackMetaDecks
     source.value = 'fallback'
+    lastUpdated.value = null
   }
   loading.value = false
+}
+
+onMounted(async () => {
+  await switchGame('pokemon')
 })
 
 async function importDeck(metaDeck) {
@@ -107,8 +135,10 @@ async function importDeck(metaDeck) {
 <style scoped>
 .meta-decks-view { max-width: 1200px; margin: 0 auto; }
 
-.meta-header { margin-bottom: 24px; }
+.meta-header { margin-bottom: 16px; }
 .meta-header h2 { font-size: 22px; font-weight: 700; }
+
+.game-filter-bar { display: flex; gap: 4px; margin-bottom: 20px; flex-wrap: wrap; }
 
 .meta-grid {
   display: grid;

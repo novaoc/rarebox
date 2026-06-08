@@ -247,6 +247,97 @@ async function searchSealed(query) {
   }
 }
 
+// ── Yu-Gi-Oh: YGOPRODeck ────────────────────────────────────────────────────
+async function searchYugioh(query) {
+  const url = `https://db.ygoprodeck.com/api/v7/cardinfo.php?fname=${encodeURIComponent(query)}`
+  const d = await fetchJson(url)
+  const arr = d.data || []
+  return {
+    cards: arr.map(c => {
+      const setInfo = c.card_sets?.[0] || {}
+      return {
+        id: `ygo-${c.id}`,
+        name: c.name,
+        number: setInfo.set_code || `${c.id}`,
+        set: setInfo.set_name || c.archetype || '',
+        image: c.card_images?.[0]?.image_url_small || '',
+        price: num(c.card_prices?.[0]?.tcgplayer_price) || num(c.card_prices?.[0]?.cardmarket_price),
+        rarity: setInfo.set_rarity || '',
+        game: 'yugioh',
+        _raw: c,
+      }
+    }),
+    total: arr.length,
+  }
+}
+
+// ── Card resolve (for deck price refresh) ─────────────────────────────────────
+
+async function resolvePokemonCard(cardId) {
+  const url = `https://api.pokemontcg.io/v2/cards/${cardId}`
+  const d = await fetchJson(url)
+  if (!d.data) return null
+  return {
+    id: d.data.id,
+    name: d.data.name,
+    number: d.data.number || '',
+    set: d.data.set?.name || '',
+    image: d.data.images?.small || '',
+    price: extractPokemonPrice(d.data),
+    rarity: d.data.rarity || '',
+    game: 'pokemon',
+    _raw: d.data,
+  }
+}
+
+async function resolveMtgCard(cardId) {
+  const url = `https://api.scryfall.com/cards/${cardId}`
+  const d = await fetchJson(url)
+  const imgs = d.image_uris || d.card_faces?.[0]?.image_uris || {}
+  return {
+    id: d.id,
+    name: d.name,
+    number: d.collector_number || '',
+    set: d.set_name || '',
+    image: imgs.small || '',
+    price: num(d.prices?.usd) || num(d.prices?.usd_foil),
+    rarity: d.rarity || '',
+    game: 'mtg',
+    _raw: d,
+  }
+}
+
+async function resolveYugiohCard(cardId) {
+  const id = cardId.replace('ygo-', '')
+  const url = `https://db.ygoprodeck.com/api/v7/cardinfo.php?id=${id}`
+  const d = await fetchJson(url)
+  const c = d.data?.[0]
+  if (!c) return null
+  const setInfo = c.card_sets?.[0] || {}
+  return {
+    id: cardId,
+    name: c.name,
+    number: setInfo.set_code || `${c.id}`,
+    set: setInfo.set_name || c.archetype || '',
+    image: c.card_images?.[0]?.image_url_small || '',
+    price: num(c.card_prices?.[0]?.tcgplayer_price) || num(c.card_prices?.[0]?.cardmarket_price),
+    rarity: setInfo.set_rarity || '',
+    game: 'yugioh',
+    _raw: c,
+  }
+}
+
+// Resolve a card by ID for deck price refresh — routes to the correct API
+export async function resolveCard(cardId, game) {
+  try {
+    if (game === 'pokemon') return await resolvePokemonCard(cardId)
+    if (game === 'mtg') return await resolveMtgCard(cardId)
+    if (game === 'yugioh') return await resolveYugiohCard(cardId)
+    // For games without per-ID lookup, fall back to game-specific logic
+    return null
+  } catch { return null }
+}
+
 // ── Main search ─────────────────────────────────────────────────────────────
 // Searches all TCGs in parallel, merges + sorts by relevance (name match first).
 
@@ -256,6 +347,7 @@ const ALL_PROVIDERS = {
   lorcana: (q) => searchLorcana(q),
   'one-piece': (q) => searchOnePiece(q),
   riftbound: (q) => searchRiftbound(q),
+  yugioh: (q) => searchYugioh(q),
 }
 
 export async function multiSearch(query, { page = 1, pageSize = 20, category = 'cards', providers } = {}) {

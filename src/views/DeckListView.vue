@@ -3,7 +3,7 @@
     <div class="deck-header">
       <div>
         <h2>Decks</h2>
-        <p class="text-muted" style="font-size:13px;margin-top:2px">Build and track your Pokémon TCG decks. Compare against your collection.</p>
+        <p class="text-muted" style="font-size:13px;margin-top:2px">Build and track decks across all TCGs. Compare against your collection.</p>
       </div>
       <div class="deck-header-actions">
         <router-link to="/decks/meta" class="btn btn-secondary btn-sm">🃏 Meta Decks</router-link>
@@ -11,8 +11,19 @@
       </div>
     </div>
 
+    <!-- Game filter -->
+    <div class="game-filter-bar" v-if="deckStore.decks.length > 0">
+      <button
+        v-for="g in gameFilters"
+        :key="g.key"
+        class="btn btn-sm"
+        :class="g.key === activeGame ? 'btn-primary' : 'btn-ghost'"
+        @click="activeGame = g.key"
+      >{{ g.label }}</button>
+    </div>
+
     <!-- Empty state -->
-    <div v-if="deckStore.decks.length === 0" class="empty-state">
+    <div v-if="filteredDecks.length === 0 && deckStore.decks.length === 0" class="empty-state">
       <div class="icon">🃏</div>
       <h3>No decks yet</h3>
       <p>Create a deck from scratch or import a meta deck to get started.</p>
@@ -21,18 +32,26 @@
         <router-link to="/decks/meta" class="btn btn-secondary">Browse Meta Decks</router-link>
       </div>
     </div>
+    <div v-else-if="filteredDecks.length === 0" class="empty-state">
+      <div class="icon">🃏</div>
+      <h3>No {{ gameLabel(activeGame) }} decks</h3>
+      <button class="btn btn-primary mt-3" @click="showNewDeck = true">Create {{ gameLabel(activeGame) }} Deck</button>
+    </div>
 
     <!-- Deck grid -->
     <div v-else class="deck-grid">
       <router-link
-        v-for="deck in deckStore.decks"
+        v-for="deck in filteredDecks"
         :key="deck.id"
         :to="`/decks/${deck.id}`"
         class="deck-card"
       >
         <div class="deck-card-top">
           <div class="deck-card-name">{{ deck.name }}</div>
-          <div class="deck-card-count">{{ deck.cards.length }} unique cards</div>
+          <div class="deck-card-meta">
+            <span class="badge badge-info">{{ gameLabel(deck.game) }}</span>
+            <span class="deck-card-count">{{ deck.cards.length }} unique cards</span>
+          </div>
         </div>
         <div class="deck-card-stats">
           <div class="deck-stat">
@@ -82,6 +101,18 @@
               <label class="form-label">Deck Name</label>
               <input v-model="newDeckName" class="input" placeholder="e.g. Charizard ex" @keyup.enter="createDeck" ref="nameInput" />
             </div>
+            <div class="form-group">
+              <label class="form-label">TCG</label>
+              <div class="tcg-selector">
+                <button
+                  v-for="g in tcgOptions"
+                  :key="g.key"
+                  class="btn btn-sm"
+                  :class="g.key === newDeckGame ? 'btn-primary' : 'btn-ghost'"
+                  @click="newDeckGame = g.key"
+                >{{ g.label }}</button>
+              </div>
+            </div>
           </div>
           <div class="modal-footer">
             <button class="btn btn-secondary" @click="showNewDeck = false">Cancel</button>
@@ -95,25 +126,59 @@
 </template>
 
 <script setup>
-import { ref, nextTick } from 'vue'
+import { ref, computed, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { useDeckStore } from '../stores/decks'
 
 const deckStore = useDeckStore()
 const router = useRouter()
 
+const GAME_LABELS = {
+  pokemon: 'Pokémon', mtg: 'MTG', lorcana: 'Lorcana',
+  'one-piece': 'One Piece', riftbound: 'Riftbound', yugioh: 'Yu-Gi-Oh',
+}
+
+const GAME_KEYS = ['pokemon', 'mtg', 'lorcana', 'one-piece', 'riftbound', 'yugioh']
+
+const tcgOptions = GAME_KEYS.map(k => ({ key: k, label: GAME_LABELS[k] }))
+
+const gameFilters = computed(() => {
+  const games = new Set()
+  games.add('all')
+  for (const d of deckStore.decks) {
+    if (d.game) games.add(d.game)
+  }
+  return Array.from(games).map(g => ({
+    key: g,
+    label: g === 'all' ? 'All' : GAME_LABELS[g] || g,
+  }))
+})
+
+const activeGame = ref('all')
+
+const filteredDecks = computed(() => {
+  if (activeGame.value === 'all') return deckStore.decks
+  return deckStore.decks.filter(d => d.game === activeGame.value)
+})
+
 const showNewDeck = ref(false)
 const newDeckName = ref('')
+const newDeckGame = ref('pokemon')
 const nameInput = ref(null)
 
 function deckStats(deckId) {
   return deckStore.getDeckStats(deckId)
 }
 
+function gameLabel(game) {
+  return GAME_LABELS[game] || game
+}
+
 function createDeck() {
   if (!newDeckName.value.trim()) return
-  const deck = deckStore.createDeck(newDeckName.value.trim())
+  const deck = deckStore.createDeck(newDeckName.value.trim(), newDeckGame.value)
   newDeckName.value = ''
+  newDeckGame.value = 'pokemon'
   showNewDeck.value = false
   router.push(`/decks/${deck.id}`)
 }
@@ -132,6 +197,13 @@ function createDeck() {
 }
 .deck-header h2 { font-size: 22px; font-weight: 700; }
 .deck-header-actions { display: flex; gap: 8px; }
+
+.game-filter-bar { display: flex; gap: 4px; margin-bottom: 16px; flex-wrap: wrap; }
+
+.deck-card-meta { display: flex; align-items: center; gap: 8px; margin-top: 2px; }
+.deck-card-count { font-size: 12px; color: var(--text-muted); }
+
+.tcg-selector { display: flex; gap: 4px; flex-wrap: wrap; }
 
 .deck-grid {
   display: grid;
