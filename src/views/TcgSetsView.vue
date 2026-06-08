@@ -52,6 +52,7 @@
                 <template v-if="set.releaseDate"><span class="set-dot">·</span><span class="set-date">{{ formatDate(set.releaseDate) }}</span></template>
               </div>
             </div>
+            <button class="btn btn-ghost btn-sm set-sealed-btn" @click.stop="startBulkAdd(set)" title="Add entire set to portfolio">📋</button>
             <span class="set-go" aria-hidden="true">→</span>
           </div>
         </div>
@@ -117,6 +118,64 @@
       @close="addingCard = null"
       @added="addingCard = null"
     />
+
+    <!-- Bulk Add Set Modal -->
+    <div v-if="showBulkModal" class="modal-overlay" @click.self="showBulkModal = false">
+      <div class="modal" style="max-width:600px;max-height:80vh;display:flex;flex-direction:column">
+        <div class="modal-header">
+          <h3>Add Set — {{ bulkSetName }}</h3>
+          <button class="btn btn-ghost btn-icon" @click="showBulkModal = false">✕</button>
+        </div>
+        <div class="modal-body" style="flex:1;overflow-y:auto">
+          <!-- Loading -->
+          <div v-if="bulkLoading" class="empty-state">
+            <div class="spinner"></div>
+            <p class="mt-2">Loading cards...</p>
+          </div>
+          <!-- Done -->
+          <div v-else-if="bulkDone" class="empty-state">
+            <div class="icon">✅</div>
+            <h3>Added {{ bulkSelectedCount }} cards</h3>
+          </div>
+          <!-- Cards list -->
+          <template v-else>
+            <div class="bulk-controls mb-3">
+              <button class="btn btn-ghost btn-sm" @click="bulkSelectAll">Select All</button>
+              <button class="btn btn-ghost btn-sm" @click="bulkDeselectAll">Deselect All</button>
+              <span class="text-muted" style="font-size:12px;margin-left:auto">
+                {{ bulkSelectedCount }} / {{ bulkCards.length }} selected
+                <template v-if="bulkTotalCost > 0"> · ${{ bulkTotalCost.toFixed(2) }}</template>
+              </span>
+            </div>
+            <div class="form-group mb-3">
+              <label class="form-label">Portfolio</label>
+              <select v-model="bulkPortfolioId" class="select">
+                <option v-for="p in store.portfolios" :key="p.id" :value="p.id">{{ p.name }}</option>
+              </select>
+            </div>
+            <div class="bulk-list">
+              <div v-for="(card, idx) in filteredBulkCards" :key="card.id || idx" class="bulk-card-row" @click="toggleBulkCard(idx)">
+                <input type="checkbox" :checked="card.checked" class="bulk-checkbox" @click.stop="toggleBulkCard(idx)" />
+                <img v-if="card.image" :src="card.image" class="bulk-card-img" loading="lazy" />
+                <div class="bulk-card-info">
+                  <div class="bulk-card-name">{{ card.name }}</div>
+                  <div class="bulk-card-meta text-muted">#{{ card.number }}<template v-if="card.rarity"> · {{ card.rarity }}</template></div>
+                </div>
+                <span v-if="card.price" class="bulk-card-price">${{ card.price.toFixed(2) }}</span>
+                <span v-else class="bulk-card-price text-muted">—</span>
+              </div>
+            </div>
+          </template>
+        </div>
+        <div class="modal-footer" v-if="!bulkLoading && !bulkDone">
+          <button class="btn btn-secondary" @click="showBulkModal = false">Cancel</button>
+          <button class="btn btn-primary" :disabled="bulkAdding || bulkSelectedCount === 0" @click="confirmBulkAdd">
+            <span v-if="bulkAdding" class="spinner spinner-sm"></span>
+            Add {{ bulkSelectedCount }} Cards
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -124,7 +183,10 @@
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { getProvider, TCGS } from '../services/tcg/providers'
+import { usePortfolioStore } from '../stores/portfolio'
 import AddItemModal from '../components/AddItemModal.vue'
+
+const store = usePortfolioStore()
 
 const route = useRoute()
 const gameId = computed(() => route.params.game)
@@ -218,6 +280,81 @@ function addCard(card) {
   }
 }
 
+// ── Bulk add set ─────────────────────────────────────────────────────────────
+const showBulkModal = ref(false)
+const bulkSetName = ref('')
+const bulkCards = ref([])
+const bulkPortfolioId = ref('')
+const bulkAdding = ref(false)
+const bulkDone = ref(false)
+const bulkLoading = ref(false)
+
+const bulkSelectedCount = computed(() => bulkCards.value.filter(c => c.checked).length)
+const bulkTotalCost = computed(() => bulkCards.value.filter(c => c.checked).reduce((s, c) => s + (c.price || 0), 0))
+
+const filteredBulkCards = computed(() => bulkCards.value)
+
+async function startBulkAdd(set) {
+  if (bulkLoading.value) return
+  showBulkModal.value = true
+  bulkLoading.value = true
+  bulkDone.value = false
+  bulkSetName.value = set.name
+  bulkPortfolioId.value = store.portfolios[0]?.id || ''
+  bulkCards.value = []
+  try {
+    const allCards = await provider.value.getSetCards(set.id)
+    // Check which cards are already in the selected portfolio
+    const portfolio = store.portfolios.find(p => p.id === bulkPortfolioId.value)
+    const ownedNames = new Set(
+      (portfolio?.items || [])
+        .filter(i => i.type === 'card' && i.game === gameId.value)
+        .map(i => (i.cardData?.name || '').toLowerCase())
+    )
+    bulkCards.value = allCards.map(c => ({
+      ...c,
+      checked: !ownedNames.has(c.name.toLowerCase()),
+    }))
+  } catch {
+    bulkCards.value = []
+  } finally {
+    bulkLoading.value = false
+  }
+}
+
+function toggleBulkCard(idx) {
+  bulkCards.value[idx].checked = !bulkCards.value[idx].checked
+}
+function bulkSelectAll() { bulkCards.value.forEach(c => { c.checked = true }) }
+function bulkDeselectAll() { bulkCards.value.forEach(c => { c.checked = false }) }
+
+async function confirmBulkAdd() {
+  if (bulkAdding.value || !bulkPortfolioId.value) return
+  bulkAdding.value = true
+  const toAdd = bulkCards.value.filter(c => c.checked)
+  for (const card of toAdd) {
+    store.addItem(bulkPortfolioId.value, {
+      type: 'card',
+      quantity: 1,
+      purchasePrice: 0,
+      purchaseDate: '',
+      notes: '',
+      game: gameId.value,
+      cardData: {
+        name: card.name,
+        number: card.number,
+        set: { name: card.set },
+        images: { small: card.image },
+      },
+      pcUrl: '',
+      currentMarketPrice: card.price,
+    })
+  }
+  bulkAdding.value = false
+  bulkDone.value = true
+  setTimeout(() => { showBulkModal.value = false; bulkDone.value = false }, 1500)
+}
+
 function formatDate(d) {
   if (!d) return ''
   const dt = new Date(d)
@@ -296,4 +433,23 @@ onMounted(loadSets)
   .shimmer::after { animation: none; background: var(--bg-hover); }
   .set-card:hover, .card-result:hover { transform: none; }
 }
+
+/* Bulk add set */
+.set-sealed-btn { opacity: 0; transition: opacity 0.15s; flex-shrink: 0; font-size: 16px; padding: 4px 8px; }
+.set-card:hover .set-sealed-btn { opacity: 1; }
+@media (hover: none) { .set-sealed-btn { opacity: 0.6; } }
+
+.bulk-controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.bulk-list { max-height: 50vh; overflow-y: auto; }
+.bulk-card-row {
+  display: flex; align-items: center; gap: 10px; padding: 8px 10px;
+  border-radius: var(--radius); cursor: pointer; transition: background 0.1s;
+}
+.bulk-card-row:hover { background: var(--bg-hover); }
+.bulk-checkbox { flex-shrink: 0; width: 16px; height: 16px; accent-color: var(--accent); }
+.bulk-card-img { width: 36px; height: 50px; object-fit: contain; border-radius: 4px; flex-shrink: 0; background: var(--bg); }
+.bulk-card-info { flex: 1; min-width: 0; }
+.bulk-card-name { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bulk-card-meta { font-size: 11px; }
+.bulk-card-price { font-size: 13px; font-weight: 700; color: var(--accent); flex-shrink: 0; font-variant-numeric: tabular-nums; }
 </style>
