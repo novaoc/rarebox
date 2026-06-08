@@ -2,7 +2,7 @@
 // Lorcana (Lorcast), and One Piece (optcgapi) in parallel.
 // Results are normalised to a common shape so the search UI works for all.
 
-const TIMEOUT = 12000
+const TIMEOUT = 8000
 
 async function fetchJson(url) {
   const res = await fetch(url, {

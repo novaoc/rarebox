@@ -27,16 +27,24 @@ export async function scanCard(imageData: string): Promise<ScanResult> {
     ocrConfidence: ocr.confidence,
   }
 
-  // Try to search with the extracted query
-  let allCards: any[] = []
-  if (ocr.searchQuery) {
+  async function searchWithTimeout(query: string, size: number): Promise<any[]> {
+    const timeout = 12000
     try {
-      const res = await multiSearch(ocr.searchQuery, { page: 1, pageSize: 15 })
-      allCards = (res.cards || [])
-    } catch {}
+      const res = await Promise.race([
+        multiSearch(query, { page: 1, pageSize: size }),
+        new Promise<any>((_, reject) => setTimeout(() => reject(new Error('timeout')), timeout)),
+      ])
+      return (res as any)?.cards || []
+    } catch {
+      return []
+    }
   }
 
-  // If no results from the clean query, try the raw text as a last resort
+  let allCards: any[] = []
+  if (ocr.searchQuery) {
+    allCards = await searchWithTimeout(ocr.searchQuery, 15)
+  }
+
   if (allCards.length === 0 && ocr.text.length >= 5) {
     const rawQuery = ocr.text
       .replace(/[^a-zA-Z\s]/g, ' ')
@@ -44,10 +52,7 @@ export async function scanCard(imageData: string): Promise<ScanResult> {
       .trim()
       .slice(0, 80)
     if (rawQuery.length >= 5) {
-      try {
-        const res = await multiSearch(rawQuery, { page: 1, pageSize: 10 })
-        allCards = (res.cards || [])
-      } catch {}
+      allCards = await searchWithTimeout(rawQuery, 10)
     }
   }
 

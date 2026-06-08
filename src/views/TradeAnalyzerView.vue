@@ -4,6 +4,8 @@ import CameraViewfinder from '../components/scanner/CameraViewfinder.vue'
 import { useTradeStore } from '../stores/trade'
 import { multiSearch } from '../services/tcg/multiSearch'
 import { scanCard } from '../utils/scanPipeline'
+import type { ScannedCard as ScannedCardData } from '../utils/scanPipeline'
+type ScanResultData = Awaited<ReturnType<typeof scanCard>>
 
 interface SearchResult {
   id: string
@@ -24,6 +26,7 @@ const activeSide = ref<'A' | 'B'>('A')
 const searchQuery = ref('')
 const searchResults = ref<SearchResult[]>([])
 const scanCandidates = ref<SearchResult[]>([])
+const scanError = ref('')
 const searchBusy = ref(false)
 const scanStatus = ref('')
 let searchTimer: ReturnType<typeof setTimeout> | null = null
@@ -59,39 +62,85 @@ function openSearch(side: 'A' | 'B') {
   searchResults.value = []
 }
 
-async function onCapture(imageData: string) {
-  scanStatus.value = 'Processing…'
-  try {
-    const result = await scanCard(imageData)
-    showScanner.value = false
-    scanStatus.value = ''
-
-    // Auto-add if only one candidate and confidence > 20
-    if (result.candidates.length === 1 && result.ocrConfidence > 20) {
-      addScannedCard(result.candidates[0])
-      return
+function resizeImage(dataUrl: string, maxWidth = 600): Promise<string> {
+  return new Promise((resolve) => {
+    const img = new Image()
+    img.onload = () => {
+      if (img.width <= maxWidth) { resolve(dataUrl); return }
+      const scale = maxWidth / img.width
+      const w = maxWidth
+      const h = Math.round(img.height * scale)
+      const c = document.createElement('canvas')
+      c.width = w; c.height = h
+      const ctx = c.getContext('2d')!
+      ctx.drawImage(img, 0, 0, w, h)
+      resolve(c.toDataURL('image/jpeg', 0.8))
     }
-
-    // Show candidates for user to pick (or empty state if none found)
-    if (result.candidates.length > 0) {
-      scanCandidates.value = result.candidates.map((c: any) => ({
-        id: c.id,
-        name: c.name,
-        set: c.setName || c.set || '',
-        number: c.number,
-        image: c.image,
-        price: c.price,
-        game: c.game,
-      })) as SearchResult[]
-      showScanResults.value = true
-    }
-  } catch {
-    showScanner.value = false
-    scanStatus.value = ''
-  }
+    img.onerror = () => resolve(dataUrl)
+    img.src = dataUrl
+  })
 }
 
-function addScannedCard(card: SearchResult | ScannedCard) {
+async function onCapture(imageData: string) {
+  scanStatus.value = 'Processing image…'
+  const resized = await resizeImage(imageData)
+
+  scanStatus.value = 'Reading card text…'
+
+  // Overall timeout: 25 seconds
+  let result: ScanResultData
+  try {
+    result = await Promise.race([
+      scanCard(resized),
+      new Promise<ScanResultData>((_, reject) =>
+        setTimeout(() => reject(new Error('Timed out')), 25000)
+      ),
+    ]) as ScanResultData
+  } catch (e: any) {
+    console.error('OCR error:', e)
+    showScanner.value = false
+    scanStatus.value = ''
+    scanError.value = e?.message?.includes('Timed out')
+      ? 'Scan timed out. Try searching manually instead.'
+      : `Scan failed. Try better lighting or search manually.`
+    return
+  }
+
+  showScanner.value = false
+  scanStatus.value = ''
+
+  if (result.candidates.length === 0) {
+    const q = result.ocrText.replace(/[^a-zA-Z\s]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 60)
+    if (q.length >= 3) {
+      searchQuery.value = q
+      showSearch.value = activeSide.value
+      doSearch()
+    } else {
+      scanError.value = 'Could not read card. Try better lighting or search manually.'
+    }
+    return
+  }
+
+  // Auto-add if only one candidate with decent confidence
+  if (result.candidates.length === 1 && result.ocrConfidence > 20) {
+    addScannedCard(result.candidates[0])
+    return
+  }
+
+  // Show candidates for user to pick
+  scanCandidates.value = result.candidates.map((c: any) => ({
+    id: c.id,
+    name: c.name,
+    set: c.setName || c.set || '',
+    number: c.number,
+    image: c.image,
+    price: c.price,
+    game: c.game,
+  })) as SearchResult[]
+  showScanResults.value = true
+}
+
+function addScannedCard(card: SearchResult) {
   tradeStore.addToSide(activeSide.value, {
     id: card.id,
     name: card.name,
@@ -103,6 +152,11 @@ function addScannedCard(card: SearchResult | ScannedCard) {
   })
   showScanResults.value = false
   scanCandidates.value = []
+  scanError.value = ''
+}
+
+function dismissError() {
+  scanError.value = ''
 }
 
 function onScannerClose() {
@@ -458,6 +512,17 @@ onMounted(async () => {
 
     </div>
 
+    <!-- Scan error notification -->
+    <transition name="fade">
+      <div v-if="scanError" class="scan-error" @click="dismissError">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+        </svg>
+        <span>{{ scanError }}</span>
+        <button class="btn btn-ghost btn-icon btn-sm" style="flex-shrink:0;color:var(--danger)" @click.stop="dismissError">✕</button>
+      </div>
+    </transition>
+
     <!-- Scan results popup -->
     <transition name="fade">
       <div v-if="showScanResults" class="modal-overlay">
@@ -697,6 +762,20 @@ onMounted(async () => {
 }
 .scan-candidate-row:last-child { border-bottom: none; }
 .scan-candidate-row:hover { background: var(--bg-hover); }
+
+.scan-error {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  background: var(--danger-dim);
+  border: 1px solid rgba(248, 81, 73, 0.3);
+  border-radius: var(--radius-lg);
+  color: var(--danger);
+  font-size: 13px;
+  cursor: pointer;
+}
 
 .scan-status-overlay {
   position: absolute;
