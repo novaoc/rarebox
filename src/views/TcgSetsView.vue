@@ -258,6 +258,7 @@ onMounted(loadSets)
 .set-logo-placeholder { font-size: 26px; }
 .set-badge-lorcana { font-size: 11px; font-weight: 700; background: linear-gradient(135deg, #7b2c9e, #0f9b8e); color: #fff; padding: 4px 8px; border-radius: 6px; letter-spacing: 0.5px; }
 .set-badge-one-piece { font-size: 11px; font-weight: 700; background: linear-gradient(135deg, #d7263d, #1b1b3a); color: #fff; padding: 4px 8px; border-radius: 6px; letter-spacing: 0.5px; }
+.set-badge-riftbound { font-size: 11px; font-weight: 700; background: linear-gradient(135deg, #0bc6e3, #0a2540); color: #fff; padding: 4px 8px; border-radius: 6px; letter-spacing: 0.5px; }
 .set-info { flex: 1; min-width: 0; }
 .set-name { font-size: 13px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .set-meta { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; margin-top: 3px; font-size: 11px; color: var(--text-muted); }

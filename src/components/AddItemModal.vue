@@ -219,9 +219,10 @@ const game = ref(props.tcgCard?.game || 'pokemon')
 const games = SUPPORTED_GAMES
 const isPokemon = computed(() => game.value === 'pokemon')
 // Sealed is Pokémon-only (uses PriceCharting); graded works for all TCGs
-const visibleTypes = computed(() =>
-  isPokemon.value ? types : types.filter(t => t.value !== 'sealed')
-)
+const visibleTypes = computed(() => {
+  if (game.value === 'riftbound') return types.filter(t => t.value !== 'graded')
+  return types
+})
 // Whether the currently-selected non-Pokémon product is a sealed product.
 const selectedIsSealed = ref(false)
 

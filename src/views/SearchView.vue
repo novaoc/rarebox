@@ -216,6 +216,7 @@ const tcgFilters = [
   { id: 'mtg', label: 'Magic' },
   { id: 'lorcana', label: 'Lorcana' },
   { id: 'one-piece', label: 'One Piece' },
+  { id: 'riftbound', label: 'Riftbound' },
 ]
 const allResults = ref([])
 
@@ -224,7 +225,7 @@ const filteredResults = computed(() => {
   return results.value.filter(c => c.game === activeFilter.value)
 })
 
-const gameLabels = { pokemon: 'PKM', mtg: 'MTG', lorcana: 'LRC', 'one-piece': 'OP' }
+const gameLabels = { pokemon: 'PKM', mtg: 'MTG', lorcana: 'LRC', 'one-piece': 'OP', riftbound: 'RIF' }
 function gameLabel(game) { return gameLabels[game] || game }
 
 // Alert state
@@ -447,6 +448,7 @@ function onAdded() {
 .game-mtg { background: #f8991c; color: #1a1a2e; }
 .game-lorcana { background: #7b2c9e; color: #fff; }
 .game-one-piece { background: #d7263d; color: #fff; }
+.game-riftbound { background: #0bc6e3; color: #1a1a2e; }
 .card-price-row { display: flex; align-items: center; justify-content: space-between; margin-top: 4px; }
 .card-price { font-size: 12px; font-weight: 700; color: var(--accent); }
 .card-rarity { font-size: 9px !important; padding: 1px 5px !important; }

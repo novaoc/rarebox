@@ -191,7 +191,47 @@ const onePiece = {
   },
 }
 
-const PROVIDERS = { mtg, lorcana, 'one-piece': onePiece }
+// ── Riftbound: exported JSON from riftbound-prices ───────────────────────────
+// Data is scraped from TCGplayer by the riftbound-prices CLI tool and exported
+// as a static JSON file hosted on GitHub. No CORS issues — raw.githubusercontent.com
+// sends proper CORS headers.
+const RIFTBOUND_JSON = 'https://raw.githubusercontent.com/novaoc/riftbound-prices/main/riftbound-cards.json'
+
+const riftbound = {
+  id: 'riftbound',
+  async getSets() {
+    return cached('riftbound:sets', 3600_000, async (signal) => {
+      const d = await getJson(RIFTBOUND_JSON, { signal })
+      const sets = d.sets || []
+      return sets.map(s => ({
+        id: s.id,
+        name: s.name,
+        code: s.id,
+        releaseDate: null,
+        total: s.total || 0,
+        logo: '',
+      }))
+    })
+  },
+  async getSetCards(setId, opts) {
+    return cached(`riftbound:cards:${setId}`, 600_000, async (signal) => {
+      const d = await getJson(RIFTBOUND_JSON, { signal })
+      const set = (d.sets || []).find(s => s.id === setId)
+      if (!set) return []
+      return (set.cards || []).map(c => ({
+        id: c.id,
+        name: c.name,
+        number: c.number || '',
+        set: c.set || set.name,
+        image: '', // Riftbound cards don't have images in the JSON yet
+        price: c.price || null,
+        rarity: c.rarity || '',
+      }))
+    })
+  },
+}
+
+const PROVIDERS = { mtg, lorcana, 'one-piece': onePiece, riftbound }
 
 export function getProvider(id) {
   return PROVIDERS[id] || null
@@ -209,6 +249,6 @@ export const TCGS = [
     logoSvg: `<svg viewBox="0 0 200 80" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg"><text x="100" y="36" text-anchor="middle" fill="#c9a0dc" font-family="Georgia,serif" font-size="24" font-weight="700" font-style="italic">Lorcana</text><text x="100" y="54" text-anchor="middle" fill="#0f9b8e" font-family="Arial,sans-serif" font-size="10" letter-spacing="3">DISNEY</text></svg>` },
   { id: 'one-piece', name: 'One Piece Card Game',  tagline: '20 sets · 3300+ cards · USD prices', c1: '#d7263d', c2: '#1b1b3a', route: '/sets/one-piece', available: true,
     logoSvg: `<svg viewBox="0 0 200 80" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg"><text x="100" y="34" text-anchor="middle" fill="#d7263d" font-family="Arial Black,sans-serif" font-size="20" font-weight="900">ONE PIECE</text><text x="100" y="54" text-anchor="middle" fill="#888" font-family="Arial,sans-serif" font-size="10" letter-spacing="2">CARD GAME</text></svg>` },
-  { id: 'riftbound', name: 'Riftbound (LoL TCG)',  tagline: 'Coming soon', c1: '#0bc6e3', c2: '#0a2540', route: '', available: false,
+  { id: 'riftbound', name: 'Riftbound (LoL TCG)',  tagline: 'Singles & sealed from TCGplayer', c1: '#0bc6e3', c2: '#0a2540', route: '/sets/riftbound', available: true,
     logoSvg: `<svg viewBox="0 0 200 80" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg"><text x="100" y="34" text-anchor="middle" fill="#0bc6e3" font-family="Arial Black,sans-serif" font-size="18" font-weight="900">RIFTBOUND</text><text x="100" y="54" text-anchor="middle" fill="#667" font-family="Arial,sans-serif" font-size="9" letter-spacing="1">LEAGUE OF LEGENDS</text></svg>` },
 ]

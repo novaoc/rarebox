@@ -132,6 +132,48 @@ async function searchOnePiece(query) {
   }
 }
 
+// ── Riftbound: search client-side from exported JSON ─────────────────────────
+let _riftCards = null
+async function getRiftboundCards() {
+  if (_riftCards) return _riftCards
+  const res = await fetch('https://raw.githubusercontent.com/novaoc/riftbound-prices/main/riftbound-cards.json', {
+    signal: AbortSignal.timeout(12000),
+  })
+  if (!res.ok) throw new Error(`http_${res.status}`)
+  const d = await res.json()
+  const all = []
+  for (const s of (d.sets || [])) {
+    for (const c of (s.cards || [])) {
+      all.push({ ...c, set: c.set || s.name })
+    }
+  }
+  _riftCards = all
+  return all
+}
+
+async function searchRiftbound(query) {
+  const cards = await getRiftboundCards()
+  const q = query.toLowerCase()
+  const matches = cards.filter(c =>
+    (c.name || '').toLowerCase().includes(q) ||
+    (c.number || '').toLowerCase().includes(q)
+  ).slice(0, 50)
+  return {
+    cards: matches.map(c => ({
+      id: c.id,
+      name: c.name,
+      number: c.number || '',
+      set: c.set || '',
+      image: '',
+      price: c.price || null,
+      rarity: c.rarity || '',
+      game: 'riftbound',
+      _raw: c,
+    })),
+    total: matches.length,
+  }
+}
+
 // ── Main search ─────────────────────────────────────────────────────────────
 // Searches all TCGs in parallel, merges + sorts by relevance (name match first).
 
@@ -141,6 +183,7 @@ export async function multiSearch(query, { page = 1, pageSize = 20 } = {}) {
     searchMtg(query, page, pageSize).catch(() => ({ cards: [], total: 0 })),
     searchLorcana(query).catch(() => ({ cards: [], total: 0 })),
     searchOnePiece(query).catch(() => ({ cards: [], total: 0 })),
+    searchRiftbound(query).catch(() => ({ cards: [], total: 0 })),
   ]
 
   const results = await Promise.all(searches)
