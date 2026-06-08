@@ -568,14 +568,22 @@ function getItemName(item) {
 const GAME_LABELS = { magic: 'Magic', 'one-piece': 'One Piece', lorcana: 'Lorcana', riftbound: 'Riftbound' }
 
 function getItemSub(item) {
-  // Non-Pokémon items have no card number/variant — show set + game tag instead.
+  // Graded cards (all TCGs): show grade + company + set
+  if (item.type === 'graded') {
+    const set = item.cardData?.set?.name || item.setName || ''
+    const company = item.gradingCompany || 'PSA'
+    const grade = item.grade || ''
+    const game = (item.game && item.game !== 'pokemon') ? ` · ${GAME_LABELS[item.game] || item.game}` : ''
+    const gradeStr = grade ? `${company} ${grade}` : company
+    return set ? `${gradeStr} · ${set}${game}` : `${gradeStr}${game}`
+  }
+  // Non-Pokémon non-graded items: show set + game tag
   if (item.game && item.game !== 'pokemon') {
     const label = GAME_LABELS[item.game] || item.game
     const set = item.type === 'sealed' ? (item.setName || '') : (item.cardData?.set?.name || '')
     return set ? `${set} · ${label}` : label
   }
   if (item.type === 'card') return `${item.cardData?.set?.name || ''} #${item.cardData?.number || ''} · ${item.priceVariant || ''}`
-  if (item.type === 'graded') return `${item.gradingCompany} ${item.grade} · ${item.cardData?.set?.name || ''}`
   if (item.type === 'sealed') return item.setName || ''
   return ''
 }

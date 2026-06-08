@@ -348,6 +348,21 @@ function submit() {
         sealedType: 'sealed',
         currentValue: value,
       }
+    } else if (itemType.value === 'graded') {
+      item = {
+        ...item,
+        type: 'graded',
+        game: game.value,
+        cardData: {
+          name: form.value.name,
+          number: '',
+          set: { name: form.value.setName },
+          images: { small: form.value.imageUrl },
+        },
+        gradingCompany: form.value.gradingCompany,
+        grade: form.value.grade,
+        currentValue: value,
+      }
     } else {
       item = {
         ...item,
