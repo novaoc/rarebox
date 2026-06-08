@@ -18,6 +18,19 @@ export interface ScanResult {
   ocrConfidence: number
 }
 
+async function searchWithTimeout(query: string, size: number): Promise<any[]> {
+  const timeout = 12000
+  try {
+    const res: any = await Promise.race([
+      multiSearch(query, { page: 1, pageSize: size }),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), timeout)),
+    ])
+    return res?.cards || []
+  } catch {
+    return []
+  }
+}
+
 export async function scanCard(imageData: string): Promise<ScanResult> {
   const ocr = await recognizeCard(imageData)
   const result: ScanResult = {
@@ -27,24 +40,13 @@ export async function scanCard(imageData: string): Promise<ScanResult> {
     ocrConfidence: ocr.confidence,
   }
 
-  async function searchWithTimeout(query: string, size: number): Promise<any[]> {
-    const timeout = 12000
-    try {
-      const res = await Promise.race([
-        multiSearch(query, { page: 1, pageSize: size }),
-        new Promise<any>((_, reject) => setTimeout(() => reject(new Error('timeout')), timeout)),
-      ])
-      return (res as any)?.cards || []
-    } catch {
-      return []
-    }
-  }
-
+  // Try OCR-extracted query first
   let allCards: any[] = []
   if (ocr.searchQuery) {
     allCards = await searchWithTimeout(ocr.searchQuery, 15)
   }
 
+  // Fallback: use raw OCR text
   if (allCards.length === 0 && ocr.text.length >= 5) {
     const rawQuery = ocr.text
       .replace(/[^a-zA-Z\s]/g, ' ')
@@ -57,7 +59,6 @@ export async function scanCard(imageData: string): Promise<ScanResult> {
   }
 
   result.candidates = allCards as ScannedCard[]
-
   if (result.candidates.length > 0) {
     result.card = pickBestMatch(result.candidates, ocr.searchQuery, ocr.cardNumber)
   }
@@ -71,7 +72,6 @@ function pickBestMatch(
   cardNumber: string | null,
 ): ScannedCard {
   if (!query && !cardNumber) return candidates[0]
-
   let filtered = candidates
 
   if (cardNumber) {
@@ -84,17 +84,10 @@ function pickBestMatch(
 
   if (query && filtered.length > 1) {
     const q = query.toLowerCase()
-    // Exact name match
-    const exact = filtered.filter(
-      (c: any) => c.name.toLowerCase() === q,
-    )
+    const exact = filtered.filter((c: any) => c.name.toLowerCase() === q)
     if (exact.length === 1) return exact[0]
-    // Name starts with query
-    const starts = filtered.filter((c: any) =>
-      c.name.toLowerCase().startsWith(q),
-    )
+    const starts = filtered.filter((c: any) => c.name.toLowerCase().startsWith(q))
     if (starts.length === 1) return starts[0]
-    // All words in query appear in name
     const qWords = q.split(/\s+/)
     const allMatch = filtered.filter((c: any) =>
       qWords.every(w => c.name.toLowerCase().includes(w)),

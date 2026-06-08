@@ -19,11 +19,11 @@ const tradeStore = useTradeStore()
 
 const showScanner = ref(false)
 const showSearch = ref<'A' | 'B' | null>(null)
-const showScanReview = ref(false)
+const showScanResults = ref(false)
 const activeSide = ref<'A' | 'B'>('A')
 const searchQuery = ref('')
 const searchResults = ref<SearchResult[]>([])
-const capturedPhoto = ref('')
+const scanCandidates = ref<SearchResult[]>([])
 const scanError = ref('')
 const searchBusy = ref(false)
 const scanStatus = ref('')
@@ -60,31 +60,75 @@ function openSearch(side: 'A' | 'B') {
   searchResults.value = []
 }
 
-function onCapture(imageData: string) {
-  showScanner.value = false
-  scanStatus.value = ''
-  capturedPhoto.value = imageData
-  showScanReview.value = true
-  searchQuery.value = ''
-  searchResults.value = []
-
-  // Run OCR in background — if it completes, fill in the search query
-  scanCard(imageData).then(result => {
-    if (result.candidates.length > 0) {
-      // Found cards — pre-fill search with best match name
-      const best = result.candidates[0]
-      searchQuery.value = best.name
-      doSearch()
-    } else if (result.ocrText.length >= 5) {
-      const q = result.ocrText.replace(/[^a-zA-Z\s]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 60)
-      if (q.length >= 3) {
-        searchQuery.value = q
-        doSearch()
-      }
+function resizeImage(dataUrl: string, maxWidth = 400): Promise<string> {
+  return new Promise((resolve) => {
+    const img = new Image()
+    img.onload = () => {
+      if (img.width <= maxWidth) { resolve(dataUrl); return }
+      const scale = maxWidth / img.width
+      const w = maxWidth
+      const h = Math.round(img.height * scale)
+      const c = document.createElement('canvas')
+      c.width = w; c.height = h
+      const ctx = c.getContext('2d')!
+      ctx.drawImage(img, 0, 0, w, h)
+      resolve(c.toDataURL('image/jpeg', 0.7))
     }
-  }).catch(() => {
-    // OCR failed silently — user can type manually
+    img.onerror = () => resolve(dataUrl)
+    img.src = dataUrl
   })
+}
+
+async function onCapture(imageData: string) {
+  scanStatus.value = 'Processing…'
+  showScanner.value = false
+  const resized = await resizeImage(imageData)
+  scanStatus.value = 'Identifying card…'
+
+  let result: any
+  try {
+    result = await Promise.race([
+      scanCard(resized),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 45000)),
+    ])
+  } catch (e: any) {
+    scanStatus.value = ''
+    scanError.value = e?.message === 'timeout'
+      ? 'Scan timed out. Try search instead.'
+      : 'Could not identify card. Try search instead.'
+    return
+  }
+
+  scanStatus.value = ''
+  if (!result || result.candidates.length === 0) {
+    scanError.value = 'Could not find this card. Try search instead.'
+    return
+  }
+
+  if (result.candidates.length === 1 && result.ocrConfidence > 15) {
+    const c = result.candidates[0]
+    tradeStore.addToSide(activeSide.value, {
+      id: c.id,
+      name: c.name,
+      setName: c.setName,
+      number: c.number,
+      imageUrl: c.image,
+      marketPrice: c.price || 0,
+      game: c.game,
+    })
+    return
+  }
+
+  scanCandidates.value = result.candidates.map((c: any) => ({
+    id: c.id,
+    name: c.name,
+    set: c.setName || c.set || '',
+    number: c.number,
+    image: c.image,
+    price: c.price,
+    game: c.game,
+  })) as SearchResult[]
+  showScanResults.value = true
 }
 
 function addScannedCard(card: SearchResult) {
@@ -93,21 +137,12 @@ function addScannedCard(card: SearchResult) {
     name: card.name,
     setName: card.set,
     number: card.number,
-    imageUrl: capturedPhoto.value,
+    imageUrl: card.image,
     marketPrice: card.price || 0,
     game: card.game,
   })
-  showScanReview.value = false
-  capturedPhoto.value = ''
-  searchQuery.value = ''
-  searchResults.value = []
-}
-
-function cancelScan() {
-  showScanReview.value = false
-  capturedPhoto.value = ''
-  searchQuery.value = ''
-  searchResults.value = []
+  showScanResults.value = false
+  scanCandidates.value = []
 }
 
 function dismissError() {
@@ -117,6 +152,11 @@ function dismissError() {
 function onScannerClose() {
   showScanner.value = false
   scanStatus.value = ''
+}
+
+function onSearchAfterError() {
+  scanError.value = ''
+  openSearch(activeSide.value)
 }
 
 function onSearchInput() {
@@ -175,7 +215,15 @@ onMounted(async () => {
     <transition name="fade">
       <div v-if="showScanner" class="modal-overlay" style="padding:0;align-items:stretch;background:#000" @click.self="onScannerClose">
         <CameraViewfinder @capture="onCapture" @close="onScannerClose" />
-        <div v-if="scanStatus" class="scan-status-overlay">
+      </div>
+    </transition>
+  </Teleport>
+
+  <!-- Processing overlay -->
+  <Teleport to="body">
+    <transition name="fade">
+      <div v-if="scanStatus" class="modal-overlay scan-processing-overlay">
+        <div class="scan-status-overlay">
           <div class="spinner" />
           <span>{{ scanStatus }}</span>
         </div>
@@ -295,6 +343,7 @@ onMounted(async () => {
             @input="onSearchInput"
             placeholder="Search cards to add…"
             class="input"
+            autofocus
           />
           <div v-if="searchBusy" class="spinner spinner-sm mt-2" />
           <div v-if="searchResults.length > 0" class="search-results">
@@ -420,6 +469,7 @@ onMounted(async () => {
             @input="onSearchInput"
             placeholder="Search cards to add…"
             class="input"
+            autofocus
           />
           <div v-if="searchBusy" class="spinner spinner-sm mt-2" />
           <div v-if="searchResults.length > 0" class="search-results">
@@ -469,46 +519,28 @@ onMounted(async () => {
 
     <!-- Scan error notification -->
     <transition name="fade">
-      <div v-if="scanError" class="scan-error" @click="dismissError">
+      <div v-if="scanError" class="scan-error">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
         </svg>
-        <span>{{ scanError }}</span>
-        <button class="btn btn-ghost btn-icon btn-sm" style="flex-shrink:0;color:var(--danger)" @click.stop="dismissError">✕</button>
+        <span style="flex:1">{{ scanError }}</span>
+        <button class="btn btn-sm" style="flex-shrink:0" @click="onSearchAfterError">Search Manually</button>
+        <button class="btn btn-ghost btn-icon btn-sm" style="flex-shrink:0;color:var(--danger)" @click="dismissError">✕</button>
       </div>
     </transition>
 
-    <!-- Scan review dialog -->
+    <!-- Scan candidates picker -->
     <transition name="fade">
-      <div v-if="showScanReview" class="modal-overlay" @click.self="cancelScan">
+      <div v-if="showScanResults" class="modal-overlay" @click.self="dismissError">
         <div class="modal" style="max-width:480px">
           <div class="modal-header">
-            <h3>Add Scanned Card</h3>
-            <button class="btn btn-ghost btn-icon" @click="cancelScan">✕</button>
+            <h3>Select Card</h3>
+            <button class="btn btn-ghost btn-icon" @click="showScanResults = false; scanCandidates = []">✕</button>
           </div>
           <div class="modal-body">
-            <!-- Captured photo -->
-            <div v-if="capturedPhoto" class="scan-photo-preview">
-              <img :src="capturedPhoto" alt="Captured card" />
-            </div>
-
-            <!-- Search input -->
-            <div class="form-group">
-              <label class="form-label">Card Name</label>
-              <input
-                v-model="searchQuery"
-                @input="onSearchInput"
-                placeholder="Type card name…"
-                class="input"
-                autofocus
-              />
-            </div>
-
-            <!-- Search results -->
-            <div v-if="searchBusy" class="spinner spinner-sm mt-2" />
-            <div v-if="searchResults.length > 0" class="scan-candidate-list">
+            <div v-if="scanCandidates.length > 0" class="scan-candidate-list">
               <div
-                v-for="card in searchResults"
+                v-for="card in scanCandidates"
                 :key="card.id"
                 class="scan-candidate-row"
                 @click="addScannedCard(card)"
@@ -523,13 +555,10 @@ onMounted(async () => {
                 </span>
               </div>
             </div>
-
-            <p v-if="searchQuery.length >= 2 && searchResults.length === 0 && !searchBusy" class="text-secondary mt-2" style="font-size:13px">
-              No cards found. Try a different name.
-            </p>
+            <p v-else class="text-secondary" style="font-size:13px">No candidates found.</p>
           </div>
           <div class="modal-footer">
-            <button class="btn btn-secondary" @click="cancelScan">Cancel</button>
+            <button class="btn btn-secondary" @click="openSearch(activeSide)">Search Manually</button>
           </div>
         </div>
       </div>
@@ -770,18 +799,22 @@ onMounted(async () => {
 }
 
 .scan-status-overlay {
-  position: absolute;
-  inset: 0;
-  z-index: 40;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 16px;
-  background: rgba(0,0,0,0.85);
   color: var(--text-primary);
   font-size: 15px;
   font-weight: 500;
+}
+
+.scan-processing-overlay {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0,0,0,0.85);
+  z-index: 1000;
 }
 
 /* Responsive */
