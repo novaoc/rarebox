@@ -142,7 +142,7 @@ export function convertRow(row) {
     if (isPkmn) base._lang = jp ? 'ja' : null
   }
 
-  return { portfolioName: pname || category || 'Uncategorized', item: base }
+  return { portfolioName: pname || 'Uncategorized', item: base }
 }
 
 // ── CSV parsing ────────────────────────────────────────────────────────────
