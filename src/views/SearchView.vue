@@ -58,7 +58,7 @@
         >
           <div class="card-img-wrap">
             <img
-              :src="card.images?.small"
+              :src="card.image || card.images?.small"
               :alt="card.name"
               loading="lazy"
               class="card-img"
