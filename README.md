@@ -104,8 +104,48 @@ Built by [Nova](https://github.com/novaoc).
 - pokemontcg.io API (card data + live prices)
 - tcgdex API (Japanese sets/cards, price history Nov 2022+)
 - PriceCharting JSON API (sealed + graded prices)
+- Scryfall API (Magic sets/cards/prices) · Lorcast API (Lorcana sets/cards/prices)
 - Pokellector CDN (Japanese set logos)
 - Vercel (hosting + analytics)
+
+## Multi-TCG Browse (architecture)
+
+"Browse Sets" is a hub for multiple trading card games, not just Pokémon. For
+agents/models continuing this work:
+
+**Flow & routes**
+- `/sets` → `BrowseView.vue` — landing page with a branded tile per TCG.
+- `/sets/pokemon` → `SetsView.vue` — the original, full Pokémon experience (JP, variants, charts). **Untouched** — keep it separate.
+- `/sets/:game` → `TcgSetsView.vue` — generic sets grid → cards grid (live prices), mirroring the Pokémon UX. Card "+ Add" opens `AddItemModal` via its `tcgCard` prop (pre-filled, game-tagged single).
+
+**Data layer** — `src/services/tcg/providers.js`
+Each game is normalized to a uniform interface so one UI serves all:
+```
+getSets()        -> [{ id, name, code, releaseDate, total, logo }]
+getSetCards(id)  -> [{ id, name, number, image, price, rarity }]
+```
+`TCGS` (same file) drives the landing tiles; `available:false` renders "coming soon".
+
+**Status (English only; JP deferred)**
+
+| TCG | Source | Status |
+|-----|--------|--------|
+| Pokémon | pokemontcg.io / tcgdex (existing) | ✅ dedicated `SetsView` |
+| Magic | Scryfall (`api.scryfall.com`, CORS `*`) | ✅ browser-direct: sets, cards, USD prices, images |
+| Lorcana | Lorcast (`api.lorcast.com`, CORS `*`) | ✅ browser-direct: sets, cards, USD prices, images |
+| One Piece | optcgapi / apitcg.com | 🔜 deferred — see below |
+| Riftbound | none | 🔜 no public API yet |
+
+**To add a TCG:** add a provider object (`getSets`/`getSetCards`) to
+`providers.js`, register it in `PROVIDERS`, and add a `TCGS` entry with
+`available:true` + `route:'/sets/<id>'`. No view changes needed.
+
+**One Piece notes (deferred):** optcgapi.com has card data + market prices but
+(a) no CORS — browser can't call it, and (b) Cloudflare blocks datacenter IPs —
+a Vercel serverless proxy gets a challenge page (verified). apitcg.com works
+from servers but needs a registered API key. Wire it up once a key/source is
+available; the `getSetCards` shape is ready for it. JP languages for the
+non-Pokémon TCGs are also a future task.
 
 ## Releases
 

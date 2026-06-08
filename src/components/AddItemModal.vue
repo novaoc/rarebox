@@ -7,8 +7,8 @@
       </div>
 
       <div class="modal-body">
-        <!-- Game / TCG selector — only when adding freshly (not from a Pokémon card) -->
-        <div v-if="!props.card" class="form-group mb-3">
+        <!-- Game / TCG selector — only when adding freshly (not from a card) -->
+        <div v-if="!props.card && !props.tcgCard" class="form-group mb-3">
           <label class="form-label">Game / TCG</label>
           <select v-model="game" class="select">
             <option v-for="g in games" :key="g.id" :value="g.id">{{ g.label }}</option>
@@ -196,7 +196,10 @@ import { SUPPORTED_GAMES, searchProducts } from '../services/priceFeedService'
 const props = defineProps({
   card: { type: Object, default: null },
   defaultPortfolioId: { type: String, default: null },
-  defaultType: { type: String, default: null }
+  defaultType: { type: String, default: null },
+  // Pre-filled non-Pokémon card from the Browse view:
+  // { game, name, set, number, image, price }
+  tcgCard: { type: Object, default: null }
 })
 
 const emit = defineEmits(['close', 'added'])
@@ -212,7 +215,7 @@ const types = [
 // Game / TCG. Pokémon keeps the rich pokemontcg.io flow; any other game is
 // tracked via PriceCharting search (singles + sealed). A card passed in from
 // Pokémon search locks the game to pokemon.
-const game = ref('pokemon')
+const game = ref(props.tcgCard?.game || 'pokemon')
 const games = SUPPORTED_GAMES
 const isPokemon = computed(() => game.value === 'pokemon')
 // Whether the currently-selected non-Pokémon product is a sealed product.
@@ -408,6 +411,15 @@ function submit() {
 
 onMounted(() => {
   form.value.portfolioId = props.defaultPortfolioId || store.activePortfolio?.id || store.portfolios[0]?.id || ''
+
+  // Pre-fill from a Browse-view non-Pokémon card (skips the search step).
+  if (props.tcgCard) {
+    form.value.name = props.tcgCard.name || ''
+    form.value.setName = props.tcgCard.set || ''
+    form.value.imageUrl = props.tcgCard.image || ''
+    if (props.tcgCard.price != null) form.value.currentValue = props.tcgCard.price
+    selectedIsSealed.value = false // singles from Browse
+  }
 
   // Pre-select best variant
   if (props.card && variants.value.length > 0) {

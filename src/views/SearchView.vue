@@ -8,7 +8,7 @@
           <input
             v-model="query"
             class="input search-input"
-            placeholder="Search Pokémon cards by name..."
+            placeholder="Search any TCG card — Pokémon, Magic, Lorcana, One Piece..."
             @input="onInput"
             @keyup.enter="doSearch"
           />
@@ -19,6 +19,17 @@
           <span v-else>Search</span>
         </button>
       </div>
+    </div>
+
+    <!-- TCG filter pills -->
+    <div class="tcg-filters" v-if="searched && !loading">
+      <button
+        v-for="f in tcgFilters"
+        :key="f.id"
+        class="btn btn-sm"
+        :class="activeFilter === f.id ? 'btn-primary' : 'btn-secondary'"
+        @click="activeFilter = f.id"
+      >{{ f.label }}</button>
     </div>
 
     <!-- Results -->
@@ -39,7 +50,7 @@
 
       <div v-else class="cards-grid">
         <div
-          v-for="card in results"
+          v-for="card in filteredResults"
           :key="card.id"
           class="card-result"
           @click="selectCard(card)"
@@ -64,7 +75,10 @@
           </div>
           <div class="card-meta">
             <div class="card-name">{{ card.name }}</div>
-            <div class="card-set-info">{{ card.set?.name }}</div>
+            <div class="card-set-info">
+              <span class="card-game-badge" :class="'game-' + card.game">{{ gameLabel(card.game) }}</span>
+              {{ card.set }}
+            </div>
             <div class="card-price-row">
               <span v-if="getPrice(card)" class="card-price">${{ getPrice(card)?.toFixed(2) }}</span>
               <span v-else class="text-muted" style="font-size:11px">No price</span>
@@ -91,9 +105,9 @@
         </div>
         <div class="panel-body">
           <div class="panel-top">
-            <img :src="selectedCard.images?.large || selectedCard.images?.small" class="panel-card-img" draggable="false" />
+            <img :src="selectedCard.image || selectedCard.images?.large || selectedCard.images?.small" class="panel-card-img" draggable="false" />
             <div class="panel-card-info">
-              <div class="panel-card-set">{{ selectedCard.set?.name }} · #{{ selectedCard.number }}</div>
+              <div class="panel-card-set">{{ selectedCard.set }} · #{{ selectedCard.number }}</div>
               <div class="panel-card-rarity">{{ selectedCard.rarity }}</div>
               <div class="panel-card-type">{{ selectedCard.supertype }} · {{ selectedCard.subtypes?.join(', ') }}</div>
 
@@ -165,6 +179,7 @@
       <AddItemModal
         v-if="showAddModal"
         :card="modalCard"
+        :tcg-card="addingTcgCard"
         @close="showAddModal = false"
         @added="onAdded"
       />
@@ -174,7 +189,8 @@
 
 <script setup>
 import { ref, computed } from 'vue'
-import { searchCards, getMarketPrice, formatVariantLabel } from '../services/pokemonApi'
+import { getMarketPrice, formatVariantLabel } from '../services/pokemonApi'
+import { multiSearch } from '../services/tcg/multiSearch'
 import { getAlertsForCard, addAlert, removeAlert, requestNotificationPermission } from '../utils/alerts'
 import PriceChart from '../components/PriceChart.vue'
 import AddItemModal from '../components/AddItemModal.vue'
@@ -191,6 +207,25 @@ const totalPages = computed(() => Math.ceil(totalCount.value / pageSize))
 const selectedCard = ref(null)
 const showAddModal = ref(false)
 const modalCard = ref(null)
+
+// TCG filter
+const activeFilter = ref('all')
+const tcgFilters = [
+  { id: 'all', label: 'All TCGs' },
+  { id: 'pokemon', label: 'Pokémon' },
+  { id: 'mtg', label: 'Magic' },
+  { id: 'lorcana', label: 'Lorcana' },
+  { id: 'one-piece', label: 'One Piece' },
+]
+const allResults = ref([])
+
+const filteredResults = computed(() => {
+  if (activeFilter.value === 'all') return results.value
+  return results.value.filter(c => c.game === activeFilter.value)
+})
+
+const gameLabels = { pokemon: 'PKM', mtg: 'MTG', lorcana: 'LRC', 'one-piece': 'OP' }
+function gameLabel(game) { return gameLabels[game] || game }
 
 // Alert state
 const showAlertForm = ref(false)
@@ -231,15 +266,17 @@ function onInput() {
 
 async function doSearch(resetPage = true) {
   if (!query.value.trim()) return
-  if (resetPage === true) page.value = 1
+  if (resetPage === true) { page.value = 1; activeFilter.value = 'all' }
   loading.value = true
   searched.value = true
   lastQuery.value = query.value
   try {
-    const data = await searchCards(query.value, page.value, pageSize)
-    results.value = data.data || []
+    const data = await multiSearch(query.value, { page: page.value, pageSize })
+    allResults.value = data.cards || []
+    results.value = data.cards || []
     totalCount.value = data.totalCount || 0
   } catch (e) {
+    allResults.value = []
     results.value = []
     totalCount.value = 0
   } finally {
@@ -256,8 +293,10 @@ async function goPage(p) {
 function clearSearch() {
   query.value = ''
   results.value = []
+  allResults.value = []
   searched.value = false
   selectedCard.value = null
+  activeFilter.value = 'all'
 }
 
 function selectCard(card) {
@@ -265,13 +304,36 @@ function selectCard(card) {
 }
 
 function openAddModal(card) {
-  modalCard.value = card
+  if (card.game && card.game !== 'pokemon') {
+    // Non-Pokémon card — use tcgCard prop
+    modalCard.value = null
+    // Set a temporary tcgCard ref for the template
+    addingTcgCard.value = {
+      game: card.game,
+      name: card.name,
+      set: card.set || '',
+      number: card.number,
+      image: card.image,
+      price: card.price,
+    }
+  } else {
+    addingTcgCard.value = null
+    modalCard.value = card._raw || card
+  }
   showAddModal.value = true
 }
 
+const addingTcgCard = ref(null)
+
 function getPrice(card) {
-  const r = getMarketPrice(card)
-  return r?.price || null
+  // Multi-TCG cards have price pre-extracted
+  if (card.price != null) return card.price
+  // Pokémon cards from old flow use getMarketPrice on _raw
+  if (card._raw) {
+    const r = getMarketPrice(card._raw)
+    return r?.price || null
+  }
+  return null
 }
 
 function shortRarity(rarity) {
@@ -295,7 +357,8 @@ function shortRarity(rarity) {
 }
 
 function onAdded() {
-  // brief success feedback could go here
+  showAddModal.value = false
+  addingTcgCard.value = null
 }
 </script>
 
@@ -325,6 +388,8 @@ function onAdded() {
 }
 .search-input { padding-left: 36px; padding-right: 36px; font-size: 15px; }
 .search-clear { position: absolute; right: 4px; }
+
+.tcg-filters { display: flex; gap: 6px; margin-bottom: 16px; flex-wrap: wrap; }
 
 .search-meta { margin-bottom: 16px; font-size: 13px; }
 .search-loading { padding: 60px; }
@@ -376,7 +441,12 @@ function onAdded() {
 
 .card-meta { padding: 10px; }
 .card-name { font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.card-set-info { font-size: 10px; color: var(--text-muted); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.card-set-info { font-size: 10px; color: var(--text-muted); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; align-items: center; gap: 4px; }
+.card-game-badge { font-size: 8px; font-weight: 700; padding: 1px 4px; border-radius: 3px; text-transform: uppercase; letter-spacing: 0.3px; flex-shrink: 0; }
+.game-pokemon { background: #ffcb05; color: #1a1a2e; }
+.game-mtg { background: #f8991c; color: #1a1a2e; }
+.game-lorcana { background: #7b2c9e; color: #fff; }
+.game-one-piece { background: #d7263d; color: #fff; }
 .card-price-row { display: flex; align-items: center; justify-content: space-between; margin-top: 4px; }
 .card-price { font-size: 12px; font-weight: 700; color: var(--accent); }
 .card-rarity { font-size: 9px !important; padding: 1px 5px !important; }

@@ -1,0 +1,296 @@
+<template>
+  <div class="sets-view">
+    <div class="tcg-crumb mb-3">
+      <router-link to="/sets" class="btn btn-ghost btn-sm">← All TCGs</router-link>
+      <span class="tcg-crumb-name">{{ meta?.name || 'Sets' }}</span>
+    </div>
+
+    <!-- Unknown / unsupported game -->
+    <div v-if="!provider" class="empty-state">
+      <div class="icon">🤔</div>
+      <h3>Not available</h3>
+      <p>This TCG isn't supported yet.</p>
+      <router-link to="/sets" class="btn btn-primary mt-3">Back to all TCGs</router-link>
+    </div>
+
+    <!-- Set list -->
+    <div v-else-if="!selectedSet">
+      <div class="sets-header mb-4">
+        <div class="search-input-wrap">
+          <input v-model="setFilter" class="input search-input" placeholder="Filter sets..." style="padding-left:12px" />
+          <button v-if="setFilter" class="btn btn-ghost btn-icon search-clear" @click="setFilter = ''" aria-label="Clear filter">✕</button>
+        </div>
+      </div>
+
+      <div v-if="loadingSets" class="sets-grid">
+        <div v-for="i in 12" :key="i" class="skeleton-card shimmer"></div>
+      </div>
+
+      <div v-else-if="setsError" class="empty-state">
+        <div class="icon">⚠</div>
+        <h3>Failed to load sets</h3>
+        <p>{{ setsError }}</p>
+        <button class="btn btn-primary mt-3" @click="loadSets">Retry</button>
+      </div>
+
+      <div v-else>
+        <div class="sets-count text-muted mb-3" style="font-size:13px">
+          {{ filteredSets.length }} set{{ filteredSets.length !== 1 ? 's' : '' }}
+        </div>
+        <div class="sets-grid">
+          <div v-for="set in filteredSets" :key="set.id" class="set-card" @click="openSet(set)">
+            <div class="set-logo-wrap">
+              <img v-if="set.logo" :src="set.logo" :alt="set.name" class="set-logo" loading="lazy" draggable="false"
+                   @error="$event.target.style.display='none'" />
+              <span v-else class="set-logo-placeholder">{{ meta?.emoji || '◆' }}</span>
+            </div>
+            <div class="set-info">
+              <div class="set-name">{{ set.name }}</div>
+              <div class="set-meta">
+                <span v-if="set.code" class="set-series">{{ set.code }}</span>
+                <template v-if="set.total"><span class="set-dot">·</span><span class="set-count">{{ set.total }} cards</span></template>
+                <template v-if="set.releaseDate"><span class="set-dot">·</span><span class="set-date">{{ formatDate(set.releaseDate) }}</span></template>
+              </div>
+            </div>
+            <span class="set-go" aria-hidden="true">→</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Card browser for selected set -->
+    <div v-else>
+      <div class="set-browse-header mb-4">
+        <button class="btn btn-secondary btn-sm" @click="closeSet">← All Sets</button>
+        <div class="set-browse-title">
+          <span>{{ selectedSet.name }}</span>
+          <span v-if="cards.length" class="badge badge-accent ml-2">{{ cards.length }} cards</span>
+        </div>
+        <div class="set-browse-filters">
+          <input v-model="cardFilter" class="input input-sm" placeholder="Filter cards..." style="width:160px" />
+        </div>
+      </div>
+
+      <div v-if="loadingCards" class="cards-grid">
+        <div v-for="i in 12" :key="i" class="skeleton-card-tall shimmer"></div>
+      </div>
+
+      <div v-else-if="cardsError" class="empty-state">
+        <div class="icon">⚠</div>
+        <h3>Failed to load cards</h3>
+        <p>{{ cardsError }}</p>
+        <button class="btn btn-primary mt-3" @click="loadSetCards(selectedSet)">Retry</button>
+      </div>
+
+      <div v-else>
+        <div class="cards-grid">
+          <div v-for="card in filteredCards" :key="card.id" class="card-result">
+            <div class="card-img-wrap">
+              <img v-if="card.image" :src="card.image" :alt="card.name" class="card-img" loading="lazy" draggable="false"
+                   @error="$event.target.style.display='none'; $event.target.nextElementSibling.style.display='flex'" />
+              <div class="card-img-ph" :style="card.image ? 'display:none' : ''">
+                <span>{{ card.name }}</span>
+                <span class="card-img-num">#{{ card.number }}</span>
+              </div>
+              <div class="card-overlay">
+                <button class="btn btn-primary btn-sm" @click.stop="addCard(card)">+ Add</button>
+              </div>
+            </div>
+            <div class="card-meta">
+              <div class="card-name">{{ card.name }}</div>
+              <div class="card-num text-muted">#{{ card.number }}</div>
+              <div class="card-price-row">
+                <span v-if="card.price" class="card-price">${{ card.price.toFixed(2) }}</span>
+                <span v-else class="text-muted" style="font-size:11px">—</span>
+                <span v-if="card.rarity" class="card-rarity badge badge-accent">{{ card.rarity }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <AddItemModal
+      v-if="addingCard"
+      :tcg-card="addingCard"
+      default-type="card"
+      @close="addingCard = null"
+      @added="addingCard = null"
+    />
+  </div>
+</template>
+
+<script setup>
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
+import { useRoute } from 'vue-router'
+import { getProvider, TCGS } from '../services/tcg/providers'
+import AddItemModal from '../components/AddItemModal.vue'
+
+const route = useRoute()
+const gameId = computed(() => route.params.game)
+const provider = computed(() => getProvider(gameId.value))
+const meta = computed(() => TCGS.find(t => t.id === gameId.value))
+
+const sets = ref([])
+const loadingSets = ref(false)
+const setsError = ref('')
+const setFilter = ref('')
+
+const selectedSet = ref(null)
+const cards = ref([])
+const loadingCards = ref(false)
+const cardsError = ref('')
+const cardFilter = ref('')
+
+const addingCard = ref(null)
+
+// Abort in-flight API calls when navigating away
+let _abort = null
+function abortPending() { if (_abort) { _abort.abort(); _abort = null } }
+onUnmounted(abortPending)
+
+const filteredSets = computed(() => {
+  const q = setFilter.value.trim().toLowerCase()
+  if (!q) return sets.value
+  return sets.value.filter(s => s.name.toLowerCase().includes(q) || (s.code || '').toLowerCase().includes(q))
+})
+
+const filteredCards = computed(() => {
+  const q = cardFilter.value.trim().toLowerCase()
+  if (!q) return cards.value
+  return cards.value.filter(c => c.name.toLowerCase().includes(q) || String(c.number).toLowerCase().includes(q))
+})
+
+async function loadSets() {
+  if (!provider.value) return
+  abortPending()
+  const ac = new AbortController()
+  _abort = ac
+  loadingSets.value = true
+  setsError.value = ''
+  try {
+    sets.value = await provider.value.getSets({ signal: ac.signal })
+  } catch (e) {
+    if (e.name !== 'AbortError') setsError.value = 'Could not reach the card database. Please try again.'
+  } finally {
+    if (_abort === ac) _abort = null
+    loadingSets.value = false
+  }
+}
+
+async function openSet(set) {
+  selectedSet.value = set
+  cards.value = []
+  await loadSetCards(set)
+}
+
+async function loadSetCards(set) {
+  abortPending()
+  const ac = new AbortController()
+  _abort = ac
+  loadingCards.value = true
+  cardsError.value = ''
+  try {
+    cards.value = await provider.value.getSetCards(set.id, { signal: ac.signal })
+    if (cards.value.length === 0) cardsError.value = 'No cards found for this set.'
+  } catch (e) {
+    if (e.name !== 'AbortError') cardsError.value = 'Could not load cards for this set. Please try again.'
+  } finally {
+    if (_abort === ac) _abort = null
+    loadingCards.value = false
+  }
+}
+
+function closeSet() {
+  selectedSet.value = null
+  cards.value = []
+  cardFilter.value = ''
+}
+
+function addCard(card) {
+  addingCard.value = {
+    game: gameId.value,
+    name: card.name,
+    set: selectedSet.value?.name || '',
+    number: card.number,
+    image: card.image,
+    price: card.price,
+  }
+}
+
+function formatDate(d) {
+  if (!d) return ''
+  const dt = new Date(d)
+  if (isNaN(dt)) return ''
+  return dt.toLocaleDateString('en-US', { year: 'numeric', month: 'short' })
+}
+
+// Reset + reload when the game in the route changes
+watch(gameId, () => {
+  selectedSet.value = null
+  cards.value = []
+  setFilter.value = ''
+  loadSets()
+})
+
+onMounted(loadSets)
+</script>
+
+<style scoped>
+.sets-view { max-width: 1100px; margin: 0 auto; }
+
+.tcg-crumb { display: flex; align-items: center; gap: 10px; }
+.tcg-crumb-name { font-size: 13px; color: var(--text-muted); font-weight: 600; }
+
+.sets-header { display: flex; gap: 12px; }
+.search-input-wrap { flex: 1; position: relative; display: flex; align-items: center; max-width: 400px; }
+.search-input { flex: 1; }
+.search-clear { position: absolute; right: 4px; }
+
+.sets-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; }
+.set-card {
+  background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-lg);
+  padding: 14px 16px; display: flex; align-items: center; gap: 14px; cursor: pointer; transition: all 0.2s;
+}
+.set-card:hover { border-color: var(--accent); transform: translateY(-1px); box-shadow: 0 4px 16px rgba(0,0,0,0.25); }
+.set-logo-wrap { width: 48px; min-width: 48px; display: flex; align-items: center; justify-content: center; }
+.set-logo { max-width: 48px; max-height: 40px; object-fit: contain; }
+.set-logo-placeholder { font-size: 26px; }
+.set-info { flex: 1; min-width: 0; }
+.set-name { font-size: 13px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.set-meta { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; margin-top: 3px; font-size: 11px; color: var(--text-muted); }
+.set-dot { color: var(--border); }
+.set-series { color: var(--text-secondary); }
+.set-go { color: var(--text-muted); flex-shrink: 0; }
+.set-card:hover .set-go { color: var(--accent); }
+
+.set-browse-header { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.set-browse-title { display: flex; align-items: center; gap: 8px; font-size: 17px; font-weight: 700; flex: 1; }
+.set-browse-filters { display: flex; gap: 8px; align-items: center; }
+
+.cards-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; margin-bottom: 24px; }
+.card-result { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; transition: all 0.2s; }
+.card-result:hover { border-color: var(--accent); transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.3); }
+.card-img-wrap { position: relative; overflow: hidden; background: #1a1f28; aspect-ratio: 2.5/3.5; }
+.card-img { width: 100%; height: 100%; object-fit: contain; display: block; }
+.card-img-ph { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; padding: 8px; text-align: center; font-size: 11px; color: var(--text-muted); }
+.card-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.55); display: flex; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.2s; }
+.card-result:hover .card-overlay { opacity: 1; }
+@media (hover: none) { .card-overlay { opacity: 1; background: linear-gradient(transparent 60%, rgba(0,0,0,0.7)); align-items: flex-end; padding-bottom: 8px; } }
+.card-meta { padding: 8px 10px; }
+.card-name { font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.card-num { font-size: 10px; }
+.card-price-row { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-top: 4px; }
+.card-price { font-size: 13px; font-weight: 700; color: var(--accent); font-variant-numeric: tabular-nums; }
+.card-rarity { font-size: 9px; }
+
+.skeleton-card { height: 76px; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-lg); }
+.skeleton-card-tall { aspect-ratio: 2.5/3.5; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-lg); }
+.shimmer { position: relative; overflow: hidden; }
+.shimmer::after { content: ''; position: absolute; inset: 0; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.05), transparent); animation: shimmer-anim 1.5s infinite; }
+@keyframes shimmer-anim { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
+@media (prefers-reduced-motion: reduce) {
+  .shimmer::after { animation: none; background: var(--bg-hover); }
+  .set-card:hover, .card-result:hover { transform: none; }
+}
+</style>
