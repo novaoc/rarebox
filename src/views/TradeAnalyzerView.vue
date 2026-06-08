@@ -4,8 +4,6 @@ import CameraViewfinder from '../components/scanner/CameraViewfinder.vue'
 import { useTradeStore } from '../stores/trade'
 import { multiSearch } from '../services/tcg/multiSearch'
 import { scanCard } from '../utils/scanPipeline'
-import type { ScannedCard as ScannedCardData } from '../utils/scanPipeline'
-type ScanResultData = Awaited<ReturnType<typeof scanCard>>
 
 interface SearchResult {
   id: string
@@ -21,11 +19,11 @@ const tradeStore = useTradeStore()
 
 const showScanner = ref(false)
 const showSearch = ref<'A' | 'B' | null>(null)
-const showScanResults = ref(false)
+const showScanReview = ref(false)
 const activeSide = ref<'A' | 'B'>('A')
 const searchQuery = ref('')
 const searchResults = ref<SearchResult[]>([])
-const scanCandidates = ref<SearchResult[]>([])
+const capturedPhoto = ref('')
 const scanError = ref('')
 const searchBusy = ref(false)
 const scanStatus = ref('')
@@ -62,97 +60,54 @@ function openSearch(side: 'A' | 'B') {
   searchResults.value = []
 }
 
-function resizeImage(dataUrl: string, maxWidth = 600): Promise<string> {
-  return new Promise((resolve) => {
-    const img = new Image()
-    img.onload = () => {
-      if (img.width <= maxWidth) { resolve(dataUrl); return }
-      const scale = maxWidth / img.width
-      const w = maxWidth
-      const h = Math.round(img.height * scale)
-      const c = document.createElement('canvas')
-      c.width = w; c.height = h
-      const ctx = c.getContext('2d')!
-      ctx.drawImage(img, 0, 0, w, h)
-      resolve(c.toDataURL('image/jpeg', 0.8))
-    }
-    img.onerror = () => resolve(dataUrl)
-    img.src = dataUrl
-  })
-}
-
-async function onCapture(imageData: string) {
-  scanStatus.value = 'Processing image…'
-  const resized = await resizeImage(imageData)
-
-  scanStatus.value = 'Reading card text…'
-
-  // Overall timeout: 25 seconds
-  let result: ScanResultData
-  try {
-    result = await Promise.race([
-      scanCard(resized),
-      new Promise<ScanResultData>((_, reject) =>
-        setTimeout(() => reject(new Error('Timed out')), 25000)
-      ),
-    ]) as ScanResultData
-  } catch (e: any) {
-    console.error('OCR error:', e)
-    showScanner.value = false
-    scanStatus.value = ''
-    scanError.value = e?.message?.includes('Timed out')
-      ? 'Scan timed out. Try searching manually instead.'
-      : `Scan failed. Try better lighting or search manually.`
-    return
-  }
-
+function onCapture(imageData: string) {
   showScanner.value = false
   scanStatus.value = ''
+  capturedPhoto.value = imageData
+  showScanReview.value = true
+  searchQuery.value = ''
+  searchResults.value = []
 
-  if (result.candidates.length === 0) {
-    const q = result.ocrText.replace(/[^a-zA-Z\s]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 60)
-    if (q.length >= 3) {
-      searchQuery.value = q
-      showSearch.value = activeSide.value
+  // Run OCR in background — if it completes, fill in the search query
+  scanCard(imageData).then(result => {
+    if (result.candidates.length > 0) {
+      // Found cards — pre-fill search with best match name
+      const best = result.candidates[0]
+      searchQuery.value = best.name
       doSearch()
-    } else {
-      scanError.value = 'Could not read card. Try better lighting or search manually.'
+    } else if (result.ocrText.length >= 5) {
+      const q = result.ocrText.replace(/[^a-zA-Z\s]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 60)
+      if (q.length >= 3) {
+        searchQuery.value = q
+        doSearch()
+      }
     }
-    return
-  }
-
-  // Auto-add if only one candidate with decent confidence
-  if (result.candidates.length === 1 && result.ocrConfidence > 20) {
-    addScannedCard(result.candidates[0])
-    return
-  }
-
-  // Show candidates for user to pick
-  scanCandidates.value = result.candidates.map((c: any) => ({
-    id: c.id,
-    name: c.name,
-    set: c.setName || c.set || '',
-    number: c.number,
-    image: c.image,
-    price: c.price,
-    game: c.game,
-  })) as SearchResult[]
-  showScanResults.value = true
+  }).catch(() => {
+    // OCR failed silently — user can type manually
+  })
 }
 
 function addScannedCard(card: SearchResult) {
   tradeStore.addToSide(activeSide.value, {
     id: card.id,
     name: card.name,
-    setName: (card as any).setName || (card as any).set || '',
+    setName: card.set,
     number: card.number,
-    imageUrl: card.image,
-    marketPrice: (card as any).price || 0,
+    imageUrl: capturedPhoto.value,
+    marketPrice: card.price || 0,
     game: card.game,
   })
-  showScanResults.value = false
-  scanCandidates.value = []
-  scanError.value = ''
+  showScanReview.value = false
+  capturedPhoto.value = ''
+  searchQuery.value = ''
+  searchResults.value = []
+}
+
+function cancelScan() {
+  showScanReview.value = false
+  capturedPhoto.value = ''
+  searchQuery.value = ''
+  searchResults.value = []
 }
 
 function dismissError() {
@@ -523,38 +478,58 @@ onMounted(async () => {
       </div>
     </transition>
 
-    <!-- Scan results popup -->
+    <!-- Scan review dialog -->
     <transition name="fade">
-      <div v-if="showScanResults" class="modal-overlay">
+      <div v-if="showScanReview" class="modal-overlay" @click.self="cancelScan">
         <div class="modal" style="max-width:480px">
           <div class="modal-header">
-            <h3>Select Card</h3>
-            <button class="btn btn-ghost btn-icon" @click="showScanResults = false">✕</button>
+            <h3>Add Scanned Card</h3>
+            <button class="btn btn-ghost btn-icon" @click="cancelScan">✕</button>
           </div>
           <div class="modal-body">
-            <p class="text-secondary" style="font-size:13px;margin-bottom:12px">
-              {{ scanCandidates.length }} card{{ scanCandidates.length > 1 ? 's' : '' }} found. Tap the correct one.
-            </p>
-            <div class="scan-candidate-list">
+            <!-- Captured photo -->
+            <div v-if="capturedPhoto" class="scan-photo-preview">
+              <img :src="capturedPhoto" alt="Captured card" />
+            </div>
+
+            <!-- Search input -->
+            <div class="form-group">
+              <label class="form-label">Card Name</label>
+              <input
+                v-model="searchQuery"
+                @input="onSearchInput"
+                placeholder="Type card name…"
+                class="input"
+                autofocus
+              />
+            </div>
+
+            <!-- Search results -->
+            <div v-if="searchBusy" class="spinner spinner-sm mt-2" />
+            <div v-if="searchResults.length > 0" class="scan-candidate-list">
               <div
-                v-for="c in scanCandidates"
-                :key="c.id"
+                v-for="card in searchResults"
+                :key="card.id"
                 class="scan-candidate-row"
-                @click="addScannedCard(c)"
+                @click="addScannedCard(card)"
               >
-                <img :src="c.image" class="search-result-thumb" />
+                <img :src="card.image" class="search-result-thumb" />
                 <div class="search-result-info">
-                  <div class="search-result-name">{{ c.name }}</div>
-                  <div class="search-result-sub">{{ c.set }} &middot; #{{ c.number }}</div>
+                  <div class="search-result-name">{{ card.name }}</div>
+                  <div class="search-result-sub">{{ card.set }} &middot; #{{ card.number }}</div>
                 </div>
                 <span class="font-bold font-mono" style="font-size:12px;flex-shrink:0">
-                  ${{ (c.price || 0).toFixed(2) }}
+                  ${{ (card.price || 0).toFixed(2) }}
                 </span>
               </div>
             </div>
+
+            <p v-if="searchQuery.length >= 2 && searchResults.length === 0 && !searchBusy" class="text-secondary mt-2" style="font-size:13px">
+              No cards found. Try a different name.
+            </p>
           </div>
           <div class="modal-footer">
-            <button class="btn btn-secondary" @click="showScanResults = false">Not here</button>
+            <button class="btn btn-secondary" @click="cancelScan">Cancel</button>
           </div>
         </div>
       </div>
@@ -743,8 +718,25 @@ onMounted(async () => {
   margin-top: 1px;
 }
 
+.scan-photo-preview {
+  margin-bottom: 16px;
+  border-radius: var(--radius);
+  overflow: hidden;
+  border: 1px solid var(--border);
+  background: var(--bg-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  max-height: 200px;
+}
+.scan-photo-preview img {
+  max-width: 100%;
+  max-height: 200px;
+  object-fit: contain;
+}
+
 .scan-candidate-list {
-  max-height: 320px;
+  max-height: 280px;
   overflow-y: auto;
   border: 1px solid var(--border);
   border-radius: var(--radius);
