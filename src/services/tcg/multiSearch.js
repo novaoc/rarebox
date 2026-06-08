@@ -137,20 +137,25 @@ async function searchOnePiece(query) {
 // merges prices by collector number, searches client-side.
 let _riftCards = null
 const PC_RIFTBOUND = 'https://www.pricecharting.com/search-products'
-
+// Fetch PriceCharting prices for a Riftbound set.
+// Returns map of "number|variant" → price.
 async function fetchPCPrices(setName) {
   try {
     const d = await fetchJson(`${PC_RIFTBOUND}?type=prices&q=${encodeURIComponent('riftbound ' + setName)}`)
     const products = d.products || []
     const map = {}
     for (const p of products) {
-      const numMatch = (p.productName || '').match(/#(\d+)/)
-      if (numMatch && p.price1) {
-        const price = typeof p.price1 === 'string'
-          ? parseFloat(p.price1.replace(/[$,]/g, ''))
-          : p.price1
-        if (price > 0) map[numMatch[1]] = price
-      }
+      const name = p.productName || ''
+      const numMatch = name.match(/#(\d+)/)
+      if (!numMatch || !p.price1) continue
+      const price = typeof p.price1 === 'string'
+        ? parseFloat(p.price1.replace(/[$,]/g, ''))
+        : p.price1
+      if (!(price > 0)) continue
+      const variantMatch = name.match(/\[([^\]]+)\]/)
+      const variant = variantMatch ? variantMatch[1].toLowerCase() : ''
+      map[`${numMatch[1]}|${variant}`] = price
+      if (!variant) map[`${numMatch[1]}|`] = price
     }
     return map
   } catch { return {} }
@@ -187,8 +192,14 @@ async function getRiftboundCards() {
     // Fetch PriceCharting prices for this set (one request)
     const priceMap = await fetchPCPrices(s.name)
     for (const card of setCards) {
-      if (card.number && priceMap[card.number]) {
-        card.price = priceMap[card.number]
+      if (!card.number) continue
+      const variantMatch = card.name.match(/\(([^)]+)\)/)
+      const variant = variantMatch ? variantMatch[1].toLowerCase() : ''
+      const key = `${card.number}|${variant}`
+      if (priceMap[key] != null) {
+        card.price = priceMap[key]
+      } else if (!variant && priceMap[`${card.number}|`] != null) {
+        card.price = priceMap[`${card.number}|`]
       }
     }
     all.push(...setCards)
