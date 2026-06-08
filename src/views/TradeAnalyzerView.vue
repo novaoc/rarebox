@@ -31,8 +31,34 @@ let searchTimer: ReturnType<typeof setTimeout> | null = null
 
 const searchCache = new Map<string, SearchResult[]>()
 
+const searchCategory = ref<'cards' | 'sealed'>('cards')
+const activeGradeCard = ref<string | null>(null)
+
+const GRADE_COMPANIES = ['PSA', 'BGS', 'CGC', 'SGC'] as const
+const GRADES: Record<string, string[]> = {
+  PSA: ['10', '9', '8', '7', '6', '5', '4', '3', '2', '1'],
+  BGS: ['10', '9.5', '9', '8.5', '8', '7', '6', '5', '4', '3', '2', '1'],
+  CGC: ['10', '9.5', '9', '8.5', '8', '7', '6', '5', '4', '3', '2', '1'],
+  SGC: ['10', '9.5', '9', '8', '7', '6', '5', '4', '3', '2', '1'],
+}
+
+function effectivePrice(card: any): number {
+  const base = card.currentMarketPrice ?? card.marketPrice ?? card.purchasePrice ?? 0
+  if (!card.graded) return base
+  const mults: Record<string, Record<string, number>> = {
+    PSA:  { '10': 2.0, '9': 1.5, '8': 1.2, '7': 1.0, '6': 0.8, '5': 0.7, '4': 0.5, '3': 0.4, '2': 0.3, '1': 0.2 },
+    BGS:  { '10': 2.0, '9.5': 1.7, '9': 1.4, '8.5': 1.2, '8': 1.1, '7': 1.0, '6': 0.8, '5': 0.7, '4': 0.5, '3': 0.4, '2': 0.3, '1': 0.2 },
+    CGC:  { '10': 2.0, '9.5': 1.5, '9': 1.3, '8.5': 1.1, '8': 1.0, '7': 0.8, '6': 0.7, '5': 0.6, '4': 0.5, '3': 0.4, '2': 0.3, '1': 0.2 },
+    SGC:  { '10': 1.8, '9.5': 1.4, '9': 1.2, '8': 1.0, '7': 0.8, '6': 0.7, '5': 0.6, '4': 0.5, '3': 0.4, '2': 0.3, '1': 0.2 },
+  }
+  const mult = mults[card.gradeCompany]?.[card.grade] || 1.0
+  return base * mult
+}
+
 const deltaFormatted = computed(() => {
-  const d = tradeStore.priceDelta
+  const a = tradeStore.sideA.items.reduce((s, c) => s + effectivePrice(c), 0)
+  const b = tradeStore.sideB.items.reduce((s, c) => s + effectivePrice(c), 0)
+  const d = b - a
   const abs = Math.abs(d)
   if (abs < 0.01) return '$0.00'
   const sign = d > 0 ? '+' : '-'
@@ -40,7 +66,9 @@ const deltaFormatted = computed(() => {
 })
 
 const deltaLabel = computed(() => {
-  const d = tradeStore.priceDelta
+  const a = tradeStore.sideA.items.reduce((s, c) => s + effectivePrice(c), 0)
+  const b = tradeStore.sideB.items.reduce((s, c) => s + effectivePrice(c), 0)
+  const d = b - a
   if (d > 0.01) return "You're winning"
   if (d < -0.01) return "You're losing"
   return 'Even trade'
@@ -163,8 +191,9 @@ function onSearchInput() {
   if (searchTimer) clearTimeout(searchTimer)
   const q = searchQuery.value.trim()
   if (q.length < 2) { searchResults.value = []; return }
-  if (searchCache.has(q)) {
-    searchResults.value = searchCache.get(q)!
+  const cacheKey = `${searchCategory.value}:${q}`
+  if (searchCache.has(cacheKey)) {
+    searchResults.value = searchCache.get(cacheKey)!
     return
   }
   searchTimer = setTimeout(doSearch, 150)
@@ -175,9 +204,9 @@ async function doSearch() {
   if (q.length < 2) return
   searchBusy.value = true
   try {
-    const res = await multiSearch(q, { page: 1, pageSize: 15 })
+    const res = await multiSearch(q, { page: 1, pageSize: 15, category: searchCategory.value })
     const cards = (res.cards || []) as SearchResult[]
-    searchCache.set(q, cards)
+    searchCache.set(`${searchCategory.value}:${q}`, cards)
     if (searchCache.size > 50) {
       const first = searchCache.keys().next().value
       if (first) searchCache.delete(first)
@@ -315,11 +344,60 @@ onMounted(async () => {
               draggable="false"
             />
             <div class="card-row-info">
-              <div class="card-row-name">{{ card.name }}</div>
+              <div class="card-row-name">
+                {{ card.name }}
+                <span
+                  v-if="card.graded"
+                  class="grade-badge"
+                  @click.stop="activeGradeCard = activeGradeCard === card.tradeId ? null : card.tradeId"
+                >{{ card.gradeCompany }} {{ card.grade }}</span>
+                <span
+                  v-else
+                  class="grade-badge ungraded"
+                  @click.stop="activeGradeCard = activeGradeCard === card.tradeId ? null : card.tradeId"
+                >Add Grade</span>
+              </div>
               <div class="card-row-sub">{{ card.setName }} &middot; {{ card.number }}</div>
+              <div v-if="activeGradeCard === card.tradeId" class="grade-picker" @click.stop>
+                <label class="grade-toggle">
+                  <input
+                    type="checkbox"
+                    :checked="card.graded"
+                    @change="tradeStore.updateCardGrade('A', card.tradeId, {
+                      graded: !card.graded,
+                      gradeCompany: card.gradeCompany || 'PSA',
+                      grade: card.grade || '9',
+                    })"
+                  />
+                  Graded
+                </label>
+                <div v-if="card.graded" class="grade-selects">
+                  <select
+                    :value="card.gradeCompany"
+                    @change="tradeStore.updateCardGrade('A', card.tradeId, {
+                      graded: true,
+                      gradeCompany: ($event.target as HTMLSelectElement).value,
+                      grade: card.grade || '9',
+                    })"
+                  >
+                    <option v-for="c in GRADE_COMPANIES" :key="c" :value="c">{{ c }}</option>
+                  </select>
+                  <select
+                    :value="card.grade"
+                    @change="tradeStore.updateCardGrade('A', card.tradeId, {
+                      graded: true,
+                      gradeCompany: card.gradeCompany || 'PSA',
+                      grade: ($event.target as HTMLSelectElement).value,
+                    })"
+                  >
+                    <option v-for="g in GRADES[card.gradeCompany || 'PSA'] || []" :key="g" :value="g">{{ g }}</option>
+                  </select>
+                </div>
+              </div>
             </div>
             <div class="text-right" style="flex-shrink:0">
-              <div class="font-bold font-mono">${{ card.marketPrice.toFixed(2) }}</div>
+              <div class="font-bold font-mono">${{ effectivePrice(card).toFixed(2) }}</div>
+              <div v-if="card.graded" class="text-secondary" style="font-size:11px">raw ${{ (card.marketPrice || 0).toFixed(2) }}</div>
             </div>
             <button
               class="btn btn-ghost btn-icon btn-sm"
@@ -338,10 +416,20 @@ onMounted(async () => {
 
         <!-- Search panel -->
         <div v-if="showSearch === 'A'" class="search-panel">
+          <div class="search-category-toggle">
+            <button
+              :class="['btn btn-sm', searchCategory === 'cards' ? 'btn-primary' : 'btn-ghost']"
+              @click="searchCategory = 'cards'; searchQuery = ''; searchResults = []"
+            >Cards</button>
+            <button
+              :class="['btn btn-sm', searchCategory === 'sealed' ? 'btn-primary' : 'btn-ghost']"
+              @click="searchCategory = 'sealed'; searchQuery = ''; searchResults = []"
+            >Sealed</button>
+          </div>
           <input
             v-model="searchQuery"
             @input="onSearchInput"
-            placeholder="Search cards to add…"
+            :placeholder="searchCategory === 'cards' ? 'Search cards to add…' : 'Search sealed products…'"
             class="input"
             autofocus
           />
@@ -441,11 +529,60 @@ onMounted(async () => {
               draggable="false"
             />
             <div class="card-row-info">
-              <div class="card-row-name">{{ card.name }}</div>
+              <div class="card-row-name">
+                {{ card.name }}
+                <span
+                  v-if="card.graded"
+                  class="grade-badge"
+                  @click.stop="activeGradeCard = activeGradeCard === card.tradeId ? null : card.tradeId"
+                >{{ card.gradeCompany }} {{ card.grade }}</span>
+                <span
+                  v-else
+                  class="grade-badge ungraded"
+                  @click.stop="activeGradeCard = activeGradeCard === card.tradeId ? null : card.tradeId"
+                >Add Grade</span>
+              </div>
               <div class="card-row-sub">{{ card.setName }} &middot; {{ card.number }}</div>
+              <div v-if="activeGradeCard === card.tradeId" class="grade-picker" @click.stop>
+                <label class="grade-toggle">
+                  <input
+                    type="checkbox"
+                    :checked="card.graded"
+                    @change="tradeStore.updateCardGrade('B', card.tradeId, {
+                      graded: !card.graded,
+                      gradeCompany: card.gradeCompany || 'PSA',
+                      grade: card.grade || '9',
+                    })"
+                  />
+                  Graded
+                </label>
+                <div v-if="card.graded" class="grade-selects">
+                  <select
+                    :value="card.gradeCompany"
+                    @change="tradeStore.updateCardGrade('B', card.tradeId, {
+                      graded: true,
+                      gradeCompany: ($event.target as HTMLSelectElement).value,
+                      grade: card.grade || '9',
+                    })"
+                  >
+                    <option v-for="c in GRADE_COMPANIES" :key="c" :value="c">{{ c }}</option>
+                  </select>
+                  <select
+                    :value="card.grade"
+                    @change="tradeStore.updateCardGrade('B', card.tradeId, {
+                      graded: true,
+                      gradeCompany: card.gradeCompany || 'PSA',
+                      grade: ($event.target as HTMLSelectElement).value,
+                    })"
+                  >
+                    <option v-for="g in GRADES[card.gradeCompany || 'PSA'] || []" :key="g" :value="g">{{ g }}</option>
+                  </select>
+                </div>
+              </div>
             </div>
             <div class="text-right" style="flex-shrink:0">
-              <div class="font-bold font-mono">${{ card.marketPrice.toFixed(2) }}</div>
+              <div class="font-bold font-mono">${{ effectivePrice(card).toFixed(2) }}</div>
+              <div v-if="card.graded" class="text-secondary" style="font-size:11px">raw ${{ (card.marketPrice || 0).toFixed(2) }}</div>
             </div>
             <button
               class="btn btn-ghost btn-icon btn-sm"
@@ -464,10 +601,20 @@ onMounted(async () => {
 
         <!-- Search panel -->
         <div v-if="showSearch === 'B'" class="search-panel">
+          <div class="search-category-toggle">
+            <button
+              :class="['btn btn-sm', searchCategory === 'cards' ? 'btn-primary' : 'btn-ghost']"
+              @click="searchCategory = 'cards'; searchQuery = ''; searchResults = []"
+            >Cards</button>
+            <button
+              :class="['btn btn-sm', searchCategory === 'sealed' ? 'btn-primary' : 'btn-ghost']"
+              @click="searchCategory = 'sealed'; searchQuery = ''; searchResults = []"
+            >Sealed</button>
+          </div>
           <input
             v-model="searchQuery"
             @input="onSearchInput"
-            placeholder="Search cards to add…"
+            :placeholder="searchCategory === 'cards' ? 'Search cards to add…' : 'Search sealed products…'"
             class="input"
             autofocus
           />
@@ -815,6 +962,68 @@ onMounted(async () => {
   justify-content: center;
   background: rgba(0,0,0,0.85);
   z-index: 1000;
+}
+
+/* Grade picker */
+.grade-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--accent-dim);
+  color: var(--accent);
+  cursor: pointer;
+  vertical-align: middle;
+  margin-left: 4px;
+  letter-spacing: 0.3px;
+}
+.grade-badge.ungraded {
+  background: var(--bg-hover);
+  color: var(--text-muted);
+  font-weight: 400;
+}
+.grade-picker {
+  margin-top: 6px;
+  padding: 8px 10px;
+  background: var(--bg-hover);
+  border-radius: var(--radius);
+  border: 1px solid var(--border-subtle);
+}
+.grade-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+.grade-toggle input { margin: 0; }
+.grade-selects {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+}
+.grade-selects select {
+  flex: 1;
+  font-size: 12px;
+  padding: 3px 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+/* Search category toggle */
+.search-category-toggle {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+.search-category-toggle .btn {
+  font-size: 12px;
+  padding: 4px 12px;
 }
 
 /* Responsive */

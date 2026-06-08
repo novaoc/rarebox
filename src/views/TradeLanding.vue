@@ -5,7 +5,7 @@
         <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-arrow-left-right"><path d="M17 2 21 6 17 10"/><path d="M7 22 3 18 7 14"/><path d="M21 6H3"/><path d="M3 18h18"/></svg>
       </div>
       <h1 class="landing-title">Trade Analyzer</h1>
-      <p class="landing-subtitle">Compare the value of cards you're trading to make sure every deal is fair.</p>
+      <p class="landing-subtitle">Compare the value of cards you're trading to make sure every deal is fair. <strong>Scan</strong> single cards with your camera &mdash; or <strong>search</strong> any card or sealed product by name.</p>
 
       <div class="feature-list">
         <div class="feature-item">
