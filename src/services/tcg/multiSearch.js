@@ -250,19 +250,24 @@ async function searchSealed(query) {
 // ── Main search ─────────────────────────────────────────────────────────────
 // Searches all TCGs in parallel, merges + sorts by relevance (name match first).
 
-export async function multiSearch(query, { page = 1, pageSize = 20, category = 'cards' } = {}) {
+const ALL_PROVIDERS = {
+  pokemon: (q, p, ps) => searchPokemon(q, p, ps),
+  mtg: (q, p, ps) => searchMtg(q, p, ps),
+  lorcana: (q) => searchLorcana(q),
+  'one-piece': (q) => searchOnePiece(q),
+  riftbound: (q) => searchRiftbound(q),
+}
+
+export async function multiSearch(query, { page = 1, pageSize = 20, category = 'cards', providers } = {}) {
   if (category === 'sealed') {
     const result = await searchSealed(query).catch(() => ({ cards: [], total: 0 }))
     return result
   }
 
-  const searches = [
-    searchPokemon(query, page, pageSize).catch(() => ({ cards: [], total: 0 })),
-    searchMtg(query, page, pageSize).catch(() => ({ cards: [], total: 0 })),
-    searchLorcana(query).catch(() => ({ cards: [], total: 0 })),
-    searchOnePiece(query).catch(() => ({ cards: [], total: 0 })),
-    searchRiftbound(query).catch(() => ({ cards: [], total: 0 })),
-  ]
+  const active = providers || Object.keys(ALL_PROVIDERS)
+  const searches = active.map(k =>
+    ALL_PROVIDERS[k](query, page, pageSize).catch(() => ({ cards: [], total: 0 })),
+  )
 
   const results = await Promise.all(searches)
   const allCards = results.flatMap(r => r.cards)

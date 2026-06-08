@@ -18,11 +18,14 @@ export interface ScanResult {
   ocrConfidence: number
 }
 
+// Fast providers for scan — skip Riftbound & OnePiece (slow initial loads)
+const SCAN_PROVIDERS = ['pokemon', 'mtg', 'lorcana']
+
 async function searchWithTimeout(query: string, size: number): Promise<any[]> {
-  const timeout = 12000
+  const timeout = 25000
   try {
     const res: any = await Promise.race([
-      multiSearch(query, { page: 1, pageSize: size }),
+      multiSearch(query, { page: 1, pageSize: size, providers: SCAN_PROVIDERS }),
       new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), timeout)),
     ])
     return res?.cards || []
@@ -31,8 +34,8 @@ async function searchWithTimeout(query: string, size: number): Promise<any[]> {
   }
 }
 
-export async function scanCard(imageData: string): Promise<ScanResult> {
-  const ocr = await recognizeCard(imageData)
+export async function scanCard(imageData: string, onProgress?: (pct: number) => void): Promise<ScanResult> {
+  const ocr = await recognizeCard(imageData, onProgress)
   const result: ScanResult = {
     card: null,
     candidates: [],
@@ -40,7 +43,6 @@ export async function scanCard(imageData: string): Promise<ScanResult> {
     ocrConfidence: ocr.confidence,
   }
 
-  // Try OCR-extracted query first
   let allCards: any[] = []
   if (ocr.searchQuery) {
     allCards = await searchWithTimeout(ocr.searchQuery, 15)

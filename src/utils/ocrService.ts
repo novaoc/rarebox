@@ -1,4 +1,4 @@
-import Tesseract from 'tesseract.js'
+import { createWorker } from 'tesseract.js'
 
 export interface OcrResult {
   text: string
@@ -7,12 +7,29 @@ export interface OcrResult {
   cardNumber: string | null
 }
 
-export async function recognizeCard(imageData: string): Promise<OcrResult> {
-  const { data } = await Tesseract.recognize(
-    imageData,
-    'eng',
-    { logger: () => {} },
-  )
+let _worker: any = null
+let _preloaded = false
+
+export async function preloadOcrWorker() {
+  if (_preloaded) return
+  _worker = await createWorker('eng')
+  _preloaded = true
+}
+
+export async function recognizeCard(imageData: string, onProgress?: (pct: number) => void): Promise<OcrResult> {
+  if (!_worker) {
+    _worker = await createWorker('eng')
+    _preloaded = true
+  }
+
+  const { data } = await _worker.recognize(imageData, undefined, {
+    logger: (m: any) => {
+      if (m.status === 'recognizing text' && onProgress) {
+        const pct = Math.round((m.progress || 0) * 100)
+        onProgress(pct)
+      }
+    },
+  })
 
   const text = data.text || ''
   const confidence = data.confidence
@@ -31,9 +48,6 @@ function cleanWord(w: string): string {
 
 function buildQuery(text: string): string | null {
   const lines = text.split('\n').map(l => l.trim()).filter(Boolean)
-  const words = text.split(/\s+/).map(cleanWord).filter(Boolean)
-
-  // Find lines that contain capitalized words (likely card names)
   const nameLines = lines.filter(line => {
     const cleaned = line.replace(/[^a-zA-Z\s]/g, '').trim()
     const capWords = cleaned.split(/\s+/).filter(w =>
@@ -42,7 +56,6 @@ function buildQuery(text: string): string | null {
     return capWords.length >= 1 && cleaned.length >= 4
   })
 
-  // Score each line: prefer longer, more capitalized words
   const scored = nameLines.map(line => {
     const cleaned = line.replace(/[^a-zA-Z\s]/g, '').trim()
     const capWords = cleaned.split(/\s+/).filter(w =>
@@ -56,12 +69,10 @@ function buildQuery(text: string): string | null {
 
   if (scored.length > 0) {
     const best = scored[0]
-    // Take the capitalized words as the query
     const query = best.capWords.join(' ')
     if (query.length >= 3) return query
   }
 
-  // Fallback: remove non-alpha chars, find longest meaningful fragment
   const fragments = text
     .split(/[^a-zA-Z\s]/)
     .map(s => s.trim())

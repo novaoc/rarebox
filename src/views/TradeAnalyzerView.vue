@@ -4,6 +4,7 @@ import CameraViewfinder from '../components/scanner/CameraViewfinder.vue'
 import { useTradeStore } from '../stores/trade'
 import { multiSearch } from '../services/tcg/multiSearch'
 import { scanCard } from '../utils/scanPipeline'
+import { preloadOcrWorker } from '../utils/ocrService'
 
 interface SearchResult {
   id: string
@@ -111,12 +112,13 @@ async function onCapture(imageData: string) {
   scanStatus.value = 'Processing…'
   showScanner.value = false
   const resized = await resizeImage(imageData)
-  scanStatus.value = 'Identifying card…'
 
   let result: any
   try {
     result = await Promise.race([
-      scanCard(resized),
+      scanCard(resized, (pct) => {
+        scanStatus.value = pct < 100 ? `Reading card… ${pct}%` : 'Identifying card…'
+      }),
       new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 45000)),
     ])
   } catch (e: any) {
@@ -235,6 +237,7 @@ function addCard(card: SearchResult) {
 
 onMounted(async () => {
   if (!tradeStore.initialized) await tradeStore.init()
+  preloadOcrWorker().catch(() => {})
 })
 </script>
 
