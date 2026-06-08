@@ -158,49 +158,59 @@ async function fetchOnePiece(onProgress) {
 }
 
 // ── Yu-Gi-Oh ────────────────────────────────────────────────────────────────
-// Fetches set list, then cards per set (batched to avoid rate limits).
+// Uses batch fetching (5000 cards per request) instead of per-set.
+// ~14,400 cards total = 3 requests.
 
 async function fetchYugioh(onProgress) {
-  onProgress({ game: 'yugioh', phase: 'Fetching sets…', loaded: 0, total: 0 })
-
   const YGO_API = 'https://db.ygoprodeck.com/api/v7'
-  const setsData = await fetchJson(`${YGO_API}/cardsets.php`)
-  const sets = setsData.filter(s => s.num_of_cards > 0 && s.tcg_date)
-
-  onProgress({ game: 'yugioh', phase: `Loading ${sets.length} sets…`, loaded: 0, total: sets.length })
-
+  const BATCH_SIZE = 5000
   const allCards = []
-  const seen = new Set() // dedupe by id
+  const seen = new Set()
 
-  for (let i = 0; i < sets.length; i++) {
-    const s = sets[i]
-    try {
-      const d = await fetchJson(`${YGO_API}/cardinfo.php?cardset=${encodeURIComponent(s.set_name)}`)
-      for (const c of (d.data || [])) {
-        if (seen.has(c.id)) continue
-        seen.add(c.id)
-        const setInfo = (c.card_sets || []).find(cs => cs.set_name === s.set_name) || {}
-        const prices = c.card_prices?.[0] || {}
-        const imgs = c.card_images || []
-        allCards.push({
-          id: String(c.id),
-          name: c.name,
-          set: s.set_name,
-          number: setInfo.set_code || '',
-          image: imgs[0]?.image_url_small || imgs[0]?.image_url || '',
-          price: num(prices.tcgplayer_price),
-          rarity: setInfo.set_rarity || '',
-        })
-      }
-    } catch { /* skip failed sets */ }
+  // First request to get total count
+  onProgress({ game: 'yugioh', phase: 'Fetching cards…', loaded: 0, total: 0 })
+
+  let offset = 0
+  let hasMore = true
+
+  while (hasMore) {
+    const d = await fetchJson(`${YGO_API}/cardinfo.php?num=${BATCH_SIZE}&offset=${offset}`)
+    const cards = d.data || []
+
+    if (cards.length === 0) { hasMore = false; break }
+
+    for (const c of cards) {
+      if (seen.has(c.id)) continue
+      seen.add(c.id)
+
+      const prices = c.card_prices?.[0] || {}
+      const imgs = c.card_images || []
+      // Use the first set the card appears in
+      const setInfo = c.card_sets?.[0] || {}
+
+      allCards.push({
+        id: String(c.id),
+        name: c.name,
+        set: setInfo.set_name || '',
+        number: setInfo.set_code || '',
+        image: imgs[0]?.image_url_small || imgs[0]?.image_url || '',
+        price: num(prices.tcgplayer_price),
+        rarity: setInfo.set_rarity || '',
+      })
+    }
+
+    offset += BATCH_SIZE
+    hasMore = cards.length === BATCH_SIZE
 
     onProgress({
       game: 'yugioh',
-      phase: `Loading sets… ${i + 1}/${sets.length}`,
-      loaded: i + 1,
-      total: sets.length,
+      phase: `Fetching cards… ${allCards.length.toLocaleString()}`,
+      loaded: allCards.length,
+      total: 0,
     })
   }
+
+  onProgress({ game: 'yugioh', phase: `Processing ${allCards.length} cards…`, loaded: allCards.length, total: allCards.length })
 
   await saveGameCards('yugioh', allCards)
   return allCards.length
