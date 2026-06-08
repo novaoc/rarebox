@@ -565,7 +565,7 @@ function getItemName(item) {
   return item.cardData?.name || '—'
 }
 
-const GAME_LABELS = { magic: 'Magic', 'one-piece': 'One Piece', lorcana: 'Lorcana', riftbound: 'Riftbound' }
+const GAME_LABELS = { magic: 'Magic', yugioh: 'Yu-Gi-Oh!', 'one-piece': 'One Piece', lorcana: 'Lorcana', riftbound: 'Riftbound' }
 
 function getItemSub(item) {
   // Graded cards (all TCGs): show grade + company + set

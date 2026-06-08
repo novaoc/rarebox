@@ -1,10 +1,10 @@
 import { createRouter, createWebHistory } from 'vue-router'
 
 const routes = [
-  { path: '/', name: 'Dashboard', component: () => import('../views/DashboardView.vue'), meta: { title: 'Dashboard', description: 'Track your TCG collection — Pokémon, Magic, Lorcana, One Piece, and Riftbound. Live prices, portfolio charts, and gain/loss.' } },
+  { path: '/', name: 'Dashboard', component: () => import('../views/DashboardView.vue'), meta: { title: 'Dashboard', description: 'Track your TCG collection — Pokémon, Magic, Yu-Gi-Oh!, Lorcana, One Piece, and Riftbound. Live prices, portfolio charts, and gain/loss.' } },
   { path: '/mockup', name: 'Mockup', component: () => import('../views/MockDashboard.vue'), meta: { title: 'New Dashboard Mockup', description: 'Prototype of the new dark-themed dashboard interface.' } },
-  { path: '/search', name: 'Search', component: () => import('../views/SearchView.vue'), meta: { title: 'Search Cards', description: 'Search any card across Pokémon, Magic, Lorcana, One Piece, and Riftbound. Live market prices and price history charts.' } },
-  { path: '/sets', name: 'Browse', component: () => import('../views/BrowseView.vue'), meta: { title: 'Browse Sets', description: 'Browse trading card games — Pokémon, Magic, One Piece, Lorcana and more. Explore sets, cards and live prices.' } },
+  { path: '/search', name: 'Search', component: () => import('../views/SearchView.vue'), meta: { title: 'Search Cards', description: 'Search any card across Pokémon, Magic, Yu-Gi-Oh!, Lorcana, One Piece, and Riftbound. Live market prices and price history charts.' } },
+  { path: '/sets', name: 'Browse', component: () => import('../views/BrowseView.vue'), meta: { title: 'Browse Sets', description: 'Browse trading card games — Pokémon, Magic, Yu-Gi-Oh!, One Piece, Lorcana and more. Explore sets, cards and live prices.' } },
   { path: '/sets/pokemon', name: 'Sets', component: () => import('../views/SetsView.vue'), meta: { title: 'Pokémon Sets', description: 'Browse every Pokémon TCG set. View cards, release dates, and card counts.' } },
   { path: '/sets/:game', name: 'TcgSets', component: () => import('../views/TcgSetsView.vue'), meta: { title: 'Browse Sets', description: 'Browse sets and cards with live prices.' } },  // ⚠ must be AFTER /sets/pokemon
   { path: '/portfolio/:id', name: 'Portfolio', component: () => import('../views/PortfolioView.vue'), meta: { title: 'Portfolio', description: 'View portfolio items, value charts, gain/loss, and manage your collection.' } },
@@ -33,13 +33,13 @@ router.afterEach((to) => {
     desc.setAttribute('name', 'description')
     document.head.appendChild(desc)
   }
-  desc.setAttribute('content', to.meta.description || 'Track your TCG collection — Pokémon, Magic, Lorcana, One Piece, and Riftbound. Live prices and portfolio charts.')
+  desc.setAttribute('content', to.meta.description || 'Track your TCG collection — Pokémon, Magic, Yu-Gi-Oh!, Lorcana, One Piece, and Riftbound. Live prices and portfolio charts.')
 
   // Update OG tags
   let ogTitle = document.querySelector('meta[property="og:title"]')
   if (ogTitle) ogTitle.setAttribute('content', `${title} — Rarebox`)
   let ogDesc = document.querySelector('meta[property="og:description"]')
-  if (ogDesc) ogDesc.setAttribute('content', to.meta.description || 'Track your TCG collection — Pokémon, Magic, Lorcana, One Piece, and Riftbound. Live prices and portfolio charts.')
+  if (ogDesc) ogDesc.setAttribute('content', to.meta.description || 'Track your TCG collection — Pokémon, Magic, Yu-Gi-Oh!, Lorcana, One Piece, and Riftbound. Live prices and portfolio charts.')
 })
 
 export default router

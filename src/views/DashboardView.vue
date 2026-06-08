@@ -8,7 +8,7 @@
         <div class="hero-content">
           <div class="hero-icon">⬡</div>
           <h1 class="hero-title">Rarebox</h1>
-          <p class="hero-sub">Track your TCG collection — Pokémon, Magic, Lorcana, One Piece, and Riftbound — with live prices, portfolio charts, and deck building tools. Free. Private. Runs in your browser.</p>
+          <p class="hero-sub">Track your TCG collection — Pokémon, Magic, Yu-Gi-Oh!, Lorcana, One Piece, and Riftbound — with live prices, portfolio charts, and deck building tools. Free. Private. Runs in your browser.</p>
           <div class="hero-actions">
             <router-link to="/search" class="btn btn-primary btn-lg hero-cta">Get Started</router-link>
             <button class="btn btn-secondary btn-lg" @click="scrollToFeatures">See Features</button>
@@ -30,14 +30,14 @@
             <span class="feature-icon">🃏</span>
             <div>
               <h2>Collection Management</h2>
-              <p class="feature-sub">Add cards, sealed products, and graded slabs to organized portfolios. Supports Pokémon, Magic, Lorcana, One Piece, and Riftbound.</p>
+              <p class="feature-sub">Add cards, sealed products, and graded slabs to organized portfolios. Supports Pokémon, Magic, Yu-Gi-Oh!, Lorcana, One Piece, and Riftbound.</p>
             </div>
           </div>
           <div class="feature-grid">
             <div class="feature-card">
               <div class="feature-card-icon">🔍</div>
               <h3>Search Any Card</h3>
-              <p>Search across every set for Pokémon, Magic, Lorcana, One Piece, and Riftbound. Live results with card images and market prices.</p>
+              <p>Search across every set for Pokémon, Magic, Yu-Gi-Oh!, Lorcana, One Piece, and Riftbound. Live results with card images and market prices.</p>
             </div>
             <div class="feature-card">
               <div class="feature-card-icon">📦</div>

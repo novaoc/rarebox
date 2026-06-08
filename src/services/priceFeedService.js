@@ -19,6 +19,7 @@ const CACHE_DURATION = 6 * 60 * 60 * 1000 // 6 hours
 export const SUPPORTED_GAMES = [
   { id: 'pokemon',   label: 'Pokémon',   suffix: 'pokemon',   match: 'pokemon' },
   { id: 'magic',     label: 'Magic: The Gathering', suffix: 'magic', match: 'magic' },
+  { id: 'yugioh',    label: 'Yu-Gi-Oh!', suffix: 'yugioh',   match: 'yugioh' },
   { id: 'one-piece', label: 'One Piece',  suffix: 'one piece', match: 'one piece' },
   { id: 'lorcana',   label: 'Lorcana',    suffix: 'lorcana',   match: 'lorcana' },
   { id: 'riftbound', label: 'Riftbound',  suffix: 'riftbound', match: 'riftbound' },

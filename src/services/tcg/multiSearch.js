@@ -1,5 +1,6 @@
 // Multi-TCG search — fans out to Pokémon (pokemontcg.io), MTG (Scryfall),
-// Lorcana (Lorcast), and One Piece (optcgapi) in parallel.
+// Lorcana (Lorcast), One Piece (optcgapi), Riftbound (riftcodex), and
+// Yu-Gi-Oh! (YGOPRODeck) in parallel.
 // Results are normalised to a common shape so the search UI works for all.
 
 const TIMEOUT = 12000
@@ -132,6 +133,33 @@ async function searchOnePiece(query) {
   }
 }
 
+// ── Yu-Gi-Oh!: YGOPRODeck ─────────────────────────────────────────────────────
+// Uses the fname (fuzzy name) endpoint for search. Returns cards with prices.
+async function searchYugioh(query) {
+  const url = `https://db.ygoprodeck.com/api/v7/cardinfo.php?fname=${encodeURIComponent(query)}`
+  const d = await fetchJson(url)
+  const cards = d.data || []
+  return {
+    cards: cards.slice(0, 50).map(c => {
+      const prices = c.card_prices?.[0] || {}
+      const imgs = c.card_images || []
+      const setInfo = c.card_sets?.[0] || {}
+      return {
+        id: String(c.id),
+        name: c.name,
+        number: setInfo.set_code || '',
+        set: setInfo.set_name || '',
+        image: imgs[0]?.image_url_small || imgs[0]?.image_url || '',
+        price: num(prices.tcgplayer_price),
+        rarity: setInfo.set_rarity || '',
+        game: 'yugioh',
+        _raw: c,
+      }
+    }),
+    total: cards.length,
+  }
+}
+
 // ── Riftbound: client-side search from riftcodex.com ─────────────────────────
 // Fetches all cards (paginated), fetches prices from PriceCharting per set,
 // merges prices by collector number, searches client-side.
@@ -234,6 +262,7 @@ export async function multiSearch(query, { page = 1, pageSize = 20 } = {}) {
     searchLorcana(query).catch(() => ({ cards: [], total: 0 })),
     searchOnePiece(query).catch(() => ({ cards: [], total: 0 })),
     searchRiftbound(query).catch(() => ({ cards: [], total: 0 })),
+    searchYugioh(query).catch(() => ({ cards: [], total: 0 })),
   ]
 
   const results = await Promise.all(searches)

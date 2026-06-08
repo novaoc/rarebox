@@ -10,6 +10,8 @@
 //   • MTG       — Scryfall   (api.scryfall.com)    CORS *  — browser-direct
 //   • Lorcana   — Lorcast    (api.lorcast.com)     CORS *  — browser-direct
 //   • One Piece — optcgapi   (via /api/optcg proxy — optcgapi has no CORS)
+//   • Riftbound — riftcodex  (api.riftcodex.com)   CORS *  — browser-direct
+//   • Yu-Gi-Oh! — YGOPRODeck (db.ygoprodeck.com)   CORS *  — browser-direct
 //   • Pokémon keeps its richer dedicated flow (SetsView) — not handled here.
 
 async function getJson(url, { signal } = {}) {
@@ -290,7 +292,51 @@ const riftbound = {
   },
 }
 
-const PROVIDERS = { mtg, lorcana, 'one-piece': onePiece, riftbound }
+// ── Yu-Gi-Oh!: YGOPRODeck ─────────────────────────────────────────────────────
+// Card data + images from YGOPRODeck (CORS *). Prices from card_prices field
+// (tcgplayer_price). Sets from cardsets.php, cards from cardinfo.php?set={name}.
+const YGO_API = 'https://db.ygoprodeck.com/api/v7'
+
+const yugioh = {
+  id: 'yugioh',
+  async getSets() {
+    return cached('yugioh:sets', 3600_000, async (signal) => {
+      const sets = await getJson(`${YGO_API}/cardsets.php`, { signal })
+      return sets
+        .filter(s => s.num_of_cards > 0 && s.tcg_date)
+        .sort((a, b) => (b.tcg_date || '').localeCompare(a.tcg_date || ''))
+        .map(s => ({
+          id: s.set_name,
+          name: s.set_name,
+          code: s.set_code || '',
+          releaseDate: s.tcg_date || null,
+          total: s.num_of_cards || null,
+          logo: s.set_image || '',
+        }))
+    })
+  },
+  async getSetCards(setName) {
+    return cached(`yugioh:cards:${setName}`, 600_000, async (signal) => {
+      const d = await getJson(`${YGO_API}/cardinfo.php?set=${encodeURIComponent(setName)}`, { signal })
+      const cards = d.data || []
+      return cards.map(c => {
+        const setInfo = (c.card_sets || []).find(s => s.set_name === setName) || {}
+        const prices = c.card_prices?.[0] || {}
+        const imgs = c.card_images || []
+        return {
+          id: String(c.id),
+          name: c.name,
+          number: setInfo.set_code || '',
+          image: imgs[0]?.image_url_small || imgs[0]?.image_url || '',
+          price: num(prices.tcgplayer_price),
+          rarity: setInfo.set_rarity || '',
+        }
+      })
+    })
+  },
+}
+
+const PROVIDERS = { mtg, lorcana, 'one-piece': onePiece, riftbound, yugioh }
 
 export function getProvider(id) {
   return PROVIDERS[id] || null
@@ -310,4 +356,6 @@ export const TCGS = [
     logoSvg: `<svg viewBox="0 0 200 80" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg"><text x="100" y="34" text-anchor="middle" fill="#d7263d" font-family="Arial Black,sans-serif" font-size="20" font-weight="900">ONE PIECE</text><text x="100" y="54" text-anchor="middle" fill="#888" font-family="Arial,sans-serif" font-size="10" letter-spacing="2">CARD GAME</text></svg>` },
   { id: 'riftbound', name: 'Riftbound (LoL TCG)',  tagline: '7 sets · 1000+ cards · images from Riot', c1: '#0bc6e3', c2: '#0a2540', route: '/sets/riftbound', available: true,
     logoSvg: `<svg viewBox="0 0 200 80" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg"><text x="100" y="34" text-anchor="middle" fill="#0bc6e3" font-family="Arial Black,sans-serif" font-size="18" font-weight="900">RIFTBOUND</text><text x="100" y="54" text-anchor="middle" fill="#667" font-family="Arial,sans-serif" font-size="9" letter-spacing="1">LEAGUE OF LEGENDS</text></svg>` },
+  { id: 'yugioh',    name: 'Yu-Gi-Oh!',             tagline: '130+ sets · 12000+ cards · USD prices', c1: '#000', c2: '#c0202a', route: '/sets/yugioh', available: true,
+    logoSvg: `<svg viewBox="0 0 200 80" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg"><text x="100" y="36" text-anchor="middle" fill="#c0202a" font-family="Arial Black,sans-serif" font-size="22" font-weight="900">YU-GI-OH!</text><text x="100" y="56" text-anchor="middle" fill="#888" font-family="Arial,sans-serif" font-size="10" font-weight="700" letter-spacing="3">TRADING CARD GAME</text></svg>` },
 ]
