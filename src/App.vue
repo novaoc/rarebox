@@ -151,6 +151,9 @@
     <!-- Tour videos (replayable via info icon) -->
     <TourModal v-if="showSetsTour" :key="tourKey" src="/videos/sets-tour.mp4" storage-key="rarebox_sets_tour_seen" />
     <TourModal v-if="showDecksTour" :key="tourKey" src="/videos/decks-tour.mp4" storage-key="rarebox_deck_tour_seen" />
+
+    <!-- Background card loading indicator -->
+    <CardLoadIndicator ref="cardLoadIndicator" />
   </div>
 </template>
 
@@ -161,6 +164,7 @@ import { usePortfolioStore } from './stores/portfolio'
 import InstallPrompt from './components/InstallPrompt.vue'
 import TourModal from './components/TourModal.vue'
 import CardDatabaseLoader from './components/CardDatabaseLoader.vue'
+import CardLoadIndicator from './components/CardLoadIndicator.vue'
 import { isCardDatabaseReady, buildSearchIndex } from './services/tcg/cardCache.js'
 import { preloadSlow } from './services/tcg/cardPreloader.js'
 
@@ -169,6 +173,7 @@ const route = useRoute()
 const router = useRouter()
 
 const sidebarOpen = ref(false)
+const cardLoadIndicator = ref(null)
 const showLoader = ref(!isCardDatabaseReady()) // no flash — correct value from start
 const showNewPortfolioModal = ref(false)
 const newPortfolioName = ref('')
@@ -230,11 +235,19 @@ async function onLoaderReady() {
   showLoader.value = false
   await store.init()
   store.autoSnapshot()
-  // Start background preloading of slow TCGs (Pokemon, MTG, Yu-Gi-Oh)
-  preloadSlow().then(() => {
-    buildSearchIndex() // rebuild index with new data
-    console.log('[Rarebox] Background preload complete')
-  }).catch(() => {})
+  startBackgroundPreload()
+}
+
+function startBackgroundPreload() {
+  const indicator = cardLoadIndicator.value
+  if (!indicator) return
+  indicator.start()
+  preloadSlow(({ game, phase }) => {
+    indicator.onProgress({ game, phase })
+  }).then(async () => {
+    await buildSearchIndex()
+    indicator.finish()
+  }).catch(() => indicator.finish())
 }
 
 onMounted(async () => {
@@ -247,10 +260,7 @@ onMounted(async () => {
   store.autoSnapshot()
 
   // Background preload slow TCGs if not yet cached
-  preloadSlow().then(() => {
-    buildSearchIndex()
-    console.log('[Rarebox] Background preload complete')
-  }).catch(() => {})
+  startBackgroundPreload()
 })
 </script>
 

@@ -37,11 +37,11 @@ async function sleep(ms) {
 async function fetchWithRetry(fn, retries = 2, onProgress = () => {}) {
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
-      return await fn()
+      return await fn(onProgress)
     } catch (err) {
       if (attempt < retries) {
         const delay = RETRY_DELAY[attempt] || 5000
-        onProgress({ phase: `Retrying in ${delay / 1000}s… (${attempt + 1}/${retries})` })
+        onProgress({ game: '', phase: `Retrying in ${delay / 1000}s…` })
         await sleep(delay)
       } else {
         throw err
