@@ -7,8 +7,16 @@
       </div>
 
       <div class="modal-body">
-        <!-- Type selector — hidden when a default type is locked in -->
-        <div v-if="!props.defaultType" class="type-tabs mb-4">
+        <!-- Game / TCG selector — only when adding freshly (not from a Pokémon card) -->
+        <div v-if="!props.card" class="form-group mb-3">
+          <label class="form-label">Game / TCG</label>
+          <select v-model="game" class="select">
+            <option v-for="g in games" :key="g.id" :value="g.id">{{ g.label }}</option>
+          </select>
+        </div>
+
+        <!-- Type selector — Pokémon only; other TCGs infer type from the picked product -->
+        <div v-if="!props.defaultType && isPokemon" class="type-tabs mb-4">
           <button
             v-for="t in types"
             :key="t.value"
@@ -62,16 +70,16 @@
           </select>
         </div>
 
-        <!-- Sealed product fields -->
-        <div v-if="itemType === 'sealed'">
+        <!-- Sealed (Pokémon) + any non-Pokémon TCG: PriceCharting search -->
+        <div v-if="itemType === 'sealed' || !isPokemon">
           <!-- Search -->
           <div class="form-group">
-            <label class="form-label">Search by Set Name</label>
+            <label class="form-label">{{ isPokemon ? 'Search by Set Name' : 'Search cards & sealed products' }}</label>
             <div class="flex gap-2">
               <input
                 v-model="sealedQuery"
                 class="input"
-                placeholder="e.g. Fusion Strike, Phantasmal Flames case…"
+                :placeholder="isPokemon ? 'e.g. Fusion Strike, Phantasmal Flames case…' : 'e.g. card or set name…'"
                 @keyup.enter="doSealedSearch"
               />
               <button
@@ -183,6 +191,7 @@ import { ref, computed, watch, onMounted } from 'vue'
 import { usePortfolioStore } from '../stores/portfolio'
 import { getAllVariants, getMarketPrice } from '../services/pokemonApi'
 import { searchSealed } from '../services/priceServer'
+import { SUPPORTED_GAMES, searchProducts } from '../services/priceFeedService'
 
 const props = defineProps({
   card: { type: Object, default: null },
@@ -199,6 +208,15 @@ const types = [
   { value: 'graded', label: 'Graded Slab', icon: '🏆' },
   { value: 'sealed', label: 'Sealed Product', icon: '📦' },
 ]
+
+// Game / TCG. Pokémon keeps the rich pokemontcg.io flow; any other game is
+// tracked via PriceCharting search (singles + sealed). A card passed in from
+// Pokémon search locks the game to pokemon.
+const game = ref('pokemon')
+const games = SUPPORTED_GAMES
+const isPokemon = computed(() => game.value === 'pokemon')
+// Whether the currently-selected non-Pokémon product is a sealed product.
+const selectedIsSealed = ref(false)
 
 const gradesByCompany = {
   PSA:   ['10', '9', '8', '7', '6', '5', '4', '3', '2', '1'],
@@ -221,9 +239,14 @@ async function doSealedSearch() {
   sealedError.value = ''
   sealedResults.value = []
   try {
-    const data = await searchSealed(sealedQuery.value)
-    sealedResults.value = data.results || []
-    if (sealedResults.value.length === 0) sealedError.value = 'No sealed products found'
+    if (isPokemon.value) {
+      const data = await searchSealed(sealedQuery.value)
+      sealedResults.value = data.results || []
+    } else {
+      // Any other TCG: PriceCharting search covers both singles and sealed.
+      sealedResults.value = await searchProducts(sealedQuery.value, game.value)
+    }
+    if (sealedResults.value.length === 0) sealedError.value = 'No products found'
   } catch (e) {
     if (e.message === 'server_down') sealedError.value = 'PriceCharting unavailable — check your connection'
     else if (e.message === 'timeout') sealedError.value = 'Request timed out'
@@ -239,6 +262,8 @@ function selectSealed(result) {
   form.value.pcUrl = result.url
   form.value.imageUrl = result.image || ''
   if (result.price) form.value.currentValue = result.price
+  // Pokémon results are always sealed; other TCGs carry an inferred `sealed` flag.
+  selectedIsSealed.value = isPokemon.value ? true : (result.sealed !== false)
   sealedResults.value = []
 }
 
@@ -283,6 +308,7 @@ const currentPrice = computed(() => {
 })
 
 const canSubmit = computed(() => {
+  if (!isPokemon.value) return form.value.name.trim().length > 0
   if (itemType.value === 'sealed') return form.value.name.trim().length > 0
   return !!props.card
 })
@@ -299,7 +325,38 @@ function submit() {
     notes: form.value.notes,
   }
 
-  if (itemType.value === 'card') {
+  if (!isPokemon.value) {
+    // Non-Pokémon TCG item, sourced from PriceCharting. Modeled with the same
+    // generic fields the rest of the app already renders/values/refreshes.
+    const value = form.value.currentValue || form.value.purchasePrice || 0
+    if (selectedIsSealed.value) {
+      item = {
+        ...item,
+        type: 'sealed',
+        game: game.value,
+        name: form.value.name,
+        setName: form.value.setName,
+        pcUrl: form.value.pcUrl,
+        imageUrl: form.value.imageUrl,
+        sealedType: 'sealed',
+        currentValue: value,
+      }
+    } else {
+      item = {
+        ...item,
+        type: 'card',
+        game: game.value,
+        cardData: {
+          name: form.value.name,
+          number: '',
+          set: { name: form.value.setName },
+          images: { small: form.value.imageUrl },
+        },
+        pcUrl: form.value.pcUrl,
+        currentMarketPrice: value,
+      }
+    }
+  } else if (itemType.value === 'card') {
     item = {
       ...item,
       cardId: props.card.id,
