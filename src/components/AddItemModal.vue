@@ -15,10 +15,10 @@
           </select>
         </div>
 
-        <!-- Type selector — Pokémon only; other TCGs infer type from the picked product -->
-        <div v-if="!props.defaultType && isPokemon" class="type-tabs mb-4">
+        <!-- Type selector: card + graded for all TCGs, sealed only for Pokémon -->
+        <div v-if="!props.defaultType" class="type-tabs mb-4">
           <button
-            v-for="t in types"
+            v-for="t in visibleTypes"
             :key="t.value"
             class="type-tab"
             :class="{ active: itemType === t.value }"
@@ -218,6 +218,10 @@ const types = [
 const game = ref(props.tcgCard?.game || 'pokemon')
 const games = SUPPORTED_GAMES
 const isPokemon = computed(() => game.value === 'pokemon')
+// Sealed is Pokémon-only (uses PriceCharting); graded works for all TCGs
+const visibleTypes = computed(() =>
+  isPokemon.value ? types : types.filter(t => t.value !== 'sealed')
+)
 // Whether the currently-selected non-Pokémon product is a sealed product.
 const selectedIsSealed = ref(false)
 

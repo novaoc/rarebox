@@ -65,13 +65,9 @@ const tcgs = TCGS
   width: 80px;
   min-width: 80px;
   height: 80px;
-  border-radius: 14px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, var(--c1), var(--c2));
-  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.12);
-  overflow: hidden;
 }
 .tcg-logo :deep(svg) { width: 100%; height: 100%; }
 
