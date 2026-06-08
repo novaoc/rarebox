@@ -10,6 +10,12 @@ db.version(1).stores({
   state: 'key'
 })
 
+db.version(2).stores({
+  prices_cache: 'key, game, timestamp'
+})
+
+export default db
+
 // ── Persistence layer ──────────────────────────────────────────────────
 // Single blob approach: entire app state stored as one JSON row.
 
