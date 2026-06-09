@@ -1,6 +1,6 @@
 <template>
   <transition name="pill">
-    <div v-if="visible" class="load-pill" :class="{ done: isDone }" @click="expanded = !expanded">
+    <div v-if="visible && !isHiddenBySetting" class="load-pill" :class="{ done: isDone }" @click="expanded = !expanded">
       <div v-if="!expanded && !isDone" class="pill-collapsed">
         <div class="pill-spinner" />
         <span class="pill-time">{{ timeLeft }}</span>
@@ -39,7 +39,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 
 const visible = ref(false)
 const expanded = ref(true)
@@ -49,6 +49,7 @@ const isDone = ref(false)
 const gameProgress = ref({})
 const startTime = ref(0)
 const activeGames = ref([])
+const isHiddenBySetting = ref(false)
 
 const GAME_NAMES = {
   pokemon: 'Pokémon',
@@ -119,7 +120,18 @@ const timeLeft = computed(() => {
   return `~${Math.round(remaining / 60)}m`
 })
 
+function checkSetting() {
+  isHiddenBySetting.value = localStorage.getItem('hide_load_indicator') === 'true'
+}
+
+onMounted(() => {
+  checkSetting()
+  // Listen for storage changes if multiple tabs are open
+  window.addEventListener('storage', checkSetting)
+})
+
 function start(games) {
+  checkSetting()
   visible.value = true
   expanded.value = true
   isDone.value = false
