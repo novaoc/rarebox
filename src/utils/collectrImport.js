@@ -7,6 +7,7 @@ import * as XLSX from 'xlsx'
 
 const GAME_MAP = {
   pokemon: 'pokemon',
+  'pok\u00e9mon': 'pokemon',
   yugioh: 'yugioh',
   'yu-gi-oh': 'yugioh',
   'magic: the gathering': 'magic',
