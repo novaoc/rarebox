@@ -380,9 +380,9 @@ async function refreshCardDb() {
   }
 }
 
-onMounted(() => {
+onMounted(async () => {
   loadCardCounts()
-  calcStorage()
+  await calcStorage()
 })
 
 const totalItems = computed(() => store.portfolios.reduce((s, p) => s + p.items.length, 0))
@@ -391,15 +391,34 @@ const cacheCount = computed(() => {
   return Object.keys(localStorage).filter(k => k.startsWith('ph_cache_')).length
 })
 
-const storageUsed = computed(() => {
+const storageUsed = ref('Calculating…')
+
+function formatBytes(bytes) {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / 1024 / 1024).toFixed(2)} MB`
+}
+
+async function calcStorage() {
+  try {
+    if (navigator.storage?.estimate) {
+      const est = await navigator.storage.estimate()
+      if (est.usage) {
+        storageUsed.value = formatBytes(est.usage)
+        return
+      }
+    }
+  } catch {}
+
+  // Fallback: localStorage + estimated IndexedDB card size
   let bytes = 0
   for (const key of Object.keys(localStorage)) {
     bytes += (localStorage.getItem(key) || '').length * 2
   }
-  if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-  return `${(bytes / 1024 / 1024).toFixed(2)} MB`
-})
+  const counts = cardCounts.value?.total
+  if (counts) bytes += counts * 400
+  storageUsed.value = formatBytes(bytes)
+}
 
 function clearPriceCache() {
   const keys = Object.keys(localStorage).filter(k => k.startsWith('ph_cache_'))
