@@ -4,10 +4,11 @@
   https://rarebox.io
 -->
 <template>
-  <!-- Card database loader (first visit only) -->
-  <CardDatabaseLoader v-if="showLoader" @ready="onLoaderReady" />
-
-  <div class="app-layout" v-else>
+  <div class="app-layout">
+    <!-- TCG selection modal (first visit only, app renders behind it) -->
+    <transition name="fade">
+      <CardDatabaseLoader v-if="showLoader" @ready="onLoaderReady" />
+    </transition>
     <aside class="sidebar" :class="{ open: sidebarOpen }">
       <a href="/" class="sidebar-logo" @click.prevent="hardRefresh">
         <span class="logo-icon">
@@ -233,8 +234,6 @@ function createPortfolio() {
 
 async function onLoaderReady() {
   showLoader.value = false
-  await store.init()
-  store.autoSnapshot()
   startBackgroundPreload()
 }
 
@@ -252,7 +251,14 @@ function startBackgroundPreload() {
 }
 
 onMounted(async () => {
-  if (!isCardDatabaseReady()) return // loader handles init
+  // Always init the store — app is usable immediately, search falls back to live APIs
+  await store.init()
+  store.autoSnapshot()
+
+  if (!isCardDatabaseReady()) {
+    // First visit: show TCG picker, preload starts after selection
+    return
+  }
 
   // Returning visitor: build search index from cached IDB data
   await buildSearchIndex()

@@ -1,27 +1,31 @@
 <!--
   CardLoadIndicator — Floating pill showing background card loading progress.
-  Appears in bottom-right when preload starts, collapses when done.
+  Shows TCG being loaded, progress %, and estimated time remaining.
 -->
 <template>
   <transition name="pill">
     <div v-if="visible" class="load-pill" :class="{ done: isDone }" @click="expanded = !expanded">
-      <!-- Collapsed state: just the icon -->
+      <!-- Collapsed: spinner + time -->
       <div v-if="!expanded && !isDone" class="pill-collapsed">
         <div class="pill-spinner" />
-        <span class="pill-pct">{{ overallPct }}%</span>
+        <span class="pill-time">{{ timeLeft }}</span>
       </div>
 
-      <!-- Expanded state: full details -->
+      <!-- Expanded / Done -->
       <template v-else>
         <div class="pill-header">
           <span class="pill-icon" v-if="isDone">✓</span>
           <span class="pill-icon spinning" v-else>⟳</span>
-          <span class="pill-title">{{ isDone ? 'Cards ready' : 'Loading cards…' }}</span>
-          <span class="pill-pct-lg">{{ overallPct }}%</span>
+          <span class="pill-title">{{ isDone ? 'Cards ready' : currentLabel }}</span>
+          <span class="pill-pct">{{ overallPct }}%</span>
         </div>
 
         <div class="pill-bar-wrap" v-if="!isDone">
           <div class="pill-bar" :style="{ width: overallPct + '%' }" />
+        </div>
+
+        <div class="pill-speed" v-if="!isDone && speed > 0">
+          {{ speedLabel }} · {{ timeLeft }}
         </div>
 
         <div class="pill-games" v-if="expanded">
@@ -48,6 +52,8 @@ const currentGame = ref('')
 const status = ref('')
 const isDone = ref(false)
 const gameProgress = ref({})
+const startTime = ref(0)
+const completedPct = ref(0)
 
 const GAMES = [
   { id: 'pokemon', name: 'Pokémon' },
@@ -71,7 +77,37 @@ const overallPct = computed(() => {
   return Math.round((done / GAMES.length) * 100)
 })
 
-/** Call this to start showing the indicator. */
+const currentLabel = computed(() => {
+  const g = GAMES.find(x => x.id === currentGame.value)
+  return g ? `Loading ${g.name}…` : 'Loading cards…'
+})
+
+// Speed & time estimation
+const speed = computed(() => {
+  if (!startTime.value || overallPct.value <= 0) return 0
+  const elapsed = (Date.now() - startTime.value) / 1000
+  return overallPct.value / elapsed // % per second
+})
+
+const speedLabel = computed(() => {
+  if (speed.value <= 0) return ''
+  const remaining = (100 - overallPct.value) / speed.value
+  if (remaining < 60) return `${Math.round(remaining)}s left`
+  return `${Math.round(remaining / 60)}m left`
+})
+
+const timeLeft = computed(() => {
+  if (isDone.value) return 'Done'
+  if (!startTime.value || overallPct.value <= 0) return 'Starting…'
+  const elapsed = (Date.now() - startTime.value) / 1000
+  const pctPerSec = overallPct.value / elapsed
+  if (pctPerSec <= 0) return 'Starting…'
+  const remaining = (100 - overallPct.value) / pctPerSec
+  if (remaining < 5) return 'Almost done'
+  if (remaining < 60) return `~${Math.round(remaining)}s`
+  return `~${Math.round(remaining / 60)}m`
+})
+
 function start() {
   visible.value = true
   expanded.value = true
@@ -79,9 +115,9 @@ function start() {
   gameProgress.value = {}
   currentGame.value = ''
   status.value = ''
+  startTime.value = Date.now()
 }
 
-/** Call this for each progress update from the preloader. */
 function onProgress({ game, phase }) {
   currentGame.value = game
   status.value = phase
@@ -93,7 +129,6 @@ function onProgress({ game, phase }) {
   }
 }
 
-/** Call this when everything is done. Shows checkmark briefly, then hides. */
 function finish() {
   isDone.value = true
   expanded.value = true
@@ -114,8 +149,8 @@ defineExpose({ start, onProgress, finish })
   border: 1px solid var(--border, #30363d);
   border-radius: 12px;
   padding: 10px 14px;
-  min-width: 200px;
-  max-width: 280px;
+  min-width: 180px;
+  max-width: 260px;
   z-index: 1000;
   box-shadow: 0 4px 24px rgba(0,0,0,0.3);
   cursor: pointer;
@@ -124,15 +159,9 @@ defineExpose({ start, onProgress, finish })
   color: var(--text-primary, #e6edf3);
 }
 
-.load-pill:hover {
-  border-color: var(--accent, #f5a623);
-}
+.load-pill:hover { border-color: var(--accent, #f5a623); }
+.load-pill.done { border-color: var(--success, #3fb950); }
 
-.load-pill.done {
-  border-color: var(--success, #3fb950);
-}
-
-/* Collapsed view */
 .pill-collapsed {
   display: flex;
   align-items: center;
@@ -148,55 +177,48 @@ defineExpose({ start, onProgress, finish })
   animation: spin 0.8s linear infinite;
 }
 
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
+@keyframes spin { to { transform: rotate(360deg); } }
 
-.pill-pct {
+.pill-time {
   font-weight: 600;
-  font-variant-numeric: tabular-nums;
   color: var(--accent, #f5a623);
+  font-variant-numeric: tabular-nums;
 }
 
-/* Expanded view */
 .pill-header {
   display: flex;
   align-items: center;
   gap: 6px;
-  margin-bottom: 6px;
+  margin-bottom: 4px;
 }
 
-.pill-icon {
-  font-size: 14px;
-}
-
-.pill-icon.spinning {
-  animation: spin 1s linear infinite;
-}
+.pill-icon { font-size: 14px; }
+.pill-icon.spinning { animation: spin 1s linear infinite; }
 
 .pill-title {
   flex: 1;
   font-weight: 600;
   font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.pill-pct-lg {
+.pill-pct {
   font-weight: 700;
   font-size: 13px;
   color: var(--accent, #f5a623);
   font-variant-numeric: tabular-nums;
 }
 
-.done .pill-pct-lg {
-  color: var(--success, #3fb950);
-}
+.done .pill-pct { color: var(--success, #3fb950); }
 
 .pill-bar-wrap {
   height: 3px;
   background: var(--bg-hover, #21262d);
   border-radius: 2px;
   overflow: hidden;
-  margin-bottom: 8px;
+  margin-bottom: 4px;
 }
 
 .pill-bar {
@@ -206,10 +228,16 @@ defineExpose({ start, onProgress, finish })
   transition: width 0.3s ease;
 }
 
+.pill-speed {
+  font-size: 10px;
+  color: var(--text-muted, #8b949e);
+  margin-bottom: 6px;
+}
+
 .pill-games {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 2px;
 }
 
 .pill-game {
@@ -221,13 +249,8 @@ defineExpose({ start, onProgress, finish })
   font-size: 11px;
 }
 
-.pill-game.active {
-  color: var(--text-primary, #e6edf3);
-}
-
-.pill-game.done {
-  color: var(--success, #3fb950);
-}
+.pill-game.active { color: var(--text-primary, #e6edf3); }
+.pill-game.done { color: var(--success, #3fb950); }
 
 .pill-game-status {
   max-width: 100px;
@@ -237,7 +260,6 @@ defineExpose({ start, onProgress, finish })
   text-align: right;
 }
 
-/* Transitions */
 .pill-enter-active { transition: all 0.3s ease; }
 .pill-leave-active { transition: all 0.3s ease; }
 .pill-enter-from { opacity: 0; transform: translateY(20px); }
