@@ -76,7 +76,6 @@ a:hover { text-decoration: underline; }
   transition: all 0.15s;
   white-space: nowrap;
   text-decoration: none;
-  min-height: 36px; /* Base for accessibility */
 }
 .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
@@ -108,9 +107,9 @@ a:hover { text-decoration: underline; }
 }
 .btn-ghost:hover:not(:disabled) { background: var(--bg-hover); color: var(--text-primary); }
 
-.btn-sm { padding: 4px 10px; font-size: 12px; min-height: 32px; }
-.btn-lg { padding: 10px 20px; font-size: 15px; min-height: 48px; }
-.btn-icon { padding: 7px; min-width: 44px; min-height: 44px; justify-content: center; }
+.btn-sm { padding: 4px 10px; font-size: 12px; }
+.btn-lg { padding: 10px 20px; font-size: 15px; }
+.btn-icon { padding: 7px; min-width: 32px; justify-content: center; }
 
 /* Cards */
 .card {
@@ -149,7 +148,6 @@ a:hover { text-decoration: underline; }
   outline: none;
   transition: border-color 0.15s;
   font-family: inherit;
-  min-height: 44px; /* Touch target */
 }
 .input:focus, .select:focus, .textarea:focus {
   border-color: var(--accent);
@@ -174,6 +172,8 @@ a:hover { text-decoration: underline; }
   z-index: 1000;
   padding: 20px;
   backdrop-filter: blur(4px);
+  /* Disable pull-to-refresh / rubber-banding on overlays */
+  touch-action: none;
 }
 .modal {
   background: var(--bg-secondary);
@@ -184,6 +184,8 @@ a:hover { text-decoration: underline; }
   max-height: 90vh;
   overflow-y: auto;
   box-shadow: var(--shadow);
+  /* Allow internal scrolling only */
+  touch-action: pan-y;
 }
 .modal-header {
   display: flex;
@@ -216,7 +218,6 @@ a:hover { text-decoration: underline; }
 .flex-center { display: flex; align-items: center; justify-content: center; }
 .flex-between { display: flex; align-items: center; justify-content: space-between; }
 .items-center { align-items: center; }
-.gap-1 { gap: 4px; }
 .gap-2 { gap: 8px; }
 .gap-3 { gap: 12px; }
 .gap-4 { gap: 16px; }
@@ -352,7 +353,7 @@ a:hover { text-decoration: underline; }
   .grid-3 { grid-template-columns: 1fr 1fr; }
   .grid-4 { grid-template-columns: 1fr 1fr; }
   .form-row-3 { grid-template-columns: 1fr 1fr; }
-  .btn { min-height: 44px; padding: 7px 16px; }
+  .btn { min-height: 36px; }
 }
 
 @media (max-width: 640px) {
@@ -370,8 +371,8 @@ a:hover { text-decoration: underline; }
   .grid-4 { grid-template-columns: 1fr 1fr; }
 
   /* Modal full-width on phones */
-  .modal-overlay { padding: 0; align-items: flex-end; }
-  .modal { max-height: 95vh; border-radius: var(--radius-lg) var(--radius-lg) 0 0; border-bottom: none; }
+  .modal-overlay { padding: 12px; align-items: flex-end; }
+  .modal { max-height: 95vh; border-radius: var(--radius-lg) var(--radius-lg) 0 0; }
 
   /* Cards tighter padding */
   .card { padding: 14px; }
@@ -381,11 +382,11 @@ a:hover { text-decoration: underline; }
   .table { min-width: 560px; }
 
   /* Touch-friendly buttons */
-  .btn { min-height: 44px; }
+  .btn { min-height: 40px; }
   .btn-sm { min-height: 36px; }
 
   /* Prevent iOS auto-zoom on input focus (needs 16px+) */
-  .input, .select, .textarea { font-size: 16px; min-height: 44px; }
+  .input, .select, .textarea { font-size: 16px; }
 }
 
 @media (max-width: 480px) {
