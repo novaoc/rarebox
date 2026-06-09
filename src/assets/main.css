@@ -48,13 +48,11 @@ html, body, #app {
 /* Locked layout containers */
 .app-layout, .main-wrapper, .dashboard, .portfolio-view {
   touch-action: pan-y;
-  user-select: none;
-  -webkit-user-drag: none;
 }
 
 /* Prevent iOS drag/select/callout on all interactive elements */
-img, button, a, .card-result, .set-card, .card-img-wrap, .set-logo-wrap,
-.card-detail-panel, .bottom-sheet, .card-overlay, .card-img-placeholder, .modal {
+img, .card-result, .set-card, .card-img-wrap, .set-logo-wrap,
+.card-detail-panel, .bottom-sheet, .card-overlay, .card-img-placeholder {
   -webkit-user-drag: none;
   -webkit-touch-callout: none;
   user-select: none;
@@ -85,6 +83,8 @@ a:hover { text-decoration: underline; }
   transition: all 0.15s;
   white-space: nowrap;
   text-decoration: none;
+  user-select: none;
+  touch-action: manipulation;
 }
 .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
