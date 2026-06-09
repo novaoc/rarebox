@@ -7,6 +7,7 @@
 // Falls back to live APIs otherwise.
 
 import { searchCache, isGameCached } from './cardCache.js'
+import { getProvider } from './providers.js'
 
 const TIMEOUT = 8000
 
@@ -202,7 +203,26 @@ async function searchRiftbound(query) {
     (c.number || '').toLowerCase().includes(q) ||
     (c.set || '').toLowerCase().includes(q)
   ).slice(0, 50)
+  await hydrateRiftboundPrices(matches)
   return { cards: matches, total: matches.length }
+}
+
+// The raw riftcodex feed has no prices. The riftbound browse provider merges
+// variant-aware PriceCharting prices per set (cached) — reuse it so search,
+// trade analyzer and portfolio refresh show the same variant-correct prices.
+async function hydrateRiftboundPrices(matches) {
+  const setIds = [...new Set(
+    matches.filter(m => m.price == null).map(m => m._raw?.set?.set_id).filter(Boolean)
+  )]
+  if (setIds.length === 0) return
+  const provider = getProvider('riftbound')
+  await Promise.allSettled(setIds.map(async setId => {
+    const priced = await provider.getSetCards(setId)
+    const byId = new Map(priced.map(c => [c.id, c.price]))
+    for (const m of matches) {
+      if (m._raw?.set?.set_id === setId && byId.get(m.id) != null) m.price = byId.get(m.id)
+    }
+  }))
 }
 
 // Fast path for Riftbound: only fetch cards for a specific set by set_id or name.
@@ -474,7 +494,7 @@ async function resolveRiftboundCard(cardId) {
   try {
     const d = await fetchJson(url)
     if (!d) return null
-    return {
+    const card = {
       id: d.id,
       name: d.name,
       number: String(d.collector_number || ''),
@@ -485,10 +505,13 @@ async function resolveRiftboundCard(cardId) {
       game: 'riftbound',
       _raw: d,
     }
+    await hydrateRiftboundPrices([card])
+    return card
   } catch {
     // Fallback: search by name via getRiftboundCards cache
     const cards = await getRiftboundCards()
     const match = cards.find(c => c.id === cardId || c.name.toLowerCase() === cardId.toLowerCase())
+    if (match) await hydrateRiftboundPrices([match])
     return match || null
   }
 }

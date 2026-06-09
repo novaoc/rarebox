@@ -200,14 +200,38 @@ const RIFTCODEX = 'https://api.riftcodex.com'
 const PC_SEARCH = 'https://www.pricecharting.com/search-products'
 
 // Fetch PriceCharting prices for a Riftbound set.
+// PC caps each search at 100 products, and one bulk query drops the less
+// popular variant listings — so query base + signature + alternate art and
+// merge. Products from other sets (PC search is fuzzy) are filtered out by
+// console name.
 // Returns { normal: {num→price}, variants: {num→{variant→price}} }
 async function fetchRiftboundPrices(setName, signal) {
-  const q = `riftbound ${setName}`
-  const d = await getJson(`${PC_SEARCH}?type=prices&q=${encodeURIComponent(q)}`, { signal })
-  const products = d.products || []
+  const queries = [
+    `riftbound ${setName}`,
+    `riftbound ${setName} signature`,
+    `riftbound ${setName} alternate art`,
+  ]
+  const results = await Promise.allSettled(queries.map(q =>
+    getJson(`${PC_SEARCH}?type=prices&q=${encodeURIComponent(q)}`, { signal })
+  ))
+  const seen = new Set()
+  const products = []
+  for (const r of results) {
+    if (r.status !== 'fulfilled') continue
+    for (const p of (r.value.products || [])) {
+      const key = p.id || p.productName
+      if (key == null || seen.has(key)) continue
+      seen.add(key)
+      products.push(p)
+    }
+  }
+
+  const expectedConsole = `riftbound ${setName}`.toLowerCase()
   const normal = {}   // "299" → price (plain cards)
   const variants = {} // "299" → {"signature": price, "alternate art": price}
   for (const p of products) {
+    const consoleName = (p.consoleName || '').toLowerCase()
+    if (consoleName && consoleName !== expectedConsole) continue
     const name = p.productName || ''
     const numMatch = name.match(/#(\d+)/)
     if (!numMatch || !p.price1) continue
@@ -226,6 +250,19 @@ async function fetchRiftboundPrices(setName, signal) {
     }
   }
   return { normal, variants }
+}
+
+// riftcodex name suffix → PriceCharting bracket tag. "Overnumbered" is just
+// the plain printing of an over-set-size champion card, not a variant.
+const RIFT_VARIANT_ALIASES = {
+  'overnumbered': '',
+  'launch exclusive': 'launch promo',
+}
+function riftVariantFromName(name) {
+  const m = (name || '').match(/\(([^)]+)\)\s*$/)
+  let v = m ? m[1].toLowerCase() : ''
+  if (v in RIFT_VARIANT_ALIASES) v = RIFT_VARIANT_ALIASES[v]
+  return v
 }
 
 const riftbound = {
@@ -274,14 +311,14 @@ const riftbound = {
         return fetchRiftboundPrices(setName, sig)
       })
 
-      // 3. Merge prices — normal cards get normal price, variants get variant price
+      // 3. Merge prices — plain cards get the plain price, variants get their
+      // variant price. A variant printing must NEVER inherit the plain price
+      // (a $600 Signature shown at $50 is worse than no price at all).
       for (const card of cards) {
         if (!card.number) continue
-        // Extract variant from riftcodex name: "(Signature)" → "signature"
-        const variantMatch = card.name.match(/\(([^)]+)\)/)
-        const variant = variantMatch ? variantMatch[1].toLowerCase() : ''
-        if (variant && priceMap.variants[card.number]?.[variant]) {
-          card.price = priceMap.variants[card.number][variant]
+        const variant = riftVariantFromName(card.name)
+        if (variant) {
+          card.price = priceMap.variants[card.number]?.[variant] ?? null
         } else if (priceMap.normal[card.number] != null) {
           card.price = priceMap.normal[card.number]
         }
@@ -328,7 +365,10 @@ const yugioh = {
           name: c.name,
           number: setInfo.set_code || '',
           image: imgs[0]?.image_url_small || imgs[0]?.image_url || '',
-          price: num(prices.tcgplayer_price),
+          // set_price is THIS printing's price; tcgplayer_price is the card's
+          // cheapest printing overall (wrong for reprints — e.g. a $1.85
+          // Metal Raiders common showing $0.20 from a later reprint)
+          price: num(setInfo.set_price) || num(prices.tcgplayer_price),
           rarity: setInfo.set_rarity || '',
         }
       })
