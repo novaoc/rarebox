@@ -14,6 +14,13 @@ const routes = [
   { path: '/trade', name: 'TradeLanding', component: () => import('../views/TradeLanding.vue'), meta: { title: 'Trade Analyzer', description: 'Compare card values and analyze trades side-by-side. Add cards by searching or scanning.' } },
   { path: '/trade/analyzer', name: 'TradeAnalyzer', component: () => import('../views/TradeAnalyzerView.vue'), meta: { title: 'Trade Analyzer', description: 'Compare cards side-by-side. Scan or add cards to each side and see the price difference instantly.' } },
   { path: '/terms', name: 'Terms', component: () => import('../views/TermsView.vue'), meta: { title: 'Terms & Conditions', description: 'Terms & Conditions and Privacy Policy for Rarebox.' } },
+  // ── Design prototypes (branch: Design) — standalone, no app chrome ──
+  { path: '/designs', name: 'Designs', component: () => import('../views/designs/DesignsIndexView.vue'), meta: { bare: true, title: 'Design Lab' } },
+  { path: '/designs/mono', name: 'DesignMono', component: () => import('../views/designs/DesignMonoView.vue'), meta: { bare: true, title: 'Design — Mono' } },
+  { path: '/designs/aurora', name: 'DesignAurora', component: () => import('../views/designs/DesignAuroraView.vue'), meta: { bare: true, title: 'Design — Aurora' } },
+  { path: '/designs/tactile', name: 'DesignTactile', component: () => import('../views/designs/DesignTactileView.vue'), meta: { bare: true, title: 'Design — Tactile' } },
+  { path: '/designs/atelier', name: 'DesignAtelier', component: () => import('../views/designs/DesignAtelierView.vue'), meta: { bare: true, title: 'Design — Atelier' } },
+  { path: '/designs/pulse', name: 'DesignPulse', component: () => import('../views/designs/DesignPulseView.vue'), meta: { bare: true, title: 'Design — Pulse' } },
   // 404 catch-all — redirect to dashboard
   { path: '/:pathMatch(.*)*', redirect: '/' },
 ]

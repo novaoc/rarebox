@@ -4,7 +4,9 @@
   https://rarebox.io
 -->
 <template>
-  <div class="app-layout">
+  <!-- Design prototypes render without app chrome -->
+  <router-view v-if="$route.meta.bare" />
+  <div v-else class="app-layout">
     <!-- TCG selection modal (first visit only, app renders behind it) -->
     <transition name="fade">
       <CardDatabaseLoader v-if="showLoader" @ready="onLoaderReady" />
