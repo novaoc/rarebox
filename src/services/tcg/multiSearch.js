@@ -327,13 +327,56 @@ async function resolveYugiohCard(cardId) {
   }
 }
 
+async function resolveLorcanaCard(cardId) {
+  const url = `https://api.lorcast.com/v0/cards/${cardId}`
+  const d = await fetchJson(url)
+  if (!d) return null
+  const img = d.image_uris?.digital || {}
+  return {
+    id: d.id,
+    name: d.name,
+    number: d.collector_number || '',
+    set: d.set_name || d.set_code || '',
+    image: img.small || '',
+    price: num(d.prices?.usd) || num(d.prices?.usd_foil),
+    rarity: d.rarity || '',
+    game: 'lorcana',
+    _raw: d,
+  }
+}
+
+async function resolveRiftboundCard(cardId) {
+  const url = `https://api.riftcodex.com/cards/${cardId}`
+  try {
+    const d = await fetchJson(url)
+    if (!d) return null
+    return {
+      id: d.id,
+      name: d.name,
+      number: String(d.collector_number || ''),
+      set: d.set?.label || '',
+      image: d.media?.image_url || '',
+      price: null,
+      rarity: d.classification?.rarity || '',
+      game: 'riftbound',
+      _raw: d,
+    }
+  } catch {
+    // Fallback: search by name via getRiftboundCards cache
+    const cards = await getRiftboundCards()
+    const match = cards.find(c => c.id === cardId || c.name.toLowerCase() === cardId.toLowerCase())
+    return match || null
+  }
+}
+
 // Resolve a card by ID for deck price refresh — routes to the correct API
 export async function resolveCard(cardId, game) {
   try {
     if (game === 'pokemon') return await resolvePokemonCard(cardId)
     if (game === 'mtg') return await resolveMtgCard(cardId)
     if (game === 'yugioh') return await resolveYugiohCard(cardId)
-    // For games without per-ID lookup, fall back to game-specific logic
+    if (game === 'lorcana') return await resolveLorcanaCard(cardId)
+    if (game === 'riftbound') return await resolveRiftboundCard(cardId)
     return null
   } catch { return null }
 }

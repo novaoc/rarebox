@@ -177,9 +177,29 @@ export const useDeckStore = defineStore('decks', () => {
     const result = await multiSearch(name, { page: 1, pageSize: 50, providers: [game] })
     if (!result?.cards?.length) return null
 
+    const q = (setCode || '').toLowerCase()
+
     const matches = result.cards.filter(c => {
-      if (c.id.startsWith(setCode)) return true
-      if ((c.set || '').toLowerCase().includes(setCode.toLowerCase())) return true
+      if (game === 'pokemon') {
+        if (c.id && c.id.startsWith(q.replace(/[^a-z0-9]/g, ''))) return true
+      }
+      if (game === 'mtg') {
+        if (c._raw?.set?.toLowerCase() === q) return true
+      }
+      if (game === 'lorcana') {
+        if (c._raw?.set_code?.toLowerCase() === q) return true
+        if (c._raw?.set_name?.toLowerCase().includes(q)) return true
+      }
+      if (game === 'one-piece') {
+        if (c.id && c.id.startsWith(q)) return true
+      }
+      if (game === 'riftbound') {
+        if (c._raw?.set?.set_id?.toLowerCase() === q) return true
+        if ((c.set || '').toLowerCase().includes(q)) return true
+      }
+      if (game === 'yugioh') {
+        if (c.number && c.number.toLowerCase().startsWith(q)) return true
+      }
       return false
     })
 
@@ -225,16 +245,26 @@ export const useDeckStore = defineStore('decks', () => {
           game: metaDeck.game || 'pokemon',
         })
       } else {
+        const game = metaDeck.game || 'pokemon'
+        // Build a meaningful cardId fallback per TCG
+        let fallbackId = `${card.setCode || ''}-${card.name}`
+        if (game === 'pokemon' && card.number) {
+          fallbackId = `${(card.setCode || '').toLowerCase()}-${card.number}`
+        } else if (game === 'one-piece' && card.number) {
+          fallbackId = `${card.setCode}-${card.number}`
+        } else if (game === 'yugioh' && card.number) {
+          fallbackId = `ygo-${card.number}`
+        }
         addCardRaw(deck.id, {
-          cardId: `${card.setCode}-${card.name}`,
+          cardId: fallbackId,
           name: card.name,
           setName: card.setName || '',
           setCode: card.setCode || '',
-          number: '',
+          number: card.number || '',
           quantity: card.quantity,
           price: null,
           image: '',
-          game: metaDeck.game || 'pokemon',
+          game,
         })
       }
     })
