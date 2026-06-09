@@ -5,7 +5,7 @@
  */
 import { defineStore } from 'pinia'
 import { ref, computed, watch } from 'vue'
-import { loadState, saveState } from '../db'
+import { loadTradeState, saveTradeState } from '../db'
 
 const DEBOUNCE_MS = 3000
 let debounceTimer = null
@@ -34,14 +34,7 @@ export const useTradeStore = defineStore('trade', () => {
     if (debounceTimer) clearTimeout(debounceTimer)
     debounceTimer = setTimeout(async () => {
       try {
-        // Since Rarebox uses a single blob approach for the entire app state,
-        // this store should ideally be integrated into the main persist loop.
-        // For now, we'll store trade state in its own key or assume the main
-        // store will handle it once integrated. 
-        // We'll use 'trade_state' key to keep it simple and isolated for now.
-        const row = await loadState('app_state') || {}
-        row.trade = getState()
-        await saveState(row)
+        await saveTradeState(getState())
       } catch (e) {
         console.error('IDB trade persist failed:', e)
       }
@@ -49,9 +42,9 @@ export const useTradeStore = defineStore('trade', () => {
   }
 
   async function init() {
-    const appState = await loadState()
-    if (appState && appState.trade) {
-      applyState(appState.trade)
+    const tradeState = await loadTradeState()
+    if (tradeState) {
+      applyState(tradeState)
     }
     initialized.value = true
   }

@@ -339,7 +339,9 @@
 <script setup>
 import { computed, onMounted, onActivated, ref } from 'vue'
 import { usePortfolioStore } from '../stores/portfolio'
-import { getCard, getJapaneseCardDetail, getMarketPrice } from '../services/pokemonApi'
+import { getCard, getMarketPrice } from '../services/pokemonApi'
+import { getPrice as getTcgPrice } from '../services/priceFeedService'
+import { checkAlerts, notifyTriggered } from '../utils/alerts'
 import PortfolioChart from '../components/PortfolioChart.vue'
 
 const store = usePortfolioStore()
@@ -388,22 +390,27 @@ onMounted(async () => {
     p.items.filter(i => i.type === 'card' && i.cardId).map(i => ({ ...i, portfolioId: p.id }))
   )
 
-  // Split into EN and JP cards
-  const enCards = allCardItems.filter(i => !store.isJPCard(i))
-  const jpCards = allCardItems.filter(i => store.isJPCard(i))
+  // Split into Pokemon and non-Pokemon cards
+  const pokemonCards = allCardItems.filter(i => !i.game || i.game === 'pokemon')
+  const otherTcgCards = allCardItems.filter(i => i.game && i.game !== 'pokemon')
 
-  // EN cards — refresh all (pokemontcg.io is fast and bulk-friendly)
+  // Pokemon EN cards — refresh all (pokemontcg.io is fast and bulk-friendly)
+  const enCards = pokemonCards.filter(i => !store.isJPCard(i))
+  const jpCards = pokemonCards.filter(i => store.isJPCard(i))
+
   for (const item of enCards) {
     try {
       const card = await getCard(item.cardId, item._lang)
       const result = getMarketPrice(card, item.priceVariant)
       const price = result?.price || result
       if (price) store.updateItem(item.portfolioId, item.id, { currentMarketPrice: price, lastPriceUpdate: new Date().toISOString() })
-    } catch {}
+    } catch (e) {
+      console.warn(`Failed to refresh EN card ${item.cardId}:`, e.message)
+    }
     await new Promise(r => setTimeout(r, 100))
   }
 
-  // JP cards — only refresh stale ones (tcgdex needs one request per card)
+  // Pokemon JP cards — only refresh stale ones (tcgdex needs one request per card)
   for (const item of jpCards) {
     if (!store.isPriceStale(item)) continue
     try {
@@ -411,9 +418,36 @@ onMounted(async () => {
       const result = getMarketPrice(card, item.priceVariant)
       const price = result?.price || result
       if (price) store.updateItem(item.portfolioId, item.id, { currentMarketPrice: price, lastPriceUpdate: new Date().toISOString() })
-    } catch {}
+    } catch (e) {
+      console.warn(`Failed to refresh JP card ${item.cardId}:`, e.message)
+    }
     await new Promise(r => setTimeout(r, 500)) // 500ms between tcgdex requests
   }
+
+  // Non-Pokemon TCG cards — PriceCharting by product name
+  for (const item of otherTcgCards) {
+    try {
+      const query = item.cardData?.name || item.name
+      if (!query) continue
+      const price = await getTcgPrice(query, item.game)
+      if (price) store.updateItem(item.portfolioId, item.id, { currentMarketPrice: price, lastPriceUpdate: new Date().toISOString() })
+    } catch (e) {
+      console.warn(`Failed to refresh ${item.game} card "${item.cardData?.name}":`, e.message)
+    }
+    await new Promise(r => setTimeout(r, 100))
+  }
+
+  // Check price alerts after refresh
+  const priceMap = new Map()
+  for (const portfolio of store.portfolios) {
+    for (const item of portfolio.items) {
+      if (item.type === 'card' && item.cardId) {
+        priceMap.set(item.cardId, item.currentMarketPrice || item.purchasePrice || 0)
+      }
+    }
+  }
+  const triggered = checkAlerts(priceMap)
+  if (triggered.length > 0) notifyTriggered(triggered)
 })
 </script>
 

@@ -111,7 +111,7 @@ let _optCards = null
 async function getOptCards() {
   if (_optCards) return _optCards
   const d = await fetchJson('https://optcgapi.com/api/allSetCards/')
-  _optCards = Array.isArray(d) ? d : []
+  _optCards = Array.isArray(d) ? d : (d?.data || d?.cards || [])
   return _optCards
 }
 

@@ -90,10 +90,18 @@ export async function hasGameCards(game) {
 
 /** Check if a game's cached cards are fresh (< 24h old). */
 export async function isCacheFresh(game) {
+  // Check if we have any cards for this game
+  const count = await db.cards.where('game').equals(game).count()
+  if (count === 0) return false
+  
+  // Check the first card's cachedAt timestamp
   const card = await db.cards.where('game').equals(game).first()
   if (!card) return false
+  
   const age = Date.now() - (card.cachedAt || 0)
-  return age < 86_400_000
+  // Cache is fresh if less than 24h old AND we have at least some cards
+  // (partial cache from interrupted preload is better than nothing)
+  return age < 86_400_000 && count > 0
 }
 
 /** Get card counts per game from IDB. */
