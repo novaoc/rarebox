@@ -169,7 +169,7 @@ async function fetchLorcana(onProgress) {
           set: set_name,
           number: c.collector_number || c.number || '',
           image: c.image_uris?.small || c.image || '',
-          price: num(c.tcgplayer?.prices?.holofoil?.market || c.tcgplayer?.prices?.normal?.market),
+          price: num(c.prices?.usd) || num(c.prices?.usd_foil) || num(c.tcgplayer?.prices?.holofoil?.market || c.tcgplayer?.prices?.normal?.market),
           rarity: c.rarity || '',
         })
       }

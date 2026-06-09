@@ -16,6 +16,7 @@ const MAX_SNAPSHOTS = 1095 // 3 years of daily snapshots
 const DEBOUNCE_MS = 3000
 
 let debounceTimer = null
+let beforeunloadRegistered = false
 
 function generateId() {
   return crypto.randomUUID()
@@ -105,8 +106,9 @@ export const usePortfolioStore = defineStore('portfolio', () => {
       }
     }
 
-    // Safety: register beforeunload flush
-    if (typeof window !== 'undefined') {
+    // Safety: register beforeunload flush (only once)
+    if (typeof window !== 'undefined' && !beforeunloadRegistered) {
+      beforeunloadRegistered = true
       window.addEventListener('beforeunload', () => {
         persistNow()
       })
@@ -457,6 +459,9 @@ export const usePortfolioStore = defineStore('portfolio', () => {
       return 'sv' // default
     }
 
+    // Hoist dynamic import to avoid redundant module loading inside the loop
+    const { multiSearch } = await import('../services/tcg/multiSearch.js')
+
     for (let i = 0; i < tasks.length; i++) {
       const { portfolioId, item } = tasks[i]
       if (onProgress) onProgress(i + 1, tasks.length, resolved)
@@ -560,8 +565,44 @@ export const usePortfolioStore = defineStore('portfolio', () => {
             updateItem(portfolioId, item.id, updates)
             resolved++
           }
+        } else if (['yugioh', 'lorcana', 'one-piece', 'riftbound'].includes(game)) {
+          // ── Other TCGs via multiSearch ─────────────────────────────
+          try {
+            const name = item.cardData.name.trim()
+            const result = await multiSearch(name, { page: 1, pageSize: 10, providers: [game] })
+            const candidates = result?.cards || []
+            
+            if (candidates.length > 0) {
+              // Try to match by set name or number
+              const setLower = (item.cardData.set?.name || '').toLowerCase()
+              const numStr = (item.cardData.number || '').toLowerCase()
+              
+              let match = candidates.find(c => {
+                const cSet = (c.set || '').toLowerCase()
+                const cNum = (c.number || '').toLowerCase()
+                return cSet.includes(setLower) || setLower.includes(cSet) || cNum === numStr
+              })
+              if (!match) match = candidates[0]
+              
+              const updates = {
+                cardId: match.id,
+                cardData: {
+                  name: match.name,
+                  number: match.number || item.cardData.number,
+                  images: { small: match.image || '', large: '' },
+                  set: { id: match.set || '', name: match.set || item.cardData.set?.name },
+                  rarity: match.rarity || item.cardData.rarity,
+                },
+                lastPriceUpdate: new Date().toISOString(),
+              }
+              if (match.price != null) updates.currentMarketPrice = match.price
+              updateItem(portfolioId, item.id, updates)
+              resolved++
+            }
+          } catch (e) {
+            console.warn(`Failed to resolve ${game} card "${item.cardData.name}":`, e.message)
+          }
         }
-        // Other TCGs (one-piece, lorcana, riftbound, yu-gi-oh) — keep CSV prices, skip API for now
       } catch {}
 
       // 80ms delay between requests

@@ -2,7 +2,6 @@ import { createRouter, createWebHistory } from 'vue-router'
 
 const routes = [
   { path: '/', name: 'Dashboard', component: () => import('../views/DashboardView.vue'), meta: { title: 'Dashboard', description: 'Track your TCG collection — Pokémon, Magic, Yu-Gi-Oh!, Lorcana, One Piece, and Riftbound. Live prices, portfolio charts, and gain/loss.' } },
-  { path: '/mockup', name: 'Mockup', component: () => import('../views/MockDashboard.vue'), meta: { title: 'New Dashboard Mockup', description: 'Prototype of the new dark-themed dashboard interface.' } },
   { path: '/search', name: 'Search', component: () => import('../views/SearchView.vue'), meta: { title: 'Search Cards', description: 'Search any card across Pokémon, Magic, Yu-Gi-Oh!, Lorcana, One Piece, and Riftbound. Live market prices and price history charts.' } },
   { path: '/sets', name: 'Browse', component: () => import('../views/BrowseView.vue'), meta: { title: 'Browse Sets', description: 'Browse trading card games — Pokémon, Magic, Yu-Gi-Oh!, One Piece, Lorcana and more. Explore sets, cards and live prices.' } },
   { path: '/sets/pokemon', name: 'Sets', component: () => import('../views/SetsView.vue'), meta: { title: 'Pokémon Sets', description: 'Browse every Pokémon TCG set. View cards, release dates, and card counts.' } },
@@ -15,6 +14,8 @@ const routes = [
   { path: '/trade', name: 'TradeLanding', component: () => import('../views/TradeLanding.vue'), meta: { title: 'Trade Analyzer', description: 'Compare card values and analyze trades side-by-side. Add cards by searching or scanning.' } },
   { path: '/trade/analyzer', name: 'TradeAnalyzer', component: () => import('../views/TradeAnalyzerView.vue'), meta: { title: 'Trade Analyzer', description: 'Compare cards side-by-side. Scan or add cards to each side and see the price difference instantly.' } },
   { path: '/terms', name: 'Terms', component: () => import('../views/TermsView.vue'), meta: { title: 'Terms & Conditions', description: 'Terms & Conditions and Privacy Policy for Rarebox.' } },
+  // 404 catch-all — redirect to dashboard
+  { path: '/:pathMatch(.*)*', redirect: '/' },
 ]
 
 const router = createRouter({

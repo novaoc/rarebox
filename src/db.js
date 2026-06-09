@@ -39,6 +39,28 @@ export async function saveState(state) {
   }
 }
 
+// ── Trade state (separate key to avoid conflicts with portfolio) ────────
+
+export async function loadTradeState() {
+  try {
+    const row = await db.state.get('trade_state')
+    return row?.value || null
+  } catch (e) {
+    console.error('IDB trade load failed:', e)
+    return null
+  }
+}
+
+export async function saveTradeState(state) {
+  try {
+    await db.state.put({ key: 'trade_state', value: state })
+    return true
+  } catch (e) {
+    console.error('IDB trade save failed:', e)
+    return false
+  }
+}
+
 // ── Staleness helpers ──────────────────────────────────────────────────
 
 const STALE_THRESHOLDS = {
