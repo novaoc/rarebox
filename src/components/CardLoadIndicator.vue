@@ -1,17 +1,11 @@
-<!--
-  CardLoadIndicator — Floating pill showing background card loading progress.
-  Shows TCG being loaded, progress %, and estimated time remaining.
--->
 <template>
   <transition name="pill">
     <div v-if="visible" class="load-pill" :class="{ done: isDone }" @click="expanded = !expanded">
-      <!-- Collapsed: spinner + time -->
       <div v-if="!expanded && !isDone" class="pill-collapsed">
         <div class="pill-spinner" />
         <span class="pill-time">{{ timeLeft }}</span>
       </div>
 
-      <!-- Expanded / Done -->
       <template v-else>
         <div class="pill-header">
           <span class="pill-icon" v-if="isDone">✓</span>
@@ -29,11 +23,12 @@
         </div>
 
         <div class="pill-games" v-if="expanded">
-          <div v-for="g in gameList" :key="g.id" class="pill-game" :class="{ active: currentGame === g.id && !isDone, done: g.done }">
+          <div v-for="g in gameList" :key="g.id" class="pill-game" :class="{ active: currentGame === g.id && !isDone, done: g.done, failed: g.failed }">
             <span class="pill-game-name">{{ g.name }}</span>
             <span class="pill-game-status">
-              <template v-if="g.done">✓</template>
-              <template v-else-if="currentGame === g.id && !isDone">{{ status }}</template>
+              <template v-if="g.done && !g.failed">✓</template>
+              <template v-else-if="g.failed">✗</template>
+              <template v-else-if="currentGame === g.id">{{ status }}</template>
               <template v-else>…</template>
             </span>
           </div>
@@ -53,40 +48,44 @@ const status = ref('')
 const isDone = ref(false)
 const gameProgress = ref({})
 const startTime = ref(0)
-const completedPct = ref(0)
+const activeGames = ref([])
 
-const GAMES = [
-  { id: 'pokemon', name: 'Pokémon' },
-  { id: 'mtg', name: 'MTG' },
-  { id: 'lorcana', name: 'Lorcana' },
-  { id: 'one-piece', name: 'One Piece' },
-  { id: 'yugioh', name: 'Yu-Gi-Oh' },
-  { id: 'riftbound', name: 'Riftbound' },
-]
+const GAME_NAMES = {
+  pokemon: 'Pokémon',
+  mtg: 'MTG',
+  lorcana: 'Lorcana',
+  'one-piece': 'One Piece',
+  yugioh: 'Yu-Gi-Oh',
+  riftbound: 'Riftbound',
+}
+
+const totalGames = computed(() => activeGames.value.length)
 
 const gameList = computed(() =>
-  GAMES.map(g => ({
-    ...g,
-    done: gameProgress.value[g.id]?.done || false,
+  activeGames.value.map(id => ({
+    id,
+    name: GAME_NAMES[id] || id,
+    done: gameProgress.value[id]?.done || false,
+    failed: gameProgress.value[id]?.failed || false,
   }))
 )
 
 const overallPct = computed(() => {
   if (isDone.value) return 100
+  if (totalGames.value === 0) return 0
   const done = Object.values(gameProgress.value).filter(g => g.done).length
-  return Math.round((done / GAMES.length) * 100)
+  return Math.round((done / totalGames.value) * 100)
 })
 
 const currentLabel = computed(() => {
-  const g = GAMES.find(x => x.id === currentGame.value)
-  return g ? `Loading ${g.name}…` : 'Loading cards…'
+  const name = GAME_NAMES[currentGame.value]
+  return name ? `Loading ${name}…` : 'Loading cards…'
 })
 
-// Speed & time estimation
 const speed = computed(() => {
   if (!startTime.value || overallPct.value <= 0) return 0
   const elapsed = (Date.now() - startTime.value) / 1000
-  return overallPct.value / elapsed // % per second
+  return overallPct.value / elapsed
 })
 
 const speedLabel = computed(() => {
@@ -108,11 +107,12 @@ const timeLeft = computed(() => {
   return `~${Math.round(remaining / 60)}m`
 })
 
-function start() {
+function start(games) {
   visible.value = true
   expanded.value = true
   isDone.value = false
   gameProgress.value = {}
+  activeGames.value = games || []
   currentGame.value = ''
   status.value = ''
   startTime.value = Date.now()
@@ -122,10 +122,13 @@ function onProgress({ game, phase }) {
   currentGame.value = game
   status.value = phase
   if (!gameProgress.value[game]) {
-    gameProgress.value[game] = { done: false }
+    gameProgress.value[game] = { done: false, failed: false }
   }
-  if (phase === 'Done') {
+  if (phase === 'Done' || phase === 'Already cached') {
     gameProgress.value[game].done = true
+  } else if (phase && phase.startsWith('Failed')) {
+    gameProgress.value[game].done = true
+    gameProgress.value[game].failed = true
   }
 }
 
@@ -134,7 +137,7 @@ function finish() {
   expanded.value = true
   setTimeout(() => {
     visible.value = false
-  }, 3000)
+  }, 4000)
 }
 
 defineExpose({ start, onProgress, finish })
@@ -251,6 +254,7 @@ defineExpose({ start, onProgress, finish })
 
 .pill-game.active { color: var(--text-primary, #e6edf3); }
 .pill-game.done { color: var(--success, #3fb950); }
+.pill-game.failed { color: var(--danger, #f85149); }
 
 .pill-game-status {
   max-width: 100px;

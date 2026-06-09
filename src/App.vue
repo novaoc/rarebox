@@ -166,7 +166,7 @@ import InstallPrompt from './components/InstallPrompt.vue'
 import TourModal from './components/TourModal.vue'
 import CardDatabaseLoader from './components/CardDatabaseLoader.vue'
 import CardLoadIndicator from './components/CardLoadIndicator.vue'
-import { isCardDatabaseReady, buildSearchIndex, getTcgPrefs } from './services/tcg/cardCache.js'
+import { isCardDatabaseReady, buildSearchIndex, saveCardDatabaseReady, getTcgPrefs } from './services/tcg/cardCache.js'
 import { preloadGames } from './services/tcg/cardPreloader.js'
 
 const store = usePortfolioStore()
@@ -241,11 +241,12 @@ function startBackgroundPreload() {
   const indicator = cardLoadIndicator.value
   const games = getTcgPrefs()
   if (!indicator || !games || games.length === 0) return
-  indicator.start()
+  indicator.start(games)
   preloadGames(games, ({ game, phase }) => {
     indicator.onProgress({ game, phase })
   }).then(async () => {
     await buildSearchIndex()
+    saveCardDatabaseReady()
     indicator.finish()
   }).catch(() => indicator.finish())
 }
