@@ -2,7 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { usePortfolioStore } from './portfolio'
 import { getMarketPrice } from '../services/pokemonApi'
-import { multiSearch, resolveCard, searchRiftboundBySet } from '../services/tcg/multiSearch'
+import { multiSearch, resolveCard, searchRiftboundBySet, searchLorcanaBySet } from '../services/tcg/multiSearch'
 
 const STORAGE_KEY = 'rarebox_decks'
 
@@ -179,6 +179,11 @@ export const useDeckStore = defineStore('decks', () => {
       return await searchRiftboundBySet(name, setCode)
     }
 
+    // Lorcana fast path: fetch only the matching set's cards
+    if (game === 'lorcana') {
+      return await searchLorcanaBySet(name, setCode)
+    }
+
     const result = await multiSearch(name, { page: 1, pageSize: 50, providers: [game] })
     if (!result?.cards?.length) return null
 
@@ -192,8 +197,8 @@ export const useDeckStore = defineStore('decks', () => {
         if (c._raw?.set?.toLowerCase() === q) return true
       }
       if (game === 'lorcana') {
-        if (c._raw?.set_code?.toLowerCase() === q) return true
-        if (c._raw?.set_name?.toLowerCase().includes(q)) return true
+        if (c._raw?.set?.code?.toLowerCase() === q) return true
+        if (c._raw?.set?.name?.toLowerCase().includes(q)) return true
       }
       if (game === 'one-piece') {
         if (c.id && c.id.startsWith(q)) return true

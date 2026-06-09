@@ -93,7 +93,7 @@ async function searchLorcana(query) {
         id: c.id,
         name: c.version ? `${c.name} — ${c.version}` : c.name,
         number: c.collector_number || '',
-        set: c.set_name || c.set_code || '',
+        set: c.set?.name || c.set?.code || '',
         image: img.small || '',
         price: num(c.prices?.usd) || num(c.prices?.usd_foil),
         rarity: c.rarity || '',
@@ -267,6 +267,46 @@ export async function searchRiftboundBySet(name, setCode) {
   }
 }
 
+export async function searchLorcanaBySet(name, setCode) {
+  try {
+    const setsRes = await fetchJson('https://api.lorcast.com/v0/sets')
+    const sets = setsRes.results || setsRes || []
+
+    const matchSet = setCode
+      ? (sets.find(s => s.code?.toLowerCase() === setCode?.toLowerCase())
+        || sets.find(s => s.name?.toLowerCase().startsWith(setCode?.toLowerCase()))
+        || sets.find(s => s.name?.toLowerCase().includes(setCode?.toLowerCase())))
+      : null
+
+    if (matchSet) {
+      const d = await fetchJson(`https://api.lorcast.com/v0/sets/${matchSet.code}/cards`)
+      const cards = d.results || d || []
+      const q = name.toLowerCase()
+      const match = cards.find(c => c.name.toLowerCase() === q)
+        || cards.find(c => c.name.toLowerCase().includes(q))
+        || null
+
+      if (match) {
+        const img = match.image_uris?.digital || {}
+        return {
+          id: match.id,
+          name: match.version ? `${match.name} — ${match.version}` : match.name,
+          number: match.collector_number || '',
+          set: match.set?.name || matchSet.name,
+          image: img.small || '',
+          price: num(match.prices?.usd) || num(match.prices?.usd_foil),
+          rarity: match.rarity || '',
+          game: 'lorcana',
+        }
+      }
+    }
+
+    return null
+  } catch {
+    return null
+  }
+}
+
 // ── Sealed products: PriceCharting ──────────────────────────────────────────
 
 const PC_BASE = 'https://www.pricecharting.com/search-products'
@@ -402,7 +442,7 @@ async function resolveLorcanaCard(cardId) {
     id: d.id,
     name: d.name,
     number: d.collector_number || '',
-    set: d.set_name || d.set_code || '',
+    set: d.set?.name || d.set?.code || '',
     image: img.small || '',
     price: num(d.prices?.usd) || num(d.prices?.usd_foil),
     rarity: d.rarity || '',
