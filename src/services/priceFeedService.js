@@ -91,6 +91,29 @@ export async function searchProducts(query, game = 'pokemon') {
   const cached = await cacheGet(cacheKey)
   if (cached) return cached
 
+  // ── Riftbound specific routing: riftcodex API ──────────────────────
+  if (def.id === 'riftbound') {
+    try {
+      const { multiSearch } = await import('./tcg/multiSearch.js')
+      const result = await multiSearch(q, { page: 1, pageSize: 10, providers: ['riftbound'] })
+      const cards = (result?.cards || []).map(c => ({
+        name: c.name,
+        set: c.set,
+        image: c.image,
+        price: c.price,
+        url: `https://riftcodex.com/cards/${c.id}`,
+        slug: c.id,
+        sealed: false
+      }))
+      if (cards.length > 0) {
+        await cacheSet(cacheKey, def.id, cards)
+        return cards
+      }
+    } catch (e) {
+      console.warn('Riftbound specific search failed, falling back to PriceCharting:', e.message)
+    }
+  }
+
   let products
   try {
     products = await rawSearch(`${q} ${def.suffix}`)
