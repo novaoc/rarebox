@@ -459,6 +459,9 @@ export const usePortfolioStore = defineStore('portfolio', () => {
       return 'sv' // default
     }
 
+    // Hoist dynamic import to avoid redundant module loading inside the loop
+    const { multiSearch } = await import('../services/tcg/multiSearch.js')
+
     for (let i = 0; i < tasks.length; i++) {
       const { portfolioId, item } = tasks[i]
       if (onProgress) onProgress(i + 1, tasks.length, resolved)
@@ -565,7 +568,6 @@ export const usePortfolioStore = defineStore('portfolio', () => {
         } else if (['yugioh', 'lorcana', 'one-piece', 'riftbound'].includes(game)) {
           // ── Other TCGs via multiSearch ─────────────────────────────
           try {
-            const { multiSearch } = await import('../services/tcg/multiSearch.js')
             const name = item.cardData.name.trim()
             const result = await multiSearch(name, { page: 1, pageSize: 10, providers: [game] })
             const candidates = result?.cards || []
