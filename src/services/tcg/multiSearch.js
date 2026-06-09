@@ -6,7 +6,7 @@
 // When the in-memory search index is ready, searches are instant (no network).
 // Falls back to live APIs otherwise.
 
-import { searchCache, isSearchReady } from './cardCache.js'
+import { searchCache, isSearchReady, getTcgPrefs } from './cardCache.js'
 
 const TIMEOUT = 8000
 
@@ -459,11 +459,11 @@ export async function multiSearch(query, { page = 1, pageSize = 20, category = '
 
   // If the in-memory search index is ready, search instantly (no network)
   if (isSearchReady()) {
-    return searchCache(query, { page, pageSize })
+    return searchCache(query, { page, pageSize, providers })
   }
 
   // Fallback: hit live APIs (slow first time, used before preload completes)
-  const active = providers || Object.keys(ALL_PROVIDERS)
+  const active = providers || getTcgPrefs() || Object.keys(ALL_PROVIDERS)
   const searches = active.map(k =>
     ALL_PROVIDERS[k](query, page, pageSize).catch(() => ({ cards: [], total: 0 })),
   )

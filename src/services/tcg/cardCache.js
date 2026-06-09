@@ -116,8 +116,6 @@ export async function saveGameCards(game, cards) {
       cachedAt: now,
     })))
   })
-  // Rebuild in-memory index
-  await buildSearchIndex()
 }
 
 /** Clear all cached cards. */
@@ -134,14 +132,16 @@ export async function clearCardCache() {
  * Search the in-memory card index. Returns results matching multiSearch shape.
  * Pure in-memory — no IndexedDB queries, no network requests.
  */
-export function searchCache(query, { page = 1, pageSize = 20 } = {}) {
+export function searchCache(query, { page = 1, pageSize = 20, providers } = {}) {
   const q = query.toLowerCase().trim()
   if (!q || !_allCards) return { cards: [], totalCount: 0 }
 
-  // Fast path: check if any card name starts with the query
-  // by scanning the index keys
+  // Filter to selected TCGs only
+  const active = providers && providers.length > 0 ? new Set(providers) : null
+
   const matches = []
   for (const card of _allCards) {
+    if (active && !active.has(card.game)) continue
     const name = (card.name || '').toLowerCase()
     const set = (card.set || '').toLowerCase()
     const number = (card.number || '').toLowerCase()
