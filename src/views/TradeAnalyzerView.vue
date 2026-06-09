@@ -95,19 +95,24 @@ function openSearch(side: 'A' | 'B') {
   searchResults.value = []
 }
 
-function resizeImage(dataUrl: string, maxWidth = 400): Promise<string> {
+// Normalize capture toward ~1100px wide: downscale huge frames for speed, but
+// also UPSCALE small ones — tesseract needs ~20px+ glyph height to read card
+// text, and a 400px-wide card frame is illegible to it.
+function resizeImage(dataUrl: string, targetWidth = 1100): Promise<string> {
   return new Promise((resolve) => {
     const img = new Image()
     img.onload = () => {
-      if (img.width <= maxWidth) { resolve(dataUrl); return }
-      const scale = maxWidth / img.width
-      const w = maxWidth
+      if (img.width >= targetWidth * 0.6 && img.width <= targetWidth * 1.3) { resolve(dataUrl); return }
+      const scale = targetWidth / img.width
+      const w = targetWidth
       const h = Math.round(img.height * scale)
       const c = document.createElement('canvas')
       c.width = w; c.height = h
       const ctx = c.getContext('2d')!
+      ctx.imageSmoothingEnabled = true
+      ctx.imageSmoothingQuality = 'high'
       ctx.drawImage(img, 0, 0, w, h)
-      resolve(c.toDataURL('image/jpeg', 0.7))
+      resolve(c.toDataURL('image/jpeg', 0.9))
     }
     img.onerror = () => resolve(dataUrl)
     img.src = dataUrl
@@ -294,7 +299,7 @@ function cancelAddCard() {
 
 onMounted(async () => {
   if (!tradeStore.initialized) await tradeStore.init()
-  preloadOcrWorker().catch(() => {})
+  preloadOcrWorker().catch(e => console.warn('OCR preload failed:', e))
 })
 </script>
 
@@ -503,7 +508,7 @@ onMounted(async () => {
               class="search-result-row"
               @click="addCard(card)"
             >
-              <img :src="card.image" class="search-result-thumb" />
+              <img v-if="card.image" :src="card.image" class="search-result-thumb" @error="$event.target.style.display='none'" />
               <div class="search-result-info">
                 <div class="search-result-name">{{ card.name }}</div>
                 <div class="search-result-sub">{{ card.set }} &middot; #{{ card.number }}</div>
@@ -519,8 +524,6 @@ onMounted(async () => {
             class="btn btn-secondary"
             style="flex:1"
             @click="openScanner('A')"
-            disabled
-            title="Scan temporarily disabled"
           >
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
@@ -692,7 +695,7 @@ onMounted(async () => {
               class="search-result-row"
               @click="addCard(card)"
             >
-              <img :src="card.image" class="search-result-thumb" />
+              <img v-if="card.image" :src="card.image" class="search-result-thumb" @error="$event.target.style.display='none'" />
               <div class="search-result-info">
                 <div class="search-result-name">{{ card.name }}</div>
                 <div class="search-result-sub">{{ card.set }} &middot; #{{ card.number }}</div>
@@ -708,8 +711,6 @@ onMounted(async () => {
             class="btn btn-secondary"
             style="flex:1"
             @click="openScanner('B')"
-            disabled
-            title="Scan temporarily disabled"
           >
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
@@ -760,7 +761,7 @@ onMounted(async () => {
                 class="scan-candidate-row"
                 @click="addScannedCard(card)"
               >
-                <img :src="card.image" class="search-result-thumb" />
+                <img v-if="card.image" :src="card.image" class="search-result-thumb" @error="$event.target.style.display='none'" />
                 <div class="search-result-info">
                   <div class="search-result-name">{{ card.name }}</div>
                   <div class="search-result-sub">{{ card.set }} &middot; #{{ card.number }}</div>

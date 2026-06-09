@@ -1,5 +1,6 @@
-import { recognizeCard } from './ocrService'
+import { recognizeCard, recognizeJapaneseName } from './ocrService'
 import { multiSearch } from '../services/tcg/multiSearch'
+import { getJapaneseCardDetail } from '../services/pokemonApi'
 
 export interface ScannedCard {
   id: string
@@ -34,6 +35,74 @@ async function searchWithTimeout(query: string, size: number): Promise<any[]> {
   }
 }
 
+// Japanese cards live in tcgdex, not pokemontcg.io. OCR'd names are imperfect
+// (e.g. "メガリザドンX" or "めメガリザ…" for メガリザードンX), so slide a
+// window over each candidate read — substrings of decreasing length, skipping
+// up to 2 junk leading chars — until the substring search hits. When the card
+// number is known, prefer a hit set that actually contains that number.
+async function tcgdexNameSearch(fragment: string): Promise<any[]> {
+  try {
+    const res = await fetch(`https://api.tcgdex.net/v2/ja/cards?name=${encodeURIComponent(fragment)}`, {
+      signal: AbortSignal.timeout(10000),
+    })
+    if (!res.ok) return []
+    const arr = await res.json()
+    return Array.isArray(arr) && arr.length <= 100 ? arr : []
+  } catch {
+    return []
+  }
+}
+
+async function searchJapanese(queries: string[], cardNumber: string | null): Promise<ScannedCard[]> {
+  const num = cardNumber ? parseInt(cardNumber.split('/')[0], 10) : null
+  let briefs: any[] = []
+  let fallback: any[] = []
+
+  outer:
+  for (const query of queries.slice(0, 3)) {
+    const q = query.replace(/\s+/g, '')
+    for (const offset of [0, 1, 2]) {
+      for (const len of [8, 6, 4, 3]) {
+        if (offset + len > q.length) continue
+        const frag = q.slice(offset, offset + len)
+        const arr = await tcgdexNameSearch(frag)
+        if (arr.length === 0) continue
+        if (num != null && arr.some(b => parseInt(b.localId, 10) === num)) {
+          briefs = arr
+          break outer
+        }
+        if (fallback.length === 0) fallback = arr
+        break // this offset matched something; try next offset for a number-verified hit
+      }
+    }
+  }
+  if (briefs.length === 0) briefs = fallback
+  if (briefs.length === 0) return []
+
+  if (num != null && briefs.length > 1) {
+    const byNum = briefs.filter(b => parseInt(b.localId, 10) === num)
+    if (byNum.length > 0) briefs = byNum
+  }
+
+  const detailed = await Promise.all(briefs.slice(0, 8).map(async b => {
+    try {
+      const d: any = await getJapaneseCardDetail(b.id)
+      return {
+        id: d.id,
+        name: d.name,
+        setName: d.set?.name || '',
+        number: d.number || b.localId || '',
+        image: d.images?.small || '',
+        price: d.tcgplayer?.prices?.normal?.market ?? null,
+        game: 'pokemon',
+      } as ScannedCard
+    } catch {
+      return null
+    }
+  }))
+  return detailed.filter(Boolean) as ScannedCard[]
+}
+
 export async function scanCard(imageData: string, onProgress?: (pct: number) => void): Promise<ScanResult> {
   const ocr = await recognizeCard(imageData, onProgress)
   const result: ScanResult = {
@@ -43,12 +112,25 @@ export async function scanCard(imageData: string, onProgress?: (pct: number) => 
     ocrConfidence: ocr.confidence,
   }
 
+  // English queries first (name-band read, then full-frame read)
   let allCards: any[] = []
-  if (ocr.searchQuery) {
-    allCards = await searchWithTimeout(ocr.searchQuery, 15)
+  let usedQuery: string | null = null
+  for (const q of ocr.queries) {
+    allCards = await searchWithTimeout(q, 15)
+    if (allCards.length > 0) { usedQuery = q; break }
   }
 
-  // Fallback: use raw OCR text
+  // Japanese fallback — the search outcome is the language detector: if no
+  // English query hit anything, re-read the name band with the jpn model.
+  if (allCards.length === 0) {
+    const jpQueries = await recognizeJapaneseName(imageData)
+    if (jpQueries.length > 0) {
+      allCards = await searchJapanese(jpQueries, ocr.cardNumber)
+      if (allCards.length > 0) usedQuery = null // JP reads are too noisy for name ranking
+    }
+  }
+
+  // Last resort: raw OCR text
   if (allCards.length === 0 && ocr.text.length >= 5) {
     const rawQuery = ocr.text
       .replace(/[^a-zA-Z\s]/g, ' ')
@@ -57,12 +139,13 @@ export async function scanCard(imageData: string, onProgress?: (pct: number) => 
       .slice(0, 80)
     if (rawQuery.length >= 5) {
       allCards = await searchWithTimeout(rawQuery, 10)
+      if (allCards.length > 0) usedQuery = rawQuery
     }
   }
 
   result.candidates = allCards as ScannedCard[]
   if (result.candidates.length > 0) {
-    result.card = pickBestMatch(result.candidates, ocr.searchQuery, ocr.cardNumber)
+    result.card = pickBestMatch(result.candidates, usedQuery, ocr.cardNumber)
   }
 
   return result
@@ -77,9 +160,9 @@ function pickBestMatch(
   let filtered = candidates
 
   if (cardNumber) {
-    const num = cardNumber.split('/')[0]
+    const num = parseInt(cardNumber.split('/')[0], 10)
     const byNum = filtered.filter(
-      (c: any) => String(c.number).split('/')[0] === num || c.number === cardNumber,
+      (c: any) => parseInt(String(c.number).split('/')[0], 10) === num,
     )
     if (byNum.length > 0) filtered = byNum
   }
