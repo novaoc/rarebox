@@ -40,16 +40,23 @@ html, body, #app {
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   -webkit-tap-highlight-color: transparent;
-  touch-action: manipulation;
-  overscroll-behavior: none;
+  touch-action: pan-y;
+  overscroll-behavior-x: none;
+  overscroll-behavior-y: contain;
+}
+
+/* Locked layout containers */
+.app-layout, .main-wrapper, .dashboard, .portfolio-view {
+  touch-action: pan-y;
 }
 
 /* Prevent iOS drag/select/callout on all interactive elements */
-img, button, a, .card-result, .set-card, .card-img-wrap, .set-logo-wrap,
+img, .card-result, .set-card, .card-img-wrap, .set-logo-wrap,
 .card-detail-panel, .bottom-sheet, .card-overlay, .card-img-placeholder {
   -webkit-user-drag: none;
   -webkit-touch-callout: none;
   user-select: none;
+  touch-action: manipulation;
 }
 
 /* Scrollbars */
@@ -76,6 +83,8 @@ a:hover { text-decoration: underline; }
   transition: all 0.15s;
   white-space: nowrap;
   text-decoration: none;
+  user-select: none;
+  touch-action: manipulation;
 }
 .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
@@ -172,6 +181,7 @@ a:hover { text-decoration: underline; }
   z-index: 1000;
   padding: 20px;
   backdrop-filter: blur(4px);
+  touch-action: none;
 }
 .modal {
   background: var(--bg-secondary);
@@ -182,6 +192,8 @@ a:hover { text-decoration: underline; }
   max-height: 90vh;
   overflow-y: auto;
   box-shadow: var(--shadow);
+  touch-action: pan-y;
+  overscroll-behavior: contain;
 }
 .modal-header {
   display: flex;
@@ -367,7 +379,7 @@ a:hover { text-decoration: underline; }
   .grid-4 { grid-template-columns: 1fr 1fr; }
 
   /* Modal full-width on phones */
-  .modal-overlay { padding: 12px; align-items: flex-end; }
+  .modal-overlay { padding: 0; align-items: flex-end; }
   .modal { max-height: 95vh; border-radius: var(--radius-lg) var(--radius-lg) 0 0; }
 
   /* Cards tighter padding */

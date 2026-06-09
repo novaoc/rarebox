@@ -2,6 +2,29 @@
   <div class="settings-view">
     <h2 class="settings-title">Settings</h2>
 
+    <!-- UI Preferences -->
+    <div class="settings-section card mb-4">
+      <h3 class="settings-section-title">Interface</h3>
+      <p class="settings-desc">Customize your dashboard experience.</p>
+
+      <div class="settings-item">
+        <div>
+          <div class="settings-item-label">Hide Loading Progress</div>
+          <div class="settings-item-sub">Hide the card database download indicator in the bottom right.</div>
+        </div>
+        <div class="toggle-wrapper">
+          <input 
+            type="checkbox" 
+            id="hide-loader-toggle"
+            v-model="hideLoader" 
+            @change="saveUiPrefs" 
+            class="toggle-input"
+          />
+          <label for="hide-loader-toggle" class="toggle-label"></label>
+        </div>
+      </div>
+    </div>
+
     <!-- Data & Privacy -->
     <div class="settings-section card mb-4">
       <h3 class="settings-section-title">Data & Privacy</h3>
@@ -333,6 +356,7 @@ const router = useRouter()
 const confirmReset = ref(false)
 const resetConfirmText = ref('')
 const showLocalSync = ref(false)
+const hideLoader = ref(localStorage.getItem('hide_load_indicator') === 'true')
 
 // Alert state
 const allAlerts = computed(() => {
@@ -344,6 +368,12 @@ const triggeredCount = computed(() => getTriggeredAlerts().length)
 
 function removeAlertById(id) { removeAlert(id) }
 function doClearTriggered() { clearTriggeredAlerts() }
+
+function saveUiPrefs() {
+  localStorage.setItem('hide_load_indicator', hideLoader.value.toString())
+  // Dispatch storage event manually for the current tab
+  window.dispatchEvent(new Event('storage'))
+}
 
 // Card database state
 const cardCounts = ref({})
@@ -536,6 +566,46 @@ function goToDashboard() {
 .settings-item-label { font-size: 14px; font-weight: 500; }
 .settings-item-sub { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
 .settings-item-value { font-size: 13px; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+
+/* Toggle Switch Styles */
+.toggle-wrapper {
+  position: relative;
+  width: 44px;
+  height: 24px;
+}
+.toggle-input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+.toggle-label {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: var(--border);
+  transition: .4s;
+  border-radius: 24px;
+}
+.toggle-label:before {
+  position: absolute;
+  content: "";
+  height: 18px;
+  width: 18px;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  transition: .4s;
+  border-radius: 50%;
+}
+.toggle-input:checked + .toggle-label {
+  background-color: var(--accent);
+}
+.toggle-input:checked + .toggle-label:before {
+  transform: translateX(20px);
+}
 
 /* PC key row — column layout */
 .settings-item-col {

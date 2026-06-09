@@ -246,7 +246,22 @@ function addCard(card: SearchResult) {
     searchResults.value = []
     return
   }
-  // Cards: show grading prompt
+  // Cards: show grading prompt (unless Riftbound)
+  if (card.game === 'riftbound') {
+    tradeStore.addToSide(activeSide.value, {
+      id: card.id,
+      name: card.name,
+      setName: card.set,
+      number: card.number,
+      imageUrl: card.image,
+      marketPrice: card.price || 0,
+      game: card.game,
+    })
+    searchQuery.value = ''
+    searchResults.value = []
+    return
+  }
+
   pendingCard.value = card
   pendingGraded.value = false
   pendingGradeCompany.value = 'PSA'
@@ -391,19 +406,21 @@ onMounted(async () => {
             <div class="card-row-info">
               <div class="card-row-name">
                 {{ card.name }}
-                <span
-                  v-if="card.graded"
-                  class="grade-badge"
-                  @click.stop="activeGradeCard = activeGradeCard === card.tradeId ? null : card.tradeId"
-                >{{ card.gradeCompany }} {{ card.grade }}</span>
-                <span
-                  v-else
-                  class="grade-badge ungraded"
-                  @click.stop="activeGradeCard = activeGradeCard === card.tradeId ? null : card.tradeId"
-                >Add Grade</span>
+                <template v-if="card.game !== 'riftbound'">
+                  <span
+                    v-if="card.graded"
+                    class="grade-badge"
+                    @click.stop="activeGradeCard = activeGradeCard === card.tradeId ? null : card.tradeId"
+                  >{{ card.gradeCompany }} {{ card.grade }}</span>
+                  <span
+                    v-else
+                    class="grade-badge ungraded"
+                    @click.stop="activeGradeCard = activeGradeCard === card.tradeId ? null : card.tradeId"
+                  >Add Grade</span>
+                </template>
               </div>
               <div class="card-row-sub">{{ card.setName }} &middot; {{ card.number }}</div>
-              <div v-if="activeGradeCard === card.tradeId" class="grade-picker" @click.stop>
+              <div v-if="activeGradeCard === card.tradeId && card.game !== 'riftbound'" class="grade-picker" @click.stop>
                 <label class="grade-toggle">
                   <input
                     type="checkbox"
@@ -578,19 +595,21 @@ onMounted(async () => {
             <div class="card-row-info">
               <div class="card-row-name">
                 {{ card.name }}
-                <span
-                  v-if="card.graded"
-                  class="grade-badge"
-                  @click.stop="activeGradeCard = activeGradeCard === card.tradeId ? null : card.tradeId"
-                >{{ card.gradeCompany }} {{ card.grade }}</span>
-                <span
-                  v-else
-                  class="grade-badge ungraded"
-                  @click.stop="activeGradeCard = activeGradeCard === card.tradeId ? null : card.tradeId"
-                >Add Grade</span>
+                <template v-if="card.game !== 'riftbound'">
+                  <span
+                    v-if="card.graded"
+                    class="grade-badge"
+                    @click.stop="activeGradeCard = activeGradeCard === card.tradeId ? null : card.tradeId"
+                  >{{ card.gradeCompany }} {{ card.grade }}</span>
+                  <span
+                    v-else
+                    class="grade-badge ungraded"
+                    @click.stop="activeGradeCard = activeGradeCard === card.tradeId ? null : card.tradeId"
+                  >Add Grade</span>
+                </template>
               </div>
               <div class="card-row-sub">{{ card.setName }} &middot; {{ card.number }}</div>
-              <div v-if="activeGradeCard === card.tradeId" class="grade-picker" @click.stop>
+              <div v-if="activeGradeCard === card.tradeId && card.game !== 'riftbound'" class="grade-picker" @click.stop>
                 <label class="grade-toggle">
                   <input
                     type="checkbox"

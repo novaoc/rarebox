@@ -41,7 +41,7 @@
         </div>
 
         <!-- Graded specific -->
-        <div v-if="itemType === 'graded'" class="form-row mt-3">
+        <div v-if="itemType === 'graded' && game !== 'riftbound'" class="form-row mt-3">
           <div class="form-group">
             <label class="form-label">Grading Company</label>
             <select v-model="form.gradingCompany" class="select">
@@ -220,7 +220,10 @@ const games = SUPPORTED_GAMES
 const isPokemon = computed(() => game.value === 'pokemon')
 // All TCGs get card/graded/sealed. Riftbound hides graded.
 const visibleTypes = computed(() => {
-  if (game.value === 'riftbound') return types.filter(t => t.value !== 'graded')
+  if (game.value === 'riftbound') {
+    if (itemType.value === 'graded') itemType.value = 'card'
+    return types.filter(t => t.value !== 'graded')
+  }
   return types
 })
 // Whether the currently-selected non-Pokémon product is a sealed product.

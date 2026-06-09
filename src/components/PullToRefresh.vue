@@ -2,9 +2,9 @@
   <div
     ref="containerEl"
     class="pull-to-refresh-container"
-    :style="containerStyle"
+    :class="{ 'pulling-active': isPulling || refreshing }"
   >
-    <!-- Pull down indicator -->
+    <!-- Pull down indicator — localized localized localized -->
     <div
       class="pull-indicator"
       :class="{ refreshing, 'can-release': pullDistance >= threshold }"
@@ -13,9 +13,10 @@
     >
       <div class="indicator-inner">
         <svg
+          v-if="!refreshing"
           xmlns="http://www.w3.org/2000/svg"
-          width="24"
-          height="24"
+          width="20"
+          height="20"
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
@@ -28,52 +29,41 @@
           <path d="M21 12a9 9 0 1 1-6.219-8.56" />
           <polyline points="21 3 21 9 15 9" />
         </svg>
+        <div v-else class="spinner spinner-sm"></div>
       </div>
     </div>
 
-    <!-- Screen reader status -->
-    <div
-      class="sr-only"
-      role="status"
-      aria-live="polite"
-    >
-      {{ refreshing ? 'Refreshing portfolio data...' : '' }}
+    <!-- Content Wrapper — Subtly translates down as you pull -->
+    <div class="pull-content" :style="contentStyle">
+      <slot />
     </div>
-
-    <slot />
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
+import { useRoute } from 'vue-router'
 
 const props = defineProps({
-  refreshing: {
-    type: Boolean,
-    default: false
-  },
-  threshold: {
-    type: Number,
-    default: 70
-  },
-  maxPull: {
-    type: Number,
-    default: 120
-  }
+  refreshing: { type: Boolean, default: false },
+  threshold: { type: Number, default: 60 },
+  maxPull: { type: Number, default: 90 }
 })
 
 const emit = defineEmits(['refresh'])
+const route = useRoute()
+
+// Pull-to-refresh is only allowed on Dashboard and Portfolio views
+const isAllowedRoute = computed(() => {
+  return ['Dashboard', 'Portfolio'].includes(route.name)
+})
 
 const containerEl = ref(null)
 const startY = ref(0)
-const startX = ref(0)
 const pullDistance = ref(0)
 const isPulling = ref(false)
-const lockedDirection = ref(null) // null | 'vertical' | 'horizontal'
 let scrollParent = null
 
-// Find the nearest scrollable ancestor — the app scrolls inside .main-content,
-// not the window, so window.scrollY is always 0 and can't gate the gesture.
 function getScrollParent(el) {
   let node = el?.parentElement
   while (node) {
@@ -81,21 +71,17 @@ function getScrollParent(el) {
     if ((oy === 'auto' || oy === 'scroll') && node.scrollHeight > node.clientHeight) return node
     node = node.parentElement
   }
-  return document.scrollingElement || document.documentElement
+  return null
 }
 
 function atTop() {
-  return (scrollParent ? scrollParent.scrollTop : window.scrollY) <= 0
+  if (!scrollParent) return true
+  return scrollParent.scrollTop <= 0
 }
 
-const containerStyle = computed(() => {
-  if (props.refreshing) return { overflow: 'hidden' }
-  return {}
-})
-
 const indicatorStyle = computed(() => {
-  const y = props.refreshing ? 40 : Math.min(pullDistance.value * 0.5, props.maxPull)
-  const opacity = Math.min(pullDistance.value / props.threshold, 1)
+  const y = props.refreshing ? 20 : Math.min(pullDistance.value * 0.4, props.maxPull)
+  const opacity = Math.min(pullDistance.value / (props.threshold * 0.8), 1)
 
   return {
     transform: `translateY(${y}px) scale(${opacity})`,
@@ -103,56 +89,45 @@ const indicatorStyle = computed(() => {
   }
 })
 
+const contentStyle = computed(() => {
+  if (props.refreshing) return { transform: `translateY(40px)` }
+  if (pullDistance.value <= 0) return {}
+  const y = Math.min(pullDistance.value * 0.3, 40)
+  return { transform: `translateY(${y}px)` }
+})
+
 const svgStyle = computed(() => {
-  if (props.refreshing) return {}
   const rotation = (pullDistance.value / props.threshold) * 360
-  return {
-    transform: `rotate(${rotation}deg)`
-  }
+  return { transform: `rotate(${rotation}deg)` }
 })
 
 function onTouchStart(e) {
-  // Only allow pull if the scroll container is at the very top
-  if (props.refreshing || !atTop()) return
+  if (!isAllowedRoute.value || props.refreshing || !atTop()) return
   startY.value = e.touches[0].clientY
-  startX.value = e.touches[0].clientX
   isPulling.value = true
-  lockedDirection.value = null
 }
 
 function onTouchMove(e) {
   if (!isPulling.value) return
-  const t = e.touches[0]
-  const dy = t.clientY - startY.value
-  const dx = t.clientX - startX.value
-
-  // Lock gesture direction on first meaningful movement so a horizontal swipe
-  // (e.g. the horizontally-scrollable items table) never triggers a refresh.
-  if (lockedDirection.value === null && (Math.abs(dx) > 8 || Math.abs(dy) > 8)) {
-    lockedDirection.value = Math.abs(dx) > Math.abs(dy) ? 'horizontal' : 'vertical'
-  }
-  if (lockedDirection.value === 'horizontal') {
-    isPulling.value = false
-    pullDistance.value = 0
-    return
-  }
+  const dy = e.touches[0].clientY - startY.value
 
   if (dy > 0 && atTop()) {
     pullDistance.value = dy
-    // Non-passive listener (bound in onMounted) so this actually suppresses
-    // the native rubber-band scroll on iOS instead of being ignored.
+    // Prevent the actual scroll/rubber-band of the container
     if (e.cancelable) e.preventDefault()
   } else {
+    isPulling.value = false
     pullDistance.value = 0
   }
 }
 
 function onTouchEnd() {
   if (!isPulling.value) return
-  if (pullDistance.value >= props.threshold) emit('refresh')
+  if (pullDistance.value >= props.threshold) {
+    emit('refresh')
+  }
   isPulling.value = false
   pullDistance.value = 0
-  lockedDirection.value = null
 }
 
 onMounted(() => {
@@ -171,6 +146,12 @@ onBeforeUnmount(() => {
   el.removeEventListener('touchmove', onTouchMove)
   el.removeEventListener('touchend', onTouchEnd)
 })
+
+// Reset pull state if we navigate away
+watch(() => route.path, () => {
+  isPulling.value = false
+  pullDistance.value = 0
+})
 </script>
 
 <style scoped>
@@ -181,23 +162,23 @@ onBeforeUnmount(() => {
 
 .pull-indicator {
   position: absolute;
-  top: -40px;
+  top: -20px;
   left: 0;
   right: 0;
   display: flex;
   justify-content: center;
   align-items: center;
-  z-index: 50;
+  z-index: 100;
   pointer-events: none;
   transition: transform 0.2s cubic-bezier(0.2, 0, 0, 1), opacity 0.2s;
 }
 
 .indicator-inner {
-  background: var(--bg-secondary, #0d1117);
-  border: 1px solid var(--border, #30363d);
-  color: var(--accent, #f5a623);
-  width: 40px;
-  height: 40px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  color: var(--accent);
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -205,12 +186,13 @@ onBeforeUnmount(() => {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
 }
 
-.indicator-svg {
-  transition: transform 0.1s linear;
+.pull-content {
+  transition: transform 0.2s cubic-bezier(0.2, 0, 0, 1);
+  will-change: transform;
 }
 
-.refreshing .indicator-svg {
-  animation: spin 1s linear infinite;
+.pulling-active .pull-content {
+  transition: none; /* Smooth manual follow while pulling */
 }
 
 @keyframes spin {
@@ -218,29 +200,9 @@ onBeforeUnmount(() => {
   to { transform: rotate(360deg); }
 }
 
-.can-release .indicator-inner {
-  border-color: var(--accent);
-  box-shadow: 0 0 10px var(--accent-dim);
-}
-
-.sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border-width: 0;
-}
-
 @media (prefers-reduced-motion: reduce) {
-  .pull-indicator, .indicator-svg {
-    transition: none;
-  }
-  .refreshing .indicator-svg {
-    animation: none;
+  .pull-indicator, .pull-content {
+    transition: none !important;
   }
 }
 </style>

@@ -1,6 +1,17 @@
 <template>
   <transition name="pill">
-    <div v-if="visible" class="load-pill" :class="{ done: isDone }" @click="expanded = !expanded">
+    <div v-if="visible && !dismissed" class="load-pill" :class="{ done: isDone, 'can-dismiss': isDone || expanded }" @click="handlePillClick">
+      <!-- Dismiss Button (Mobile UX priority) -->
+      <button 
+        v-if="!isDone" 
+        class="pill-dismiss-btn" 
+        @click.stop="dismissed = true" 
+        aria-label="Dismiss loader"
+        title="Dismiss loader"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+      </button>
+
       <div v-if="!expanded && !isDone" class="pill-collapsed">
         <div class="pill-spinner" />
         <span class="pill-time">{{ timeLeft }}</span>
@@ -43,6 +54,7 @@ import { ref, computed } from 'vue'
 
 const visible = ref(false)
 const expanded = ref(true)
+const dismissed = ref(false)
 const currentGame = ref('')
 const status = ref('')
 const isDone = ref(false)
@@ -119,8 +131,13 @@ const timeLeft = computed(() => {
   return `~${Math.round(remaining / 60)}m`
 })
 
+function handlePillClick() {
+  expanded.value = !expanded.value
+}
+
 function start(games) {
   visible.value = true
+  dismissed.value = false
   expanded.value = true
   isDone.value = false
   gameProgress.value = {}
@@ -151,6 +168,8 @@ function onProgress({ game, phase, loaded, total }) {
 function finish() {
   isDone.value = true
   expanded.value = true
+  // Reset dismissed state on finish so they see the final checkmark
+  dismissed.value = false
   setTimeout(() => {
     visible.value = false
   }, 4000)
@@ -180,6 +199,33 @@ defineExpose({ start, onProgress, finish })
 
 .load-pill:hover { border-color: var(--accent, #f5a623); }
 .load-pill.done { border-color: var(--success, #3fb950); }
+
+/* Dismiss button styles */
+.pill-dismiss-btn {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--bg-secondary, #161b22);
+  border: 1px solid var(--border, #30363d);
+  color: var(--text-muted, #8b949e);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s;
+  z-index: 10;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+
+.pill-dismiss-btn:hover {
+  background: var(--bg-hover, #21262d);
+  color: var(--text-primary, #e6edf3);
+  transform: scale(1.1);
+  border-color: var(--accent, #f5a623);
+}
 
 .pill-collapsed {
   display: flex;
@@ -284,4 +330,19 @@ defineExpose({ start, onProgress, finish })
 .pill-leave-active { transition: all 0.3s ease; }
 .pill-enter-from { opacity: 0; transform: translateY(20px); }
 .pill-leave-to { opacity: 0; transform: translateY(20px); }
+
+@media (max-width: 768px) {
+  .load-pill {
+    bottom: 16px;
+    right: 16px;
+    max-width: 220px;
+  }
+  /* Ensure dismiss button is easy to hit on mobile */
+  .pill-dismiss-btn {
+    width: 28px;
+    height: 28px;
+    top: -12px;
+    right: -12px;
+  }
+}
 </style>
