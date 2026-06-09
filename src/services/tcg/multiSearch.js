@@ -272,7 +272,7 @@ const SEALED_HINTS = [
   'booster box', 'booster bundle', 'elite trainer', 'booster pack', 'box set',
   ' box', 'case', ' pack', ' tin', 'collection', 'bundle', 'display', 'blister',
   'starter deck', 'theme deck', 'gift set', 'premium', 'deck', 'trove',
-  'build & battle', 'battle deck', 'fat pack',
+  'build & battle', 'battle deck', 'fat pack', 'booster',
 ]
 function isSealed(name) {
   const n = (name || '').toLowerCase()
@@ -286,8 +286,8 @@ async function searchSealed(query) {
   const url = `${PC_BASE}?type=prices&q=${encodeURIComponent(query)}`
   const d = await fetchJson(url)
   const products = (d.products || []).filter(p => {
-    const name = p.productName || ''
-    if (/#\d/.test(name)) return false // skip singles with collector numbers
+    const name = `${p.productName || ''} ${p.consoleName || ''}`
+    if (/#\d/.test(p.productName || '')) return false
     if (SKIP_ACCESSORIES.some(s => name.toLowerCase().includes(s))) return false
     return isSealed(name)
   })
