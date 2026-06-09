@@ -26,6 +26,7 @@ const searchQuery = ref('')
 const searchResults = ref<SearchResult[]>([])
 const scanCandidates = ref<SearchResult[]>([])
 const scanError = ref('')
+const scanHint = ref('')
 const searchBusy = ref(false)
 const scanStatus = ref('')
 let searchTimer: ReturnType<typeof setTimeout> | null = null
@@ -93,6 +94,7 @@ function openSearch(side: 'A' | 'B') {
   showSearch.value = side
   searchQuery.value = ''
   searchResults.value = []
+  scanHint.value = ''
 }
 
 // Normalize capture toward ~1100px wide: downscale huge frames for speed, but
@@ -142,11 +144,17 @@ async function onCapture(imageData: string) {
 
   scanStatus.value = ''
   if (!result || result.candidates.length === 0) {
-    scanError.value = !result || result.ocrText.trim().length < 5
-      ? 'Could not read any text on the card — try more light, less glare, and fill the frame.'
-      : result.usedQuery
-        ? `Read "${result.usedQuery}" but found no matching card. Try search instead.`
-        : 'Could not make out the card name. Try search instead.'
+    const guess = (result?.usedQuery || '').trim()
+    if (guess.length >= 2) {
+      // Hand the OCR text to the search box — fixing a few wrong characters
+      // beats retaking the photo, especially on phones.
+      openSearch(activeSide.value)
+      searchQuery.value = guess
+      scanHint.value = 'Scanned text below — fix any wrong characters.'
+      doSearch()
+    } else {
+      scanError.value = 'Could not read any text on the card — try more light, less glare, and fill the frame.'
+    }
     return
   }
 
@@ -497,6 +505,7 @@ onMounted(async () => {
               @click="searchCategory = 'sealed'; searchQuery = ''; searchResults = []"
             >Sealed</button>
           </div>
+          <div v-if="scanHint" class="text-muted" style="font-size:12px;margin-bottom:6px">📷 {{ scanHint }}</div>
           <input
             v-model="searchQuery"
             @input="onSearchInput"
@@ -684,6 +693,7 @@ onMounted(async () => {
               @click="searchCategory = 'sealed'; searchQuery = ''; searchResults = []"
             >Sealed</button>
           </div>
+          <div v-if="scanHint" class="text-muted" style="font-size:12px;margin-bottom:6px">📷 {{ scanHint }}</div>
           <input
             v-model="searchQuery"
             @input="onSearchInput"
