@@ -213,10 +213,14 @@ export async function searchRiftboundBySet(name, setCode) {
     const sets = setsRes.items || []
 
     // Match by set_id first, then by set name prefix (handles
-    // fallback data using "core" / "spiritforged" labels)
-    const matchSet = sets.find(s => s.set_id?.toLowerCase() === setCode?.toLowerCase())
-      || sets.find(s => s.name?.toLowerCase().startsWith(setCode?.toLowerCase()))
-      || sets.find(s => s.name?.toLowerCase().includes(setCode?.toLowerCase()))
+    // fallback data using "core" / "spiritforged" labels).
+    // Guard against empty setCode — startsWith('') matches ALL sets,
+    // which causes the wrong set to win and cards not to be found.
+    const matchSet = setCode
+      ? (sets.find(s => s.set_id?.toLowerCase() === setCode?.toLowerCase())
+        || sets.find(s => s.name?.toLowerCase().startsWith(setCode?.toLowerCase()))
+        || sets.find(s => s.name?.toLowerCase().includes(setCode?.toLowerCase())))
+      : null
 
     if (matchSet) {
       const cards = []
