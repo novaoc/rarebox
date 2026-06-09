@@ -41,7 +41,9 @@ html, body, #app {
   -webkit-font-smoothing: antialiased;
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
+  /* Lock down overscroll app-wide to prevent body rubber-banding */
   overscroll-behavior: none;
+  overflow: hidden;
 }
 
 /* Prevent iOS drag/select/callout on all interactive elements */
@@ -172,8 +174,7 @@ a:hover { text-decoration: underline; }
   z-index: 1000;
   padding: 20px;
   backdrop-filter: blur(4px);
-  /* Disable pull-to-refresh / rubber-banding on overlays */
-  touch-action: none;
+  touch-action: none; /* Disable all gestures on overlay */
 }
 .modal {
   background: var(--bg-secondary);
@@ -182,10 +183,9 @@ a:hover { text-decoration: underline; }
   width: 100%;
   max-width: 560px;
   max-height: 90vh;
-  overflow-y: auto;
+  overflow: hidden; /* Manage scrolling in modal-body */
   box-shadow: var(--shadow);
-  /* Allow internal scrolling only */
-  touch-action: pan-y;
+  touch-action: pan-y; /* Allow only vertical scroll inside */
 }
 .modal-header {
   display: flex;
@@ -195,7 +195,7 @@ a:hover { text-decoration: underline; }
   margin-bottom: 20px;
 }
 .modal-header h3 { font-size: 16px; font-weight: 600; }
-.modal-body { padding: 0 24px; }
+.modal-body { padding: 0 24px; overflow-y: auto; }
 .modal-footer {
   display: flex;
   align-items: center;
