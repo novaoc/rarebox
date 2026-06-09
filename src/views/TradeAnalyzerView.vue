@@ -142,7 +142,11 @@ async function onCapture(imageData: string) {
 
   scanStatus.value = ''
   if (!result || result.candidates.length === 0) {
-    scanError.value = 'Could not find this card. Try search instead.'
+    scanError.value = !result || result.ocrText.trim().length < 5
+      ? 'Could not read any text on the card — try more light, less glare, and fill the frame.'
+      : result.usedQuery
+        ? `Read "${result.usedQuery}" but found no matching card. Try search instead.`
+        : 'Could not make out the card name. Try search instead.'
     return
   }
 

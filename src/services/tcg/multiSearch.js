@@ -526,10 +526,15 @@ export async function multiSearch(query, { page = 1, pageSize = 20, category = '
 
   const active = providers || Object.keys(ALL_PROVIDERS)
 
-  // Per-game: use cache if available, live API otherwise
-  const searches = active.map(k => {
+  // Per-game: try the local cache first, but fall through to the live API
+  // when the cache has no hits — the cached snapshot can lag behind new sets
+  // (and a cache-only miss used to make those cards unfindable entirely).
+  const searches = active.map(async k => {
     if (isGameCached(k)) {
-      return searchCache(query, { page: 1, pageSize: 500, providers: [k] })
+      try {
+        const cached = searchCache(query, { page: 1, pageSize: 500, providers: [k] })
+        if (cached.cards.length > 0) return cached
+      } catch { /* fall through to live */ }
     }
     return ALL_PROVIDERS[k](query, page, pageSize).catch(() => ({ cards: [], total: 0 }))
   })

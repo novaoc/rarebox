@@ -17,6 +17,8 @@ export interface ScanResult {
   candidates: ScannedCard[]
   ocrText: string
   ocrConfidence: number
+  /** the query that produced candidates (or the best read when nothing hit) */
+  usedQuery: string | null
 }
 
 // Fast providers for scan — skip Riftbound & OnePiece (slow initial loads)
@@ -105,11 +107,18 @@ async function searchJapanese(queries: string[], cardNumber: string | null): Pro
 
 export async function scanCard(imageData: string, onProgress?: (pct: number) => void): Promise<ScanResult> {
   const ocr = await recognizeCard(imageData, onProgress)
+  console.info('[scan] OCR read', {
+    queries: ocr.queries,
+    number: ocr.cardNumber,
+    confidence: ocr.confidence,
+    text: ocr.text.slice(0, 160),
+  })
   const result: ScanResult = {
     card: null,
     candidates: [],
     ocrText: ocr.text,
     ocrConfidence: ocr.confidence,
+    usedQuery: ocr.queries[0] || null,
   }
 
   // English queries first (name-band read, then full-frame read)
@@ -117,6 +126,7 @@ export async function scanCard(imageData: string, onProgress?: (pct: number) => 
   let usedQuery: string | null = null
   for (const q of ocr.queries) {
     allCards = await searchWithTimeout(q, 15)
+    console.info(`[scan] EN search "${q}" → ${allCards.length} hits`)
     if (allCards.length > 0) { usedQuery = q; break }
   }
 
@@ -124,9 +134,14 @@ export async function scanCard(imageData: string, onProgress?: (pct: number) => 
   // English query hit anything, re-read the name band with the jpn model.
   if (allCards.length === 0) {
     const jpQueries = await recognizeJapaneseName(imageData)
+    console.info('[scan] JP fallback reads', jpQueries)
     if (jpQueries.length > 0) {
       allCards = await searchJapanese(jpQueries, ocr.cardNumber)
-      if (allCards.length > 0) usedQuery = null // JP reads are too noisy for name ranking
+      console.info(`[scan] JP search → ${allCards.length} hits`)
+      if (allCards.length > 0) {
+        result.usedQuery = jpQueries[0]
+        usedQuery = null // JP reads are too noisy for name ranking
+      }
     }
   }
 
@@ -139,12 +154,14 @@ export async function scanCard(imageData: string, onProgress?: (pct: number) => 
       .slice(0, 80)
     if (rawQuery.length >= 5) {
       allCards = await searchWithTimeout(rawQuery, 10)
+      console.info(`[scan] raw-text search "${rawQuery}" → ${allCards.length} hits`)
       if (allCards.length > 0) usedQuery = rawQuery
     }
   }
 
   result.candidates = allCards as ScannedCard[]
   if (result.candidates.length > 0) {
+    if (usedQuery) result.usedQuery = usedQuery
     result.card = pickBestMatch(result.candidates, usedQuery, ocr.cardNumber)
   }
 
