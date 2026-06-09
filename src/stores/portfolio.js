@@ -366,6 +366,39 @@ export const usePortfolioStore = defineStore('portfolio', () => {
       }
     }
 
+    // Backfill: if fewer than 2 distinct timestamps, extend current price backward
+    // so the portfolio chart always has daily data points between purchase and now
+    if (points.length < 2 && item.purchaseDate) {
+      const currentPrice = item.type === 'card'
+        ? (item.currentMarketPrice || item.purchasePrice || 0)
+        : (item.currentValue || item.purchasePrice || 0)
+      const purchaseTs = new Date(item.purchaseDate).getTime()
+      const now = Date.now()
+      if (currentPrice > 0 && now - purchaseTs > 86400000) {
+        const DAY = 86400000
+        // ~weekly intervals so we don't generate thousands of points per card
+        const INTERVAL = 7 * DAY
+        const generated = []
+        const startDay = Math.max(purchaseTs, now - 365 * DAY)
+        for (let t = startDay; t <= now; t += INTERVAL) {
+          generated.push({ x: t, y: currentPrice })
+        }
+        // Ensure now is included
+        if (generated.length === 0 || generated[generated.length - 1].x < now) {
+          generated.push({ x: now, y: currentPrice })
+        }
+        if (generated.length > 1) {
+          if (item.purchasePrice > 0) {
+            const existing = new Set(points.map(p => p.x))
+            if (!existing.has(purchaseTs)) {
+              points.unshift({ x: purchaseTs, y: item.purchasePrice })
+            }
+          }
+          points.push(...generated)
+        }
+      }
+    }
+
     return points
   }
 
