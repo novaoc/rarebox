@@ -138,33 +138,6 @@ async function searchOnePiece(query) {
   }
 }
 
-// ── Yu-Gi-Oh!: YGOPRODeck ─────────────────────────────────────────────────────
-// Uses the fname (fuzzy name) endpoint for search. Returns cards with prices.
-async function searchYugioh(query) {
-  const url = `https://db.ygoprodeck.com/api/v7/cardinfo.php?fname=${encodeURIComponent(query)}`
-  const d = await fetchJson(url)
-  const cards = d.data || []
-  return {
-    cards: cards.slice(0, 50).map(c => {
-      const prices = c.card_prices?.[0] || {}
-      const imgs = c.card_images || []
-      const setInfo = c.card_sets?.[0] || {}
-      return {
-        id: String(c.id),
-        name: c.name,
-        number: setInfo.set_code || '',
-        set: setInfo.set_name || '',
-        image: imgs[0]?.image_url_small || imgs[0]?.image_url || '',
-        price: num(prices.tcgplayer_price),
-        rarity: setInfo.set_rarity || '',
-        game: 'yugioh',
-        _raw: c,
-      }
-    }),
-    total: cards.length,
-  }
-}
-
 // ── Riftbound: client-side search from riftcodex.com ─────────────────────────
 // Optimized: parallel set fetches, no PriceCharting on bulk load (prices fetched
 // lazily via resolveRiftboundCard). Returns quickly so meta deck import doesn't time out.
