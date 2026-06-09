@@ -1,6 +1,6 @@
 <template>
   <div class="modal-overlay" @click.self="$emit('close')">
-    <div class="modal" @touchstart.stop @touchmove.stop @touchend.stop>
+    <div class="modal">
       <div class="modal-header">
         <h3>Add to Portfolio</h3>
         <button class="btn btn-ghost btn-icon" @click="$emit('close')">✕</button>
@@ -41,7 +41,7 @@
         </div>
 
         <!-- Graded specific -->
-        <div v-if="itemType === 'graded'" class="form-row mt-3">
+        <div v-if="itemType === 'graded' && game !== 'riftbound'" class="form-row mt-3">
           <div class="form-group">
             <label class="form-label">Grading Company</label>
             <select v-model="form.gradingCompany" class="select">
@@ -54,11 +54,9 @@
           </div>
           <div class="form-group">
             <label class="form-label">Grade</label>
-            <div class="select-wrapper">
-              <select v-model="form.grade" class="select">
-                <option v-for="g in gradeOptions" :key="g" :value="g">{{ g }}</option>
-              </select>
-            </div>
+            <select v-model="form.grade" class="select">
+              <option v-for="g in gradeOptions" :key="g" :value="g">{{ g }}</option>
+            </select>
           </div>
         </div>
 
@@ -222,7 +220,10 @@ const games = SUPPORTED_GAMES
 const isPokemon = computed(() => game.value === 'pokemon')
 // All TCGs get card/graded/sealed. Riftbound hides graded.
 const visibleTypes = computed(() => {
-  if (game.value === 'riftbound') return types.filter(t => t.value !== 'graded')
+  if (game.value === 'riftbound') {
+    if (itemType.value === 'graded') itemType.value = 'card'
+    return types.filter(t => t.value !== 'graded')
+  }
   return types
 })
 // Whether the currently-selected non-Pokémon product is a sealed product.
@@ -552,11 +553,6 @@ watch(() => props.card, () => {
 .sealed-selected-name { font-size: 14px; font-weight: 600; }
 .sealed-selected-set { font-size: 12px; color: var(--text-secondary); }
 
-.select-wrapper {
-  position: relative;
-  width: 100%;
-}
-
 /* Mobile responsive */
 @media (max-width: 640px) {
   .modal-overlay { align-items: flex-end; padding: 0; }
@@ -565,9 +561,8 @@ watch(() => props.card, () => {
     width: 100%;
     max-width: 100%;
     border-radius: var(--radius-lg) var(--radius-lg) 0 0;
-    overflow-x: hidden;
   }
-  .modal-body { padding: 16px; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+  .modal-body { padding: 16px; overflow-y: auto; }
   .type-tab { font-size: 12px; padding: 8px 6px; gap: 4px; }
   .card-preview { flex-direction: column; text-align: center; gap: 8px; }
   .form-row { flex-direction: column; gap: 0; }
