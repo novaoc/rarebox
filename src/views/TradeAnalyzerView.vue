@@ -347,11 +347,11 @@ onMounted(async () => {
       <!-- Side A -->
       <div class="card side-card">
         <div class="side-header">
-          <div class="flex items-center gap-2">
+          <div class="side-header-labels">
             <span class="badge badge-accent">Side A</span>
             <span class="text-secondary" style="font-size:13px">My Cards</span>
           </div>
-          <div class="flex items-center gap-2">
+          <div class="side-header-stats">
             <span class="font-bold font-mono">${{ tradeStore.sideA.totalValue.toFixed(2) }}</span>
             <button
               v-if="tradeStore.sideA.items.length > 0"
@@ -390,7 +390,7 @@ onMounted(async () => {
             />
             <div class="card-row-info">
               <div class="card-row-name">
-                {{ card.name }}
+                <span class="truncate-text">{{ card.name }}</span>
                 <span
                   v-if="card.graded"
                   class="grade-badge"
@@ -402,7 +402,7 @@ onMounted(async () => {
                   @click.stop="activeGradeCard = activeGradeCard === card.tradeId ? null : card.tradeId"
                 >Add Grade</span>
               </div>
-              <div class="card-row-sub">{{ card.setName }} &middot; {{ card.number }}</div>
+              <div class="card-row-sub truncate-text">{{ card.setName }} &middot; {{ card.number }}</div>
               <div v-if="activeGradeCard === card.tradeId" class="grade-picker" @click.stop>
                 <label class="grade-toggle">
                   <input
@@ -488,8 +488,8 @@ onMounted(async () => {
             >
               <img :src="card.image" class="search-result-thumb" />
               <div class="search-result-info">
-                <div class="search-result-name">{{ card.name }}</div>
-                <div class="search-result-sub">{{ card.set }} &middot; #{{ card.number }}</div>
+                <div class="search-result-name truncate-text">{{ card.name }}</div>
+                <div class="search-result-sub truncate-text">{{ card.set }} &middot; #{{ card.number }}</div>
               </div>
               <span class="font-bold font-mono" style="font-size:12px;flex-shrink:0">${{ (card.price || 0).toFixed(2) }}</span>
             </div>
@@ -534,11 +534,11 @@ onMounted(async () => {
       <!-- Side B -->
       <div class="card side-card">
         <div class="side-header">
-          <div class="flex items-center gap-2">
+          <div class="side-header-labels">
             <span class="badge badge-info">Side B</span>
             <span class="text-secondary" style="font-size:13px">Their Cards</span>
           </div>
-          <div class="flex items-center gap-2">
+          <div class="side-header-stats">
             <span class="font-bold font-mono">${{ tradeStore.sideB.totalValue.toFixed(2) }}</span>
             <button
               v-if="tradeStore.sideB.items.length > 0"
@@ -577,7 +577,7 @@ onMounted(async () => {
             />
             <div class="card-row-info">
               <div class="card-row-name">
-                {{ card.name }}
+                <span class="truncate-text">{{ card.name }}</span>
                 <span
                   v-if="card.graded"
                   class="grade-badge"
@@ -589,7 +589,7 @@ onMounted(async () => {
                   @click.stop="activeGradeCard = activeGradeCard === card.tradeId ? null : card.tradeId"
                 >Add Grade</span>
               </div>
-              <div class="card-row-sub">{{ card.setName }} &middot; {{ card.number }}</div>
+              <div class="card-row-sub truncate-text">{{ card.setName }} &middot; {{ card.number }}</div>
               <div v-if="activeGradeCard === card.tradeId" class="grade-picker" @click.stop>
                 <label class="grade-toggle">
                   <input
@@ -675,8 +675,8 @@ onMounted(async () => {
             >
               <img :src="card.image" class="search-result-thumb" />
               <div class="search-result-info">
-                <div class="search-result-name">{{ card.name }}</div>
-                <div class="search-result-sub">{{ card.set }} &middot; #{{ card.number }}</div>
+                <div class="search-result-name truncate-text">{{ card.name }}</div>
+                <div class="search-result-sub truncate-text">{{ card.set }} &middot; #{{ card.number }}</div>
               </div>
               <span class="font-bold font-mono" style="font-size:12px;flex-shrink:0">${{ (card.price || 0).toFixed(2) }}</span>
             </div>
@@ -743,8 +743,8 @@ onMounted(async () => {
               >
                 <img :src="card.image" class="search-result-thumb" />
                 <div class="search-result-info">
-                  <div class="search-result-name">{{ card.name }}</div>
-                  <div class="search-result-sub">{{ card.set }} &middot; #{{ card.number }}</div>
+                  <div class="search-result-name truncate-text">{{ card.name }}</div>
+                  <div class="search-result-sub truncate-text">{{ card.set }} &middot; #{{ card.number }}</div>
                 </div>
                 <span class="font-bold font-mono" style="font-size:12px;flex-shrink:0">
                   ${{ (card.price || 0).toFixed(2) }}
@@ -771,9 +771,9 @@ onMounted(async () => {
           <div class="modal-body">
             <div class="grade-pending-preview">
               <img v-if="pendingCard.image" :src="pendingCard.image" class="grade-pending-thumb" />
-              <div>
-                <div style="font-weight:500;font-size:14px">{{ pendingCard.name }}</div>
-                <div style="font-size:12px;color:var(--text-muted)">{{ pendingCard.set }} · #{{ pendingCard.number }}</div>
+              <div style="min-width:0; flex:1">
+                <div style="font-weight:500;font-size:14px" class="truncate-text">{{ pendingCard.name }}</div>
+                <div style="font-size:12px;color:var(--text-muted)" class="truncate-text">{{ pendingCard.set }} · #{{ pendingCard.number }}</div>
                 <div style="font-size:14px;font-weight:600;margin-top:4px">${{ (pendingCard.price || 0).toFixed(2) }}</div>
               </div>
             </div>
@@ -848,13 +848,14 @@ onMounted(async () => {
 
 .trade-split {
   display: grid;
-  grid-template-columns: 1fr auto 1fr;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   gap: 16px;
   align-items: start;
 }
 
 .side-card {
   padding: 16px;
+  min-width: 0;
 }
 
 .side-header {
@@ -862,6 +863,13 @@ onMounted(async () => {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+}
+
+.side-header-labels, .side-header-stats {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
 }
 
 .card-list {
@@ -875,6 +883,7 @@ onMounted(async () => {
   gap: 12px;
   padding: 10px 0;
   border-bottom: 1px solid var(--border-subtle);
+  min-width: 0;
 }
 .card-row:last-child { border-bottom: none; }
 
@@ -895,9 +904,17 @@ onMounted(async () => {
   font-size: 14px;
   font-weight: 500;
   color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.truncate-text {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  display: block;
 }
 
 .card-row-sub {
@@ -930,6 +947,7 @@ onMounted(async () => {
 /* Search panel */
 .search-panel {
   margin-top: 4px;
+  min-width: 0;
 }
 
 .search-results {
@@ -949,6 +967,7 @@ onMounted(async () => {
   cursor: pointer;
   transition: background 0.15s;
   border-bottom: 1px solid var(--border-subtle);
+  min-width: 0;
 }
 .search-result-row:last-child { border-bottom: none; }
 .search-result-row:hover { background: var(--bg-hover); }
@@ -970,9 +989,6 @@ onMounted(async () => {
   font-size: 12px;
   font-weight: 500;
   color: var(--text-primary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .search-result-sub {
@@ -1014,6 +1030,7 @@ onMounted(async () => {
   cursor: pointer;
   transition: background 0.15s;
   border-bottom: 1px solid var(--border-subtle);
+  min-width: 0;
 }
 .scan-candidate-row:last-child { border-bottom: none; }
 .scan-candidate-row:hover { background: var(--bg-hover); }
@@ -1065,6 +1082,7 @@ onMounted(async () => {
   vertical-align: middle;
   margin-left: 4px;
   letter-spacing: 0.3px;
+  flex-shrink: 0;
 }
 .grade-badge.ungraded {
   background: var(--bg-hover);
@@ -1100,6 +1118,7 @@ onMounted(async () => {
   border-radius: var(--radius);
   background: var(--bg-primary);
   color: var(--text-primary);
+  min-width: 0;
 }
 
 /* Grade pending preview */
@@ -1111,6 +1130,7 @@ onMounted(async () => {
   background: var(--bg-hover);
   border-radius: var(--radius);
   border: 1px solid var(--border-subtle);
+  min-width: 0;
 }
 .grade-pending-thumb {
   width: 48px;
@@ -1134,7 +1154,7 @@ onMounted(async () => {
 /* Responsive */
 @media (max-width: 768px) {
   .trade-split {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
   .vs-divider {
     flex-direction: row;
