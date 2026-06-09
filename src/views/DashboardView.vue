@@ -448,6 +448,11 @@ onMounted(async () => {
   }
   const triggered = checkAlerts(priceMap)
   if (triggered.length > 0) notifyTriggered(triggered)
+
+  // Record a snapshot for each portfolio with the newly refreshed prices
+  for (const portfolio of store.portfolios) {
+    if (portfolio.items.length > 0) store.recordSnapshot(portfolio.id)
+  }
 })
 </script>
 
