@@ -78,14 +78,14 @@
         <PortfolioChart :portfolios="[portfolio]" :height="280" :label="portfolio.name" />
       </div>
 
-      <!-- Items table -->
+      <!-- Items section -->
       <div class="card">
         <div class="section-header">
           <div>
             <div class="section-title">Items</div>
             <div class="section-subtitle">{{ filteredItems.length }} of {{ portfolio.items.length }}</div>
           </div>
-          <div class="flex gap-2">
+          <div class="flex gap-2 desktop-filters">
             <div class="filter-tabs">
               <button
                 v-for="f in filters"
@@ -109,104 +109,191 @@
         </div>
 
         <div v-else>
-          <div class="table-wrap">
-          <table class="table">
-            <thead>
-              <tr>
-                <th class="checkbox-col">
-                  <div class="checkbox-wrapper">
-                    <input
-                      type="checkbox"
-                      :checked="isAllSelected"
-                      :indeterminate="isPartiallySelected"
-                      @change="toggleSelectAll"
-                      aria-label="Select all items"
-                    />
-                  </div>
-                </th>
-                <th>Item</th>
-                <th class="hide-mobile">Type</th>
-                <th>Qty</th>
-                <th>Paid</th>
-                <th>Value</th>
-                <th class="hide-small">Gain/Loss</th>
-                <th class="hide-mobile"></th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr
-                v-for="item in filteredItems"
-                :key="item.id"
-                class="item-row"
-                :class="{ selected: selectedIds.has(item.id) }"
-                @click="selectItem(item)"
-              >
-                <td class="checkbox-col" @click.stop>
-                  <div class="checkbox-wrapper">
-                    <input
-                      type="checkbox"
-                      :checked="selectedIds.has(item.id)"
-                      @change="toggleItemSelection(item.id)"
-                      :aria-label="'Select ' + getItemName(item)"
-                    />
-                  </div>
-                </td>
-                <td>
-                  <div class="item-name-cell">
-                    <img
-                      v-if="item.cardData?.images?.small"
-                      :src="item.cardData.images.small"
-                      class="item-thumb"
-                      loading="lazy"
-                      draggable="false"
-                    />
-                    <img
-                      v-else-if="item.imageUrl"
-                      :src="item.imageUrl"
-                      class="item-thumb item-thumb-sealed"
-                      loading="lazy"
-                      draggable="false"
-                    />
-                    <div class="item-sealed-icon" v-else>📦</div>
-                    <div>
-                      <div class="item-name">{{ getItemName(item) }}</div>
-                      <div class="item-sub">{{ getItemSub(item) }}</div>
+          <!-- Desktop Table -->
+          <div class="table-wrap hide-mobile">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th class="checkbox-col">
+                    <div class="checkbox-wrapper">
+                      <input
+                        type="checkbox"
+                        :checked="isAllSelected"
+                        :indeterminate="isPartiallySelected"
+                        @change="toggleSelectAll"
+                        aria-label="Select all items"
+                      />
                     </div>
-                  </div>
-                </td>
-                <td class="hide-mobile">
-                  <span class="badge" :class="typeBadgeClass(item.type)">{{ item.type }}</span>
-                </td>
-                <td class="font-mono">{{ item.quantity || 1 }}</td>
-                <td class="font-mono">${{ ((item.purchasePrice || 0) * (item.quantity || 1)).toFixed(2) }}</td>
-                <td class="font-mono">
-                  <span class="text-accent">${{ (getCurrentValue(item) * (item.quantity || 1)).toFixed(2) }}</span>
-                </td>
-                <td class="hide-small">
-                  <div class="gain-cell">
-                    <span :class="getGain(item) >= 0 ? 'text-success' : 'text-danger'">
-                      {{ getGain(item) >= 0 ? '+' : '' }}${{ Math.abs(getGain(item)).toFixed(2) }}
-                    </span>
-                    <span class="gain-pct text-muted">({{ getGainPct(item) >= 0 ? '+' : '' }}{{ getGainPct(item).toFixed(1) }}%)</span>
-                  </div>
-                </td>
-                <td class="hide-mobile">
-                  <div class="actions flex gap-2">
-                    <button class="btn btn-ghost btn-icon btn-sm" @click.stop="editItem(item)" aria-label="Edit item">
-                      <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-pencil"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
-                    </button>
-                    <button class="btn btn-ghost btn-icon btn-sm" @click.stop="removeItem(item)" aria-label="Remove item" style="color:var(--danger)">
-                      <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-x"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-          </div><!-- end table-wrap -->
+                  </th>
+                  <th>Item</th>
+                  <th>Type</th>
+                  <th>Qty</th>
+                  <th>Paid</th>
+                  <th>Value</th>
+                  <th>Gain/Loss</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr
+                  v-for="item in filteredItems"
+                  :key="item.id"
+                  class="item-row"
+                  :class="{ selected: selectedIds.has(item.id) }"
+                  @click="selectItem(item)"
+                >
+                  <td class="checkbox-col" @click.stop>
+                    <div class="checkbox-wrapper">
+                      <input
+                        type="checkbox"
+                        :checked="selectedIds.has(item.id)"
+                        @change="toggleItemSelection(item.id)"
+                        :aria-label="'Select ' + getItemName(item)"
+                      />
+                    </div>
+                  </td>
+                  <td>
+                    <div class="item-name-cell">
+                      <img
+                        v-if="item.cardData?.images?.small"
+                        :src="item.cardData.images.small"
+                        class="item-thumb"
+                        loading="lazy"
+                        draggable="false"
+                      />
+                      <img
+                        v-else-if="item.imageUrl"
+                        :src="item.imageUrl"
+                        class="item-thumb item-thumb-sealed"
+                        loading="lazy"
+                        draggable="false"
+                      />
+                      <div class="item-sealed-icon" v-else>📦</div>
+                      <div>
+                        <div class="item-name">{{ getItemName(item) }}</div>
+                        <div class="item-sub">{{ getItemSub(item) }}</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td>
+                    <span class="badge" :class="typeBadgeClass(item.type)">{{ item.type }}</span>
+                  </td>
+                  <td class="font-mono">{{ item.quantity || 1 }}</td>
+                  <td class="font-mono">${{ ((item.purchasePrice || 0) * (item.quantity || 1)).toFixed(2) }}</td>
+                  <td class="font-mono">
+                    <span class="text-accent">${{ (getCurrentValue(item) * (item.quantity || 1)).toFixed(2) }}</span>
+                  </td>
+                  <td>
+                    <div class="gain-cell">
+                      <span :class="getGain(item) >= 0 ? 'text-success' : 'text-danger'">
+                        {{ getGain(item) >= 0 ? '+' : '' }}${{ Math.abs(getGain(item)).toFixed(2) }}
+                      </span>
+                      <span class="gain-pct text-muted">({{ getGainPct(item) >= 0 ? '+' : '' }}{{ getGainPct(item).toFixed(1) }}%)</span>
+                    </div>
+                  </td>
+                  <td>
+                    <div class="actions flex gap-2">
+                      <button class="btn btn-ghost btn-icon btn-sm" @click.stop="editItem(item)" aria-label="Edit item">
+                        <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-pencil"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
+                      </button>
+                      <button class="btn btn-ghost btn-icon btn-sm" @click.stop="removeItem(item)" aria-label="Remove item" style="color:var(--danger)">
+                        <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-x"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Mobile Optimized List -->
+          <div class="mobile-list show-mobile">
+            <!-- Mobile Filters -->
+            <div class="mobile-filter-bar">
+              <div class="search-mini-wrap">
+                <input v-model="itemSearch" class="input input-mobile" placeholder="Search items..." />
+              </div>
+              <div class="filter-tabs">
+                <button
+                  v-for="f in filters"
+                  :key="f.value"
+                  class="filter-tab"
+                  :class="{ active: activeFilter === f.value }"
+                  @click="activeFilter = f.value"
+                >{{ f.label }}</button>
+              </div>
+            </div>
+
+            <div
+              v-for="item in filteredItems"
+              :key="item.id"
+              class="mobile-item-card"
+              :class="{ selected: selectedIds.has(item.id) }"
+              @click="selectItem(item)"
+            >
+              <div class="mobile-item-selection" @click.stop="toggleItemSelection(item.id)">
+                <input type="checkbox" :checked="selectedIds.has(item.id)" @change.stop="toggleItemSelection(item.id)" />
+              </div>
+              <div class="mobile-item-thumb">
+                <img
+                  v-if="item.cardData?.images?.small"
+                  :src="item.cardData.images.small"
+                  loading="lazy"
+                  draggable="false"
+                />
+                <img
+                  v-else-if="item.imageUrl"
+                  :src="item.imageUrl"
+                  loading="lazy"
+                  draggable="false"
+                />
+                <div v-else class="mobile-item-sealed-icon">📦</div>
+              </div>
+              <div class="mobile-item-info">
+                <div class="mobile-item-title">{{ getItemName(item) }}</div>
+                <div class="mobile-item-subtitle">{{ getItemSub(item) }}</div>
+                <div class="mobile-item-metrics">
+                  <span class="metric-val text-accent">${{ (getCurrentValue(item) * (item.quantity || 1)).toFixed(2) }}</span>
+                  <span class="metric-qty">Qty: {{ item.quantity || 1 }}</span>
+                  <span class="metric-gain" :class="getGain(item) >= 0 ? 'text-success' : 'text-danger'">
+                    {{ getGainPct(item) >= 0 ? '+' : '' }}{{ getGainPct(item).toFixed(1) }}%
+                  </span>
+                </div>
+              </div>
+              <button class="mobile-item-menu-btn" @click.stop="openItemMenu(item)" aria-label="Item options">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-more-vertical"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </PullToRefresh>
+
+    <!-- Mobile Item Action Menu (Bottom Sheet) -->
+    <transition name="slide-up">
+      <div v-if="activeMenuId" class="bottom-sheet-overlay" @click="activeMenuId = null">
+        <div class="bottom-sheet" @click.stop>
+          <div class="bottom-sheet-handle"></div>
+          <div class="bottom-sheet-header">
+            <div class="bottom-sheet-title">{{ getItemName(activeMenuItem) }}</div>
+          </div>
+          <div class="bottom-sheet-body">
+            <button class="sheet-action" @click="editItem(activeMenuItem); activeMenuId = null">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-pencil"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
+              Edit Details
+            </button>
+            <button class="sheet-action" @click="selectItem(activeMenuItem); activeMenuId = null">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-line-chart"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>
+              View Analysis
+            </button>
+            <button class="sheet-action text-danger" @click="removeItem(activeMenuItem); activeMenuId = null">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-trash-2"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>
+              Remove from Portfolio
+            </button>
+          </div>
+        </div>
+      </div>
+    </transition>
 
     <!-- Bulk Action Bar -->
     <transition name="slide-up">
@@ -444,6 +531,14 @@ const confirmBulkDelete = ref(false)
 const editCurrentValue = ref(null)
 const refreshing = ref(false)
 const refreshStatus = ref('')
+
+// Mobile Menu
+const activeMenuId = ref(null)
+const activeMenuItem = computed(() => portfolio.value?.items.find(i => i.id === activeMenuId.value))
+
+function openItemMenu(item) {
+  activeMenuId.value = item.id
+}
 
 // Bulk Selection
 const selectedIds = reactive(new Set())
@@ -965,14 +1060,102 @@ function deletePortfolio() {
   margin-top: 2px;
 }
 
+/* Mobile Optimized List Styles */
+.mobile-list { padding: 12px 0; }
+.mobile-filter-bar { margin-bottom: 16px; display: flex; flex-direction: column; gap: 12px; }
+.input-mobile { padding: 12px 16px; border-radius: 12px; font-size: 14px; background: var(--bg-secondary); }
+
+.mobile-item-card {
+  display: flex;
+  align-items: center;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 12px;
+  margin-bottom: 12px;
+  gap: 12px;
+  position: relative;
+  transition: border-color 0.15s;
+}
+.mobile-item-card.selected { border-color: var(--accent); background: var(--accent-dim-extra, rgba(245, 166, 35, 0.05)); }
+
+.mobile-item-selection { width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; }
+.mobile-item-selection input { width: 20px; height: 20px; accent-color: var(--accent); }
+
+.mobile-item-thumb { width: 50px; height: 70px; flex-shrink: 0; background: var(--bg-secondary); border-radius: 6px; overflow: hidden; display: flex; align-items: center; justify-content: center; }
+.mobile-item-thumb img { width: 100%; height: 100%; object-fit: contain; }
+.mobile-item-sealed-icon { font-size: 24px; }
+
+.mobile-item-info { flex: 1; min-width: 0; }
+.mobile-item-title { font-size: 14px; font-weight: 700; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 2px; }
+.mobile-item-subtitle { font-size: 11px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 8px; }
+
+.mobile-item-metrics { display: flex; align-items: center; gap: 12px; }
+.metric-val { font-size: 15px; font-weight: 700; font-family: var(--font-mono); }
+.metric-qty { font-size: 11px; color: var(--text-secondary); }
+.metric-gain { font-size: 11px; font-weight: 600; padding: 2px 6px; background: var(--bg-secondary); border-radius: 4px; }
+
+.mobile-item-menu-btn {
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  border: none;
+  background: none;
+  border-radius: 50%;
+}
+.mobile-item-menu-btn:active { background: var(--bg-hover); color: var(--text-primary); }
+
+/* Bottom Sheet */
+.bottom-sheet-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  z-index: 200;
+  display: flex;
+  align-items: flex-end;
+}
+.bottom-sheet {
+  width: 100%;
+  background: var(--bg-card);
+  border-radius: 20px 20px 0 0;
+  padding: 12px 0 32px;
+  animation: slide-up-anim 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+@keyframes slide-up-anim { from { transform: translateY(100%); } to { transform: translateY(0); } }
+
+.bottom-sheet-handle { width: 36px; height: 4px; background: var(--border); border-radius: 2px; margin: 0 auto 16px; }
+.bottom-sheet-header { padding: 0 20px 16px; border-bottom: 1px solid var(--border-subtle); margin-bottom: 8px; }
+.bottom-sheet-title { font-size: 16px; font-weight: 700; color: var(--text-primary); text-align: center; }
+
+.bottom-sheet-body { display: flex; flex-direction: column; }
+.sheet-action {
+  width: 100%;
+  padding: 16px 24px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+  border: none;
+  background: none;
+  text-align: left;
+}
+.sheet-action:active { background: var(--bg-hover); }
+.sheet-action svg { color: var(--text-muted); }
+
 @media (prefers-reduced-motion: reduce) {
   .slide-up-enter-active, .slide-up-leave-active, .fade-enter-active, .fade-leave-active {
     transition: none !important;
   }
 }
 
-/* Item detail panel — mobile bottom sheet */
+/* Existing UI Responsiveness Fixes */
 @media (max-width: 768px) {
+  .portfolio-view { padding-bottom: 120px; }
   .item-detail-panel {
     position: fixed;
     bottom: 0;
@@ -985,33 +1168,14 @@ function deletePortfolio() {
     z-index: 100;
     box-shadow: 0 -8px 32px rgba(0,0,0,0.5);
   }
-  .item-detail-panel::before {
-    content: '';
-    display: block;
-    width: 36px;
-    height: 4px;
-    border-radius: 2px;
-    background: var(--border);
-    margin: 8px auto 4px;
-  }
   .panel-body-row { flex-direction: column; }
   .panel-left { display: flex; justify-content: center; }
   .panel-img { width: 120px; }
-  .filter-tabs { flex-wrap: wrap; }
-  .search-mini-wrap { width: 100%; }
   .portfolio-header { flex-direction: column; gap: 12px; }
   .portfolio-header-actions { width: 100%; justify-content: flex-start; }
-  .portfolio-header-actions .btn { font-size: 11px; padding: 5px 8px; }
-  .portfolio-name { font-size: 18px; }
-  .portfolio-dot-lg { width: 12px; height: 12px; margin-top: 4px; }
   
   .hide-mobile { display: none !important; }
-  .show-mobile { display: inline-block !important; }
-  
-  .table { min-width: 440px; }
-  .item-thumb { width: 30px; height: 42px; }
-  .item-name { font-size: 12px; }
-  .item-sub { font-size: 10px; }
+  .show-mobile { display: block !important; }
   
   .bulk-action-bar { bottom: 12px; min-width: calc(100% - 24px); border-radius: 12px; padding: 8px 16px; }
   .bulk-action-content { gap: 12px; }
@@ -1019,24 +1183,11 @@ function deletePortfolio() {
 }
 
 @media (max-width: 640px) {
-  .hide-small { display: none !important; }
-  .item-detail-panel { max-height: 90vh; }
-  /* Make items table scrollable horizontally */
-  .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-  /* Collapse section header on mobile */
+  .desktop-filters { display: none; }
   .section-header { flex-direction: column; align-items: flex-start; gap: 10px; }
-  .section-header > div:last-child { width: 100%; }
-  /* Filter tabs — full width grid */
   .filter-tabs { width: 100%; }
-  .filter-tab { flex: 1; justify-content: center; padding: 6px 4px; }
-  /* Stats */
+  .filter-tab { flex: 1; justify-content: center; padding: 8px 4px; font-size: 13px; border-radius: 8px; }
   .stats-row { grid-template-columns: 1fr 1fr; gap: 8px; }
-  .stat-tile { padding: 12px 10px; }
-  .stat-tile .value { font-size: 18px; }
-  /* Name edit */
-  .name-edit-row { flex-wrap: wrap; }
-  .name-input { width: 100%; }
-  .portfolio-header-actions { flex-wrap: wrap; }
 }
 
 .show-mobile { display: none; }
