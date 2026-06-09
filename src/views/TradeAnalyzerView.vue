@@ -209,12 +209,15 @@ function onSearchInput() {
 
 async function doSearch() {
   const q = searchQuery.value.trim()
+  const cat = searchCategory.value
   if (q.length < 2) return
   searchBusy.value = true
   try {
-    const res = await multiSearch(q, { page: 1, pageSize: 15, category: searchCategory.value })
+    const res = await multiSearch(q, { page: 1, pageSize: 15, category: cat })
+    // Guard: discard if query or category changed while we were fetching
+    if (searchQuery.value.trim() !== q || searchCategory.value !== cat) return
     const cards = (res.cards || []) as SearchResult[]
-    searchCache.set(`${searchCategory.value}:${q}`, cards)
+    searchCache.set(`${cat}:${q}`, cards)
     if (searchCache.size > 50) {
       const first = searchCache.keys().next().value
       if (first) searchCache.delete(first)

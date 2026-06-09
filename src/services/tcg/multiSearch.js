@@ -287,7 +287,10 @@ async function searchSealed(query) {
   const d = await fetchJson(url)
   const products = (d.products || []).filter(p => {
     const name = `${p.productName || ''} ${p.consoleName || ''}`
-    if (/#\d/.test(p.productName || '')) return false
+    const pn = p.productName || ''
+    if (/#\d/.test(pn)) return false
+    if (/\d+\/\d+/.test(pn)) return false
+    if (/-\w{3,6}-\d{3,4}/i.test(pn)) return false
     if (SKIP_ACCESSORIES.some(s => name.toLowerCase().includes(s))) return false
     return isSealed(name)
   })
