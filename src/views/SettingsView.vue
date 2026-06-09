@@ -380,9 +380,9 @@ async function refreshCardDb() {
   }
 }
 
-onMounted(async () => {
+onMounted(() => {
   loadCardCounts()
-  await calcStorage()
+  calcStorage()
 })
 
 const totalItems = computed(() => store.portfolios.reduce((s, p) => s + p.items.length, 0))

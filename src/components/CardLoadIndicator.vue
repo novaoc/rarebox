@@ -73,23 +73,17 @@ const gameList = computed(() =>
 const overallPct = computed(() => {
   if (isDone.value) return 100
   if (totalGames.value === 0) return 0
-
-  let totalCards = 0
-  let loadedCards = 0
+  let pctSum = 0
   for (const id of activeGames.value) {
     const g = gameProgress.value[id]
     if (!g) continue
     if (g.done) {
-      const t = g.total || 1
-      loadedCards += t
-      totalCards += t
-    } else {
-      loadedCards += g.loaded || 0
-      totalCards += g.total || 1
+      pctSum += 100
+    } else if (g.total && g.total > 0) {
+      pctSum += Math.min((g.loaded / g.total) * 100, 99)
     }
   }
-  if (totalCards === 0) return 0
-  return Math.round((loadedCards / totalCards) * 100)
+  return Math.round(pctSum / totalGames.value)
 })
 
 const currentLabel = computed(() => {
@@ -106,18 +100,21 @@ const speed = computed(() => {
 const speedLabel = computed(() => {
   if (speed.value <= 0) return ''
   const remaining = (100 - overallPct.value) / speed.value
+  if (remaining <= 0) return ''
+  if (remaining < 1) return '< 1s left'
   if (remaining < 60) return `${Math.round(remaining)}s left`
   return `${Math.round(remaining / 60)}m left`
 })
 
 const timeLeft = computed(() => {
   if (isDone.value) return 'Done'
-  if (overallPct.value >= 98) return 'Almost done'
+  if (overallPct.value >= 95) return 'Almost done'
   if (!startTime.value || overallPct.value <= 0) return 'Starting…'
   const elapsed = (Date.now() - startTime.value) / 1000
   const pctPerSec = overallPct.value / elapsed
   if (pctPerSec <= 0) return 'Starting…'
   const remaining = (100 - overallPct.value) / pctPerSec
+  if (remaining <= 1) return 'Almost done'
   if (remaining < 60) return `~${Math.round(remaining)}s`
   return `~${Math.round(remaining / 60)}m`
 })
