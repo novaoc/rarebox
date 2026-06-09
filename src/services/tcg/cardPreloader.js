@@ -8,7 +8,7 @@
  * Retry logic: Each failed TCG gets 2 retries with exponential backoff.
  */
 
-import { saveGameCards, hasGameCards } from './cardCache.js'
+import { saveGameCards, isCacheFresh } from './cardCache.js'
 
 const BULK_TIMEOUT = 300_000   // 5 min for large downloads
 const API_TIMEOUT = 30_000     // 30s for normal API calls

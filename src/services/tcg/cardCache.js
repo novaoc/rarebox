@@ -83,6 +83,14 @@ export async function hasGameCards(game) {
   return await db.cards.where('game').equals(game).count() > 0
 }
 
+/** Check if a game's cached cards are fresh (< 24h old). */
+export async function isCacheFresh(game) {
+  const card = await db.cards.where('game').equals(game).first()
+  if (!card) return false
+  const age = Date.now() - (card.cachedAt || 0)
+  return age < 86_400_000
+}
+
 /** Get card counts per game from IDB. */
 export async function getCardCounts() {
   const games = ['pokemon', 'mtg', 'lorcana', 'one-piece', 'riftbound', 'yugioh']

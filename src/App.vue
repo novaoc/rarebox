@@ -251,7 +251,6 @@ function startBackgroundPreload() {
 }
 
 onMounted(async () => {
-  // Always init the store — app is usable immediately, search falls back to live APIs
   await store.init()
   store.autoSnapshot()
 
@@ -262,9 +261,6 @@ onMounted(async () => {
 
   // Returning visitor: build search index from cached IDB data
   await buildSearchIndex()
-
-  await store.init()
-  store.autoSnapshot()
 
   // Background preload slow TCGs if not yet cached
   startBackgroundPreload()
