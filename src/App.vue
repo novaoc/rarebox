@@ -95,7 +95,7 @@
 
       <main class="main-content">
         <router-view v-slot="{ Component }">
-          <transition name="fade" mode="out-in">
+          <transition name="fade" mode="out-in" :duration="500">
             <component :is="Component" />
           </transition>
         </router-view>

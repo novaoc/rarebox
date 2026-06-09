@@ -23,6 +23,11 @@ const router = createRouter({
   scrollBehavior: () => ({ top: 0 })
 })
 
+// Catch navigation errors so transitions don't silently hang
+router.onError((err) => {
+  console.error('Navigation error:', err)
+})
+
 // Update document title and meta description on navigation
 router.afterEach((to) => {
   const title = to.meta.title || 'Dashboard'
