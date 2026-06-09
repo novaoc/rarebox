@@ -73,8 +73,23 @@ const gameList = computed(() =>
 const overallPct = computed(() => {
   if (isDone.value) return 100
   if (totalGames.value === 0) return 0
-  const done = Object.values(gameProgress.value).filter(g => g.done).length
-  return Math.round((done / totalGames.value) * 100)
+
+  let totalCards = 0
+  let loadedCards = 0
+  for (const id of activeGames.value) {
+    const g = gameProgress.value[id]
+    if (!g) continue
+    if (g.done) {
+      const t = g.total || 1
+      loadedCards += t
+      totalCards += t
+    } else {
+      loadedCards += g.loaded || 0
+      totalCards += g.total || 1
+    }
+  }
+  if (totalCards === 0) return 0
+  return Math.round((loadedCards / totalCards) * 100)
 })
 
 const currentLabel = computed(() => {
@@ -97,12 +112,12 @@ const speedLabel = computed(() => {
 
 const timeLeft = computed(() => {
   if (isDone.value) return 'Done'
+  if (overallPct.value >= 98) return 'Almost done'
   if (!startTime.value || overallPct.value <= 0) return 'Starting…'
   const elapsed = (Date.now() - startTime.value) / 1000
   const pctPerSec = overallPct.value / elapsed
   if (pctPerSec <= 0) return 'Starting…'
   const remaining = (100 - overallPct.value) / pctPerSec
-  if (remaining < 5) return 'Almost done'
   if (remaining < 60) return `~${Math.round(remaining)}s`
   return `~${Math.round(remaining / 60)}m`
 })
@@ -118,17 +133,21 @@ function start(games) {
   startTime.value = Date.now()
 }
 
-function onProgress({ game, phase }) {
+function onProgress({ game, phase, loaded, total }) {
   currentGame.value = game
   status.value = phase
   if (!gameProgress.value[game]) {
-    gameProgress.value[game] = { done: false, failed: false }
+    gameProgress.value[game] = { done: false, failed: false, loaded: 0, total: 0 }
   }
+  if (typeof loaded === 'number') gameProgress.value[game].loaded = loaded
+  if (typeof total === 'number') gameProgress.value[game].total = total
   if (phase === 'Done' || phase === 'Already cached') {
     gameProgress.value[game].done = true
+    gameProgress.value[game].loaded = gameProgress.value[game].total || 1
   } else if (phase && phase.startsWith('Failed')) {
     gameProgress.value[game].done = true
     gameProgress.value[game].failed = true
+    gameProgress.value[game].loaded = gameProgress.value[game].total || 1
   }
 }
 
