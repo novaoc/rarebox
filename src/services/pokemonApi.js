@@ -348,7 +348,7 @@ export async function getJapaneseCardDetail(cardId) {
         const setId = data.set?.id
         const localId = data.localId
         const series = setId ? jpSetToSeries(setId) : null
-        return series ? `https://assets.tcgdex.net/ja/${series}/${setId}/${localId}` : null
+        return series ? `https://assets.tcgdex.net/ja/${series}/${setId}/${String(localId).padStart(3, '0')}` : null
       })()
       return imgBase ? { small: imgBase + '/low.webp', large: imgBase + '/high.webp' } : { small: null, large: null }
     })(),

@@ -57,50 +57,58 @@ async function fetchPokemon(onProgress) {
   const PAGE_SIZE = 250
   const allCards = []
   let page = 1
-  let hasMore = true
+  let consecutiveErrors = 0
 
-  onProgress({ game: 'pokemon', phase: 'Fetching cards…', loaded: 0, total: 0 })
+  // First, get total count from page 1
+  const first = await fetchJson(
+    `https://api.pokemontcg.io/v2/cards?page=1&pageSize=${PAGE_SIZE}&select=id,name,number,set,rarity,tcgplayer,images`
+  )
+  const totalPages = first.totalCount ? Math.ceil(first.totalCount / PAGE_SIZE) : 100
+  onProgress({ game: 'pokemon', phase: 'Fetching cards…', loaded: 0, total: first.totalCount || 0 })
 
-  while (hasMore) {
-    const d = await fetchJson(
-      `https://api.pokemontcg.io/v2/cards?page=${page}&pageSize=${PAGE_SIZE}&select=id,name,number,set,rarity,tcgplayer,images`
-    )
-    const cards = d.data || []
-    if (cards.length === 0) { hasMore = false; break }
-
-    for (const c of cards) {
-      const prices = c.tcgplayer?.prices || {}
-      const price = prices.holofoil?.market
-        || prices['1stEditionHolofoil']?.market
-        || prices.unlimitedHolofoil?.market
-        || prices.reverseHolofoil?.market
-        || prices.normal?.market
-        || null
-      allCards.push({
-        id: c.id,
-        name: c.name,
-        set: c.set?.name || '',
-        number: c.number || '',
-        image: c.images?.small || '',
-        price: num(price),
-        rarity: c.rarity || '',
-      })
-    }
-
-    hasMore = cards.length === PAGE_SIZE
-    const totalPages = d.totalCount ? Math.ceil(d.totalCount / PAGE_SIZE) : 0
-    page++
-
-    onProgress({
-      game: 'pokemon',
-      phase: `Page ${page - 1}/${totalPages} (${allCards.length.toLocaleString()} cards)`,
-      loaded: allCards.length,
-      total: d.totalCount || 0,
+  for (const c of (first.data || [])) {
+    const prices = c.tcgplayer?.prices || {}
+    allCards.push({
+      id: c.id, name: c.name, set: c.set?.name || '', number: c.number || '',
+      image: c.images?.small || '',
+      price: num(prices.holofoil?.market || prices['1stEditionHolofoil']?.market || prices.unlimitedHolofoil?.market || prices.reverseHolofoil?.market || prices.normal?.market),
+      rarity: c.rarity || '',
     })
-
-    await sleep(150)
   }
 
+  for (page = 2; page <= totalPages; page++) {
+    try {
+      const d = await fetchJson(
+        `https://api.pokemontcg.io/v2/cards?page=${page}&pageSize=${PAGE_SIZE}&select=id,name,number,set,rarity,tcgplayer,images`
+      )
+      const cards = d.data || []
+      if (cards.length === 0) break
+      for (const c of cards) {
+        const prices = c.tcgplayer?.prices || {}
+        allCards.push({
+          id: c.id, name: c.name, set: c.set?.name || '', number: c.number || '',
+          image: c.images?.small || '',
+          price: num(prices.holofoil?.market || prices['1stEditionHolofoil']?.market || prices.unlimitedHolofoil?.market || prices.reverseHolofoil?.market || prices.normal?.market),
+          rarity: c.rarity || '',
+        })
+      }
+      consecutiveErrors = 0
+      onProgress({
+        game: 'pokemon',
+        phase: `Page ${page}/${totalPages} (${allCards.length.toLocaleString()} cards)`,
+        loaded: allCards.length,
+        total: first.totalCount || 0,
+      })
+      await sleep(100)
+    } catch (err) {
+      consecutiveErrors++
+      console.warn(`Pokemon page ${page} failed (${consecutiveErrors} consecutive): ${err.message}`)
+      if (consecutiveErrors >= 3) throw err
+      await sleep(500)
+    }
+  }
+
+  if (allCards.length === 0) throw new Error('No cards fetched')
   await saveGameCards('pokemon', allCards)
   return allCards.length
 }

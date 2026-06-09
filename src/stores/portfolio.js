@@ -444,19 +444,26 @@ export const usePortfolioStore = defineStore('portfolio', () => {
       if (!JP_NAME_TO_ID[key]) JP_NAME_TO_ID[key] = id
     }
 
-    // tcgdex series prefix from set ID
+    // tcgdex series prefix from set ID (case-sensitive — CDN uses uppercase)
     function jpSetToSeries(setId) {
       if (!setId) return null
-      if (setId.startsWith('SV')) return 'sv'
-      if (setId.startsWith('S') && !setId.startsWith('SV')) return 'swsh'
-      if (setId.startsWith('SM')) return 'sm'
-      if (setId.startsWith('XY')) return 'xy'
-      if (setId.startsWith('B')) return 'bw'
-      if (setId.startsWith('DP')) return 'dp'
-      if (setId.startsWith('EX') || setId.startsWith('e')) return 'ex'
-      if (setId.startsWith('neo')) return 'neo'
-      if (setId.startsWith('PM')) return 'base'
-      return 'sv' // default
+      const id = setId.startsWith('neo') ? setId : setId.toUpperCase()
+      if (id.startsWith('SV')) return 'SV'
+      if (id.startsWith('S') && !id.startsWith('ST')) return 'S'
+      if (id.startsWith('M')) return 'M'
+      if (id.startsWith('SM')) return 'SM'
+      if (id.startsWith('XY')) return 'XY'
+      if (id.startsWith('B') || id.startsWith('BW')) return 'BW'
+      if (id.startsWith('DP')) return 'DP'
+      if (id.startsWith('EX')) return 'EX'
+      if (id.startsWith('e')) return 'EX'
+      if (id.startsWith('neo')) return 'NEO'
+      if (id.startsWith('PM')) return 'BASE'
+      return 'SV' // default
+    }
+
+    function padId(n) {
+      return String(n).padStart(3, '0')
     }
 
     // Hoist dynamic import to avoid redundant module loading inside the loop
@@ -562,7 +569,7 @@ export const usePortfolioStore = defineStore('portfolio', () => {
             } else {
               // Fallback: image-only from CDN
               const series = jpSetToSeries(tcgdexId)
-              const imgBase = `https://assets.tcgdex.net/ja/${series}/${tcgdexId}/${localId}`
+              const imgBase = `https://assets.tcgdex.net/ja/${series}/${tcgdexId}/${padId(localId)}`
               const updates = {
                 cardId: `${tcgdexId}-${localId}`,
                 _lang: 'ja',
