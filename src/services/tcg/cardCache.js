@@ -60,6 +60,22 @@ export function clearCardDatabaseReady() {
   localStorage.removeItem('rarebox_card_db_ready')
 }
 
+// ── TCG Preferences ─────────────────────────────────────────────────────────
+
+const PREFS_KEY = 'rarebox_tcg_prefs'
+
+/** Get user's selected TCGs. Returns null if never set (first visit). */
+export function getTcgPrefs() {
+  const raw = localStorage.getItem(PREFS_KEY)
+  if (!raw) return null
+  try { return JSON.parse(raw) } catch { return null }
+}
+
+/** Save user's selected TCG list. */
+export function saveTcgPrefs(games) {
+  localStorage.setItem(PREFS_KEY, JSON.stringify(games))
+}
+
 // ── Card storage ────────────────────────────────────────────────────────────
 
 /** Check if a specific game has cards cached in IDB. */

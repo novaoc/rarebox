@@ -357,57 +357,42 @@ const FETCHERS = {
   riftbound: fetchRiftbound,
 }
 
-// Fast TCGs that complete in <10 seconds
-const FAST_GAMES = ['one-piece', 'lorcana', 'riftbound']
-// Slow TCGs that take minutes
-const SLOW_GAMES = ['pokemon', 'mtg', 'yugioh']
+// All available games
+const ALL_GAMES = ['pokemon', 'mtg', 'lorcana', 'one-piece', 'yugioh', 'riftbound']
 
 /**
- * Preload fast TCGs only (One Piece, Lorcana, Riftbound).
- * Used during the initial loading screen — completes in ~5 seconds.
+ * Preload selected TCGs in PARALLEL.
+ * All APIs are independent — no rate limit conflicts between different TCGs.
+ * @param {string[]} games - Which TCGs to preload
  */
-export async function preloadFast(onProgress = () => {}) {
+export async function preloadGames(games, onProgress = () => {}) {
   const counts = {}
-  for (const game of FAST_GAMES) {
+
+  const tasks = games.map(async (game) => {
     const fetcher = FETCHERS[game]
-    if (!fetcher) continue
-    try {
-      onProgress({ game, phase: 'Starting…', loaded: 0, total: 0 })
-      counts[game] = await fetchWithRetry((p) => fetcher(p), 2, onProgress)
-      onProgress({ game, phase: 'Done', loaded: counts[game], total: counts[game] })
-    } catch (err) {
-      console.error(`Failed to preload ${game}:`, err)
-      counts[game] = 0
-      onProgress({ game, phase: `Failed: ${err.message}`, loaded: 0, total: 0 })
-    }
-  }
-  return counts
-}
+    if (!fetcher) return
 
-/**
- * Preload slow TCGs in the background (Pokemon, MTG, Yu-Gi-Oh).
- * Called after the app loads. Retries failures automatically.
- */
-export async function preloadSlow(onProgress = () => {}) {
-  const counts = {}
-  for (const game of SLOW_GAMES) {
-    // Skip if already cached
-    if (await hasGameCards(game)) {
+    // Skip if already cached and fresh (< 24h old)
+    if (await isCacheFresh(game)) {
       onProgress({ game, phase: 'Already cached', loaded: 0, total: 0 })
-      continue
+      return
     }
-    const fetcher = FETCHERS[game]
-    if (!fetcher) continue
+
     try {
       onProgress({ game, phase: 'Starting…', loaded: 0, total: 0 })
-      counts[game] = await fetchWithRetry((p) => fetcher(p), 2, onProgress)
+      counts[game] = await fetchWithRetry((p) => fetcher(p), 2, (prog) => {
+        onProgress({ game, ...prog })
+      })
       onProgress({ game, phase: 'Done', loaded: counts[game], total: counts[game] })
     } catch (err) {
       console.error(`Failed to preload ${game}:`, err)
       counts[game] = 0
       onProgress({ game, phase: `Failed: ${err.message}`, loaded: 0, total: 0 })
     }
-  }
+  })
+
+  await Promise.allSettled(tasks)
+  counts.total = Object.values(counts).reduce((a, b) => (typeof b === 'number' ? a + b : a), 0)
   return counts
 }
 
@@ -415,17 +400,5 @@ export async function preloadSlow(onProgress = () => {}) {
  * Refresh all TCG data (for manual refresh in Settings).
  */
 export async function refreshAll(onProgress = () => {}) {
-  const counts = {}
-  for (const game of Object.keys(FETCHERS)) {
-    const fetcher = FETCHERS[game]
-    try {
-      onProgress({ game, phase: 'Refreshing…', loaded: 0, total: 0 })
-      counts[game] = await fetchWithRetry((p) => fetcher(p), 2, onProgress)
-      onProgress({ game, phase: 'Done', loaded: counts[game], total: counts[game] })
-    } catch (err) {
-      console.error(`Failed to refresh ${game}:`, err)
-      counts[game] = 0
-    }
-  }
-  return counts
+  return preloadGames(ALL_GAMES, onProgress)
 }
