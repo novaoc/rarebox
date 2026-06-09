@@ -6,7 +6,7 @@
  * - In-memory Map index built on startup for O(1) search
  * - searchCache() filters the in-memory index (no IDB queries per search)
  */
-import db from '../db.js'
+import db from '../../db.js'
 
 // ── Schema ──────────────────────────────────────────────────────────────────
 db.version(3).stores({
