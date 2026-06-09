@@ -107,13 +107,13 @@ async function fetchPokemon(onProgress) {
 }
 
 // ── MTG ─────────────────────────────────────────────────────────────────────
-// Paginated via Scryfall /cards endpoint (not search — empty q is rejected).
-// ~175 cards per request, ~660 pages for 115k cards. 100ms delay between pages.
+// Paginated via Scryfall search with game:paper (catches all paper cards).
+// ~95k cards, ~175 cards per page, ~545 pages. 100ms delay between pages.
 
 async function fetchMtg(onProgress) {
   const PAGE_SIZE = 175
   const allCards = []
-  let url = `https://api.scryfall.com/cards?page=1&pageSize=${PAGE_SIZE}&order=released&include_extras=true`
+  let url = `https://api.scryfall.com/cards/search?q=game%3Apaper&unique=prints&order=released&page=1&pageSize=${PAGE_SIZE}`
   let page = 0
 
   onProgress({ game: 'mtg', phase: 'Fetching cards…', loaded: 0, total: 0 })
