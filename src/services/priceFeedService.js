@@ -80,7 +80,7 @@ async function rawSearch(query) {
  * Search PriceCharting for products of a given game.
  * @param {string} query  free-text (card or sealed product name)
  * @param {string} game   one of SUPPORTED_GAMES ids
- * @returns {Promise<Array<{name,set,image,price,url,slug,sealed}>>}
+ * @returns {Promise<Array<{name,set,image,price,all_prices,url,slug,sealed}>>}
  */
 export async function searchProducts(query, game = 'pokemon') {
   const q = (query || '').trim()
@@ -113,6 +113,11 @@ export async function searchProducts(query, game = 'pokemon') {
       set: p.consoleName || '',
       image: p.imageUri || '',
       price: parsePrice(p.price1),
+      all_prices: {
+        ungraded: parsePrice(p.price1),
+        grade9:   parsePrice(p.price2),
+        grade10:  parsePrice(p.price3),
+      },
       url: p.id ? `${PC_BASE}/game/${p.id}` : '',
       slug: p.id || '',
       sealed: inferSealed(p.productName),
