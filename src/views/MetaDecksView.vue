@@ -4,7 +4,7 @@
       <router-link to="/decks" class="btn btn-ghost btn-sm" style="margin-bottom:8px">← All Decks</router-link>
       <h2>Meta Decks</h2>
       <p class="text-muted" style="font-size:13px;margin-top:2px">
-        {{ source === 'live' ? 'Live tournament data from Limitless TCG.' : 'Top competitive decks across all TCGs.' }}
+        {{ source === 'live' ? liveSourceLabel(activeGame) : 'Top competitive decks based on recent tournament results.' }}
         Click "Add to My Decks" to import one and start tracking what you own.
         <span v-if="lastUpdated" class="text-muted"> · Updated {{ timeAgo(lastUpdated) }}</span>
       </p>
@@ -84,6 +84,19 @@ function timeAgo(date) {
   if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`
   if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`
   return `${Math.floor(seconds / 86400)}d ago`
+}
+
+const SOURCE_LABELS = {
+  pokemon: 'Live tournament data from Limitless TCG.',
+  mtg: 'Live tournament data from mtgtop8.com.',
+  lorcana: 'Live tournament data from inkdecks.com.',
+  'one-piece': 'Live tournament data from optcg.one.',
+  riftbound: 'Live tournament data from RiftDecks.com.',
+  yugioh: 'Live tournament data from ygoprodeck.com.',
+}
+
+function liveSourceLabel(game) {
+  return SOURCE_LABELS[game] || 'Live tournament data.'
 }
 
 const tcgOptions = GAME_KEYS.map(k => ({ key: k, label: GAME_LABELS[k] }))
