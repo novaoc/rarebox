@@ -41,6 +41,11 @@ export function isSearchReady() {
   return _indexReady && _allCards && _allCards.length > 0
 }
 
+/** Check if a specific game is in the in-memory index. */
+export function isGameCached(game) {
+  return _allCards ? _allCards.some(c => c.game === game) : false
+}
+
 /** Total cards in the index. */
 export function getCardCount() {
   return _allCards ? _allCards.length : 0

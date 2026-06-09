@@ -6,7 +6,7 @@
 // When the in-memory search index is ready, searches are instant (no network).
 // Falls back to live APIs otherwise.
 
-import { searchCache, isSearchReady, getTcgPrefs } from './cardCache.js'
+import { searchCache, isGameCached } from './cardCache.js'
 
 const TIMEOUT = 8000
 
@@ -451,28 +451,25 @@ const ALL_PROVIDERS = {
 }
 
 export async function multiSearch(query, { page = 1, pageSize = 20, category = 'cards', providers } = {}) {
-  // Sealed products always hit PriceCharting (not in card cache)
   if (category === 'sealed') {
     const result = await searchSealed(query).catch(() => ({ cards: [], total: 0 }))
     return result
   }
 
-  // If the in-memory search index is ready, search instantly (no network)
-  if (isSearchReady()) {
-    return searchCache(query, { page, pageSize, providers })
-  }
+  const active = providers || Object.keys(ALL_PROVIDERS)
 
-  // Fallback: hit live APIs (slow first time, used before preload completes)
-  const active = providers || getTcgPrefs() || Object.keys(ALL_PROVIDERS)
-  const searches = active.map(k =>
-    ALL_PROVIDERS[k](query, page, pageSize).catch(() => ({ cards: [], total: 0 })),
-  )
+  // Per-game: use cache if available, live API otherwise
+  const searches = active.map(k => {
+    if (isGameCached(k)) {
+      return searchCache(query, { page: 1, pageSize: 500, providers: [k] })
+    }
+    return ALL_PROVIDERS[k](query, page, pageSize).catch(() => ({ cards: [], total: 0 }))
+  })
 
   const results = await Promise.all(searches)
-  const allCards = results.flatMap(r => r.cards)
-  const totalCount = results.reduce((sum, r) => sum + r.total, 0)
+  const allCards = results.flatMap(r => r.cards || [])
+  const totalCount = results.reduce((sum, r) => sum + (r.totalCount || r.total || 0), 0)
 
-  // Sort: exact name matches first, then alphabetical
   const q = query.toLowerCase()
   allCards.sort((a, b) => {
     const aExact = a.name.toLowerCase() === q ? 0 : 1
@@ -484,7 +481,6 @@ export async function multiSearch(query, { page = 1, pageSize = 20, category = '
     return a.name.localeCompare(b.name)
   })
 
-  // Paginate the merged results
   const start = (page - 1) * pageSize
   const paged = allCards.slice(start, start + pageSize)
 
