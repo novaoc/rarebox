@@ -427,6 +427,7 @@ function clearPriceCache() {
 
 async function doReset() {
   await store.resetAll()
+  await clearCardCache()
   confirmReset.value = false
   resetConfirmText.value = ''
   router.push('/')
