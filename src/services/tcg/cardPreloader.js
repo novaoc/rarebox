@@ -52,7 +52,6 @@ async function fetchWithRetry(fn, retries = 2, onProgress = () => {}) {
 
 // ── Pokemon ─────────────────────────────────────────────────────────────────
 // Paginated: 250 cards per request, ~82 pages for 20k cards.
-// Uses 100ms delay between requests to respect rate limits.
 
 async function fetchPokemon(onProgress) {
   const PAGE_SIZE = 250
@@ -89,17 +88,17 @@ async function fetchPokemon(onProgress) {
     }
 
     hasMore = cards.length === PAGE_SIZE
+    const totalPages = d.totalCount ? Math.ceil(d.totalCount / PAGE_SIZE) : 0
     page++
 
     onProgress({
       game: 'pokemon',
-      phase: `Cards ${allCards.length.toLocaleString()}…`,
+      phase: `Page ${page - 1}/${totalPages} (${allCards.length.toLocaleString()} cards)`,
       loaded: allCards.length,
       total: d.totalCount || 0,
     })
 
-    // Rate limit: 30 req/min without key, 100ms between requests is safe
-    await sleep(100)
+    await sleep(150)
   }
 
   await saveGameCards('pokemon', allCards)
@@ -108,7 +107,7 @@ async function fetchPokemon(onProgress) {
 
 // ── MTG ─────────────────────────────────────────────────────────────────────
 // Paginated via Scryfall search with game:paper (catches all paper cards).
-// ~95k cards, ~175 cards per page, ~545 pages. 100ms delay between pages.
+// ~95k cards, ~175 cards per page, ~545 pages.
 
 async function fetchMtg(onProgress) {
   const PAGE_SIZE = 175
@@ -137,10 +136,11 @@ async function fetchMtg(onProgress) {
 
     url = d.has_more ? d.next_page : null
     page++
+    const totalPages = d.total_cards ? Math.ceil(d.total_cards / PAGE_SIZE) : 0
 
     onProgress({
       game: 'mtg',
-      phase: `Cards ${allCards.length.toLocaleString()}…`,
+      phase: `Page ${page}/${totalPages} (${allCards.length.toLocaleString()} cards)`,
       loaded: allCards.length,
       total: d.total_cards || 0,
     })
@@ -191,7 +191,7 @@ async function fetchLorcana(onProgress) {
       total: sets.length,
     })
 
-    await sleep(50)
+    await sleep(20)
   }
 
   await saveGameCards('lorcana', allCards)
@@ -232,10 +232,11 @@ async function fetchYugioh(onProgress) {
   const allCards = []
   const seen = new Set()
   let offset = 0
+  let batchNum = 0
 
   onProgress({ game: 'yugioh', phase: 'Fetching cards…', loaded: 0, total: 0 })
 
-  while (offset < 100_000) { // safety guard
+  while (offset < 100_000) {
     const d = await fetchJson(`${YGO_API}/cardinfo.php?num=${BATCH}&offset=${offset}`)
     const cards = d.data || []
     if (cards.length === 0) break
@@ -260,16 +261,17 @@ async function fetchYugioh(onProgress) {
     }
 
     offset += BATCH
+    batchNum++
     if (cards.length < BATCH) break
 
     onProgress({
       game: 'yugioh',
-      phase: `Cards ${allCards.length.toLocaleString()}…`,
+      phase: `Batch ${batchNum} (${allCards.length.toLocaleString()} cards)`,
       loaded: allCards.length,
       total: 0,
     })
 
-    await sleep(100) // respect 20 req/sec limit
+    await sleep(100)
   }
 
   await saveGameCards('yugioh', allCards)
@@ -338,7 +340,7 @@ async function fetchRiftbound(onProgress) {
       total: sets.length,
     })
 
-    await sleep(100)
+    await sleep(50)
   }
 
   await saveGameCards('riftbound', allCards)
