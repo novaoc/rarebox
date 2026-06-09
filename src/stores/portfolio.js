@@ -522,25 +522,60 @@ export const usePortfolioStore = defineStore('portfolio', () => {
             resolved++
           }
         } else if (game === 'pokemon' && isJP) {
-          // ── Pokemon JP via tcgdex CDN (no API call — construct URL) ──
+          // ── Pokemon JP via tcgdex API (prices + images) ──────────────
           const setName = (item.cardData.set?.name || '').toLowerCase().replace(/\s*\(jp\)/i, '').trim()
-          const tcgdexId = JP_NAME_TO_ID[setName]
+          // Normalise parens the same way JP_NAME_TO_ID keys are built
+          const lookupName = setName.replace(/\s*\(.*\)/, '').trim()
+          const tcgdexId = JP_NAME_TO_ID[lookupName]
           const localId = item.cardData.number.replace(/\/.*/, '').trim()
 
+          if (!lookupName || !tcgdexId) {
+            console.warn(`JP set "${setName}" (raw: "${item.cardData.set?.name}") not found in JP_NAME_TO_ID — add it to JP_EN`)
+          }
+
           if (tcgdexId && localId) {
-            const series = jpSetToSeries(tcgdexId)
-            const imgBase = `https://assets.tcgdex.net/ja/${series}/${tcgdexId}/${localId}`
-            const updates = {
-              _lang: 'ja',
-              cardData: {
-                ...item.cardData,
-                images: { small: imgBase + '/low.webp', large: imgBase + '/high.webp' },
-                set: { id: tcgdexId, name: item.cardData.set?.name },
-              },
-              lastPriceUpdate: new Date().toISOString(),
+            let cardData = null
+            try {
+              const { getJapaneseCardDetail } = await import('../services/pokemonApi.js')
+              cardData = await getJapaneseCardDetail(`${tcgdexId}-${localId}`)
+            } catch {}
+
+            if (cardData) {
+              const cm = cardData.tcgplayer?.prices?.normal
+              const marketPrice = cm?.market || cm?.mid || null
+              const updates = {
+                cardId: `${tcgdexId}-${localId}`,
+                _lang: 'ja',
+                cardData: {
+                  ...item.cardData,
+                  name: cardData.name,
+                  number: cardData.number,
+                  images: cardData.images || { small: '', large: '' },
+                  set: { id: tcgdexId, name: item.cardData.set?.name },
+                  rarity: cardData.rarity || item.cardData.rarity,
+                },
+                currentMarketPrice: marketPrice,
+                lastPriceUpdate: new Date().toISOString(),
+              }
+              updateItem(portfolioId, item.id, updates)
+              resolved++
+            } else {
+              // Fallback: image-only from CDN
+              const series = jpSetToSeries(tcgdexId)
+              const imgBase = `https://assets.tcgdex.net/ja/${series}/${tcgdexId}/${localId}`
+              const updates = {
+                cardId: `${tcgdexId}-${localId}`,
+                _lang: 'ja',
+                cardData: {
+                  ...item.cardData,
+                  images: { small: imgBase + '/low.webp', large: imgBase + '/high.webp' },
+                  set: { id: tcgdexId, name: item.cardData.set?.name },
+                },
+                lastPriceUpdate: new Date().toISOString(),
+              }
+              updateItem(portfolioId, item.id, updates)
+              resolved++
             }
-            updateItem(portfolioId, item.id, updates)
-            resolved++
           }
         } else if (game === 'magic') {
           // ── MTG via Scryfall ─────────────────────────────────────
