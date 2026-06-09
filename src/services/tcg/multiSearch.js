@@ -320,6 +320,23 @@ async function resolveLorcanaCard(cardId) {
   }
 }
 
+async function resolveOnePieceCard(cardId) {
+  const cards = await getOptCards()
+  const c = cards.find(x => x.card_set_id === cardId)
+  if (!c) return null
+  return {
+    id: c.card_set_id,
+    name: c.card_name,
+    number: c.card_set_id,
+    set: c.set_name || '',
+    image: c.card_image || '',
+    price: c.market_price || c.inventory_price || null,
+    rarity: c.rarity || '',
+    game: 'one-piece',
+    _raw: c,
+  }
+}
+
 async function resolveRiftboundCard(cardId) {
   const url = `https://api.riftcodex.com/cards/${cardId}`
   try {
@@ -351,6 +368,7 @@ export async function resolveCard(cardId, game) {
     if (game === 'mtg') return await resolveMtgCard(cardId)
     if (game === 'yugioh') return await resolveYugiohCard(cardId)
     if (game === 'lorcana') return await resolveLorcanaCard(cardId)
+    if (game === 'one-piece') return await resolveOnePieceCard(cardId)
     if (game === 'riftbound') return await resolveRiftboundCard(cardId)
     return null
   } catch { return null }
