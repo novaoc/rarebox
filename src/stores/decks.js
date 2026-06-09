@@ -2,7 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { usePortfolioStore } from './portfolio'
 import { getMarketPrice } from '../services/pokemonApi'
-import { multiSearch, resolveCard } from '../services/tcg/multiSearch'
+import { multiSearch, resolveCard, searchRiftboundBySet } from '../services/tcg/multiSearch'
 
 const STORAGE_KEY = 'rarebox_decks'
 
@@ -174,6 +174,11 @@ export const useDeckStore = defineStore('decks', () => {
   // ── Import from meta deck data ────────────────────────────────────────
 
   async function findRegularCard(name, setCode, game = 'pokemon') {
+    // Riftbound fast path: only fetch one set's cards instead of all sets
+    if (game === 'riftbound') {
+      return await searchRiftboundBySet(name, setCode)
+    }
+
     const result = await multiSearch(name, { page: 1, pageSize: 50, providers: [game] })
     if (!result?.cards?.length) return null
 

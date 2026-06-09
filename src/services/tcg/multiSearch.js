@@ -199,6 +199,64 @@ async function searchRiftbound(query) {
   return { cards: matches, total: matches.length }
 }
 
+// Fast path for Riftbound: only fetch cards for a specific set by set_id or name.
+// Avoids loading all sets' cards (~10+ HTTP requests). Used by findRegularCard.
+export async function searchRiftboundBySet(name, setCode) {
+  try {
+    const setsRes = await fetchJson('https://api.riftcodex.com/sets')
+    const sets = setsRes.items || []
+
+    // Match by set_id first, then by set name prefix (handles
+    // fallback data using "core" / "spiritforged" labels)
+    const matchSet = sets.find(s => s.set_id?.toLowerCase() === setCode?.toLowerCase())
+      || sets.find(s => s.name?.toLowerCase().startsWith(setCode?.toLowerCase()))
+      || sets.find(s => s.name?.toLowerCase().includes(setCode?.toLowerCase()))
+
+    if (matchSet) {
+      const cards = []
+      let page = 1
+      let total = Infinity
+      while (cards.length < total && page <= 5) {
+        const d = await fetchJson(
+          `https://api.riftcodex.com/cards?set_id=${encodeURIComponent(matchSet.set_id)}&limit=100&page=${page}`
+        )
+        const items = d.items || []
+        total = d.total || 0
+        for (const c of items) {
+          cards.push({
+            id: c.id,
+            name: c.name,
+            number: String(c.collector_number || ''),
+            set: c.set?.label || matchSet.name,
+            image: c.media?.image_url || '',
+            price: null,
+            rarity: c.classification?.rarity || '',
+            game: 'riftbound',
+            _raw: c,
+          })
+        }
+        page++
+      }
+
+      const q = name.toLowerCase()
+      return cards.find(c => c.name.toLowerCase() === q)
+        || cards.find(c => c.name.toLowerCase().includes(q))
+        || cards.find(c => c.number.toLowerCase() === q)
+        || null
+    }
+
+    // No matching set found — fall back to full card load
+    const allCards = await getRiftboundCards()
+    const q = name.toLowerCase()
+    return allCards.find(c => c.name.toLowerCase() === q)
+      || allCards.find(c => c.name.toLowerCase().includes(q))
+      || allCards.find(c => c.number.toLowerCase() === q)
+      || null
+  } catch {
+    return null
+  }
+}
+
 // ── Sealed products: PriceCharting ──────────────────────────────────────────
 
 const PC_BASE = 'https://www.pricecharting.com/search-products'
