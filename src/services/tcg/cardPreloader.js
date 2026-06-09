@@ -150,15 +150,13 @@ async function fetchPokemon(onProgress) {
 
   // Cards are usable right now — save before the (slow) price pass
   await saveGameCards('pokemon', allCards)
-  onProgress({ game: 'pokemon', phase: `${allCards.length.toLocaleString()} cards ready — fetching prices…`, loaded: 0, total: 0 })
 
-  // Phase 2 — prices (background quality-of-life; non-fatal)
-  try {
-    const priced = await fetchPokemonPrices(allCards, onProgress)
-    if (priced > 0) await saveGameCards('pokemon', allCards)
-  } catch (err) {
-    console.warn('Pokemon price pass failed (cards remain usable):', err.message)
-  }
+  // Phase 2 — prices, fire-and-forget. pokemontcg.io takes minutes even in
+  // parallel; blocking the loader UI on it made the preload look stuck.
+  // Prices merge into the cache silently when they arrive.
+  fetchPokemonPrices(allCards, () => {})
+    .then(priced => { if (priced > 0) return saveGameCards('pokemon', allCards) })
+    .catch(err => console.warn('Pokemon price pass failed (cards remain usable):', err.message))
 
   return allCards.length
 }
@@ -438,15 +436,15 @@ const ALL_GAMES = ['pokemon', 'mtg', 'lorcana', 'one-piece', 'yugioh', 'riftboun
  * All APIs are independent — no rate limit conflicts between different TCGs.
  * @param {string[]} games - Which TCGs to preload
  */
-export async function preloadGames(games, onProgress = () => {}) {
+export async function preloadGames(games, onProgress = () => {}, { force = false } = {}) {
   const counts = {}
 
   const tasks = games.map(async (game) => {
     const fetcher = FETCHERS[game]
     if (!fetcher) return
 
-    // Skip if already cached and fresh (< 24h old)
-    if (await isCacheFresh(game)) {
+    // Skip if already cached and fresh (< 24h old) — unless forced
+    if (!force && await isCacheFresh(game)) {
       onProgress({ game, phase: 'Already cached', loaded: 0, total: 0 })
       return
     }
@@ -471,7 +469,9 @@ export async function preloadGames(games, onProgress = () => {}) {
 
 /**
  * Refresh all TCG data (for manual refresh in Settings).
+ * Forces a re-download — without force, preloadGames skips every game whose
+ * cache is <24h old, which made the Settings refresh button a silent no-op.
  */
 export async function refreshAll(onProgress = () => {}) {
-  return preloadGames(ALL_GAMES, onProgress)
+  return preloadGames(ALL_GAMES, onProgress, { force: true })
 }
