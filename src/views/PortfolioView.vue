@@ -290,7 +290,7 @@
         </div>
         <div class="panel-body-row">
           <div class="panel-left" v-if="selectedItem.cardData?.images?.small || selectedItem.imageUrl">
-            <img :src="selectedItem.cardData?.images?.large || selectedItem.cardData?.images?.small || selectedItem.imageUrl" class="panel-img" />
+            <img :src="selectedItem.cardData?.images?.large || selectedItem.cardData?.images?.small || selectedItem.imageUrl" class="panel-img" @error="$event.target.style.display='none'" />
           </div>
           <div class="panel-right">
             <div class="panel-info-grid">
@@ -471,7 +471,8 @@ const showActionsMenu = ref(false)
 const activeItemMenu = ref(null)
 
 const isMobile = ref(window.innerWidth <= 768)
-window.addEventListener('resize', () => { isMobile.value = window.innerWidth <= 768 })
+let _resizeTimer
+window.addEventListener('resize', () => { clearTimeout(_resizeTimer); _resizeTimer = setTimeout(() => { isMobile.value = window.innerWidth <= 768 }, 150) })
 
 // Bulk Selection
 const selectedIds = reactive(new Set())
@@ -582,11 +583,113 @@ function saveCurrentValue() { if (selectedItem.value) store.updateItem(portfolio
 function onBulkImported(count) { refreshStatus.value = `Imported ${count} cards`; setTimeout(() => { refreshStatus.value = '' }, 3000) }
 function removeItem(item) { if (confirm(`Remove ${getItemName(item)}?`)) store.removeItem(portfolio.value.id, item.id) }
 
+function pcQueryForItem(item) {
+  if (item.type === 'graded') {
+    const name = item.cardData?.name || item.name || ''
+    const set = item.cardData?.set?.name || ''
+    return `${name} ${set}`.trim()
+  }
+  if (item.type === 'sealed') {
+    // Include set name so PriceCharting returns the right product, not just the most popular one
+    const name = item.name || ''
+    const set = item.setName || ''
+    return `${set} ${name}`.trim()
+  }
+  return null
+}
+function pcGradeForItem(item) {
+  if (item.type === 'graded') {
+    const company = (item.gradingCompany || 'PSA').toLowerCase()
+    const grade = item.grade || '10'
+    if (company === 'psa') return grade === '10' ? 'psa10' : grade
+    if (company === 'bgs') return grade === '10' ? 'bgs10' : grade
+    if (company === 'cgc') return grade === '10' ? 'cgc10' : grade
+    if (company === 'sgc') return grade === '10' ? 'sgc10' : grade
+    return grade
+  }
+  return 'ungraded'
+}
+
 async function refreshPrices() {
   if (!portfolio.value || refreshing.value) return
-  refreshing.value = true; refreshStatus.value = 'Refreshing prices…'
-  // ... existing refresh logic simplified for brevity but unchanged in functionality ...
-  setTimeout(() => { refreshing.value = false; refreshStatus.value = 'Prices updated' }, 1500)
+  refreshing.value = true
+  refreshStatus.value = 'Refreshing prices…'
+
+  const isPokemonItem = i => !i.game || i.game === 'pokemon'
+  const cardItems = portfolio.value.items.filter(i => i.type === 'card' && i.cardId && isPokemonItem(i))
+  const ebayItems = portfolio.value.items.filter(i => (i.type === 'graded' || i.type === 'sealed') && isPokemonItem(i))
+  // Non-Pokémon TCG items (cards + sealed) — priced via priceFeedService by name.
+  const otherTcgItems = portfolio.value.items.filter(i => i.game && i.game !== 'pokemon')
+  let updated = 0
+
+  await Promise.allSettled([
+    // Raw EN cards — pokemontcg.io (bulk-friendly)
+    ...cardItems.filter(i => !store.isJPCard(i)).map(async item => {
+      try {
+        const card = await getCard(item.cardId, item._lang)
+        const priceResult = getMarketPrice(card, item.priceVariant)
+        const price = priceResult?.price || priceResult
+        if (price) {
+          store.updateItem(portfolio.value.id, item.id, { currentMarketPrice: price, lastPriceUpdate: new Date().toISOString() })
+          updated++
+        }
+      } catch {}
+    }),
+    // JP cards — tcgdex (one request per card, stagger)
+    ...cardItems.filter(i => store.isJPCard(i)).map(async (item, idx) => {
+      await new Promise(r => setTimeout(r, idx * 500))
+      try {
+        const card = await getCard(item.cardId, item._lang)
+        const priceResult = getMarketPrice(card, item.priceVariant)
+        const price = priceResult?.price || priceResult
+        if (price) {
+          store.updateItem(portfolio.value.id, item.id, { currentMarketPrice: price, lastPriceUpdate: new Date().toISOString() })
+          updated++
+        }
+      } catch {}
+    }),
+    // Graded slabs + sealed — PriceCharting (direct browser API)
+    ...ebayItems.map(async item => {
+      const query = pcQueryForItem(item)
+      const grade = pcGradeForItem(item)
+      if (!query) return
+      const result = await fetchPrice(query, grade)
+      if (result?.price) {
+        const updates = { currentValue: result.price }
+        // Always update image for sealed items on refresh — corrects wrong images from generic queries
+        if (result.image) updates.imageUrl = result.image
+        store.updateItem(portfolio.value.id, item.id, updates)
+        updated++
+      }
+    }),
+    // Non-Pokémon TCGs (Magic, One Piece, Riftbound, …) — priceFeedService routes per game
+    ...otherTcgItems.map(async item => {
+      const query = item.name || item.cardData?.name
+      if (!query) return
+      const price = await getTcgPrice(query, item.game)
+      if (price) {
+        const updates = item.type === 'card' ? { currentMarketPrice: price } : { currentValue: price }
+        store.updateItem(portfolio.value.id, item.id, updates)
+        updated++
+      }
+    })
+  ])
+
+  if (updated > 0) store.recordSnapshot(portfolio.value.id)
+
+  // Check price alerts
+  const priceMap = new Map()
+  for (const item of portfolio.value.items) {
+    if (item.type === 'card' && item.cardId) {
+      priceMap.set(item.cardId, item.currentMarketPrice || item.purchasePrice || 0)
+    }
+  }
+  const triggered = checkAlerts(priceMap)
+  if (triggered.length > 0) notifyTriggered(triggered)
+
+  refreshStatus.value = updated > 0 ? `Updated ${updated} item${updated > 1 ? 's' : ''}` : 'No updates'
+  setTimeout(() => { refreshStatus.value = '' }, 3000)
+  refreshing.value = false
 }
 
 onMounted(() => { refreshPrices() })

@@ -5,3 +5,4 @@ dist/
 .env.local
 eng.traineddata
 test_ocr.mjs
+jpn.traineddata

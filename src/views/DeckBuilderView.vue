@@ -101,7 +101,7 @@
 
         <div v-else class="deck-cards-list">
           <div v-for="card in sortedCards" :key="card.cardId" class="deck-card-row">
-            <img :src="card.image" class="deck-card-img" loading="lazy" />
+            <img v-if="card.image" :src="card.image" class="deck-card-img" loading="lazy" @error="$event.target.style.display='none'" />
             <div class="deck-card-info">
               <div class="deck-card-name">{{ card.name }}</div>
               <div class="deck-card-set">{{ card.setName }} · #{{ card.number }}</div>

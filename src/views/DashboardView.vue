@@ -384,7 +384,6 @@ function getPortfolioGainPct(portfolio) {
 
 // Silently refresh prices for all card items on mount (background, no blocking)
 onMounted(async () => {
-  console.log('[Dashboard] onMounted fired, portfolios:', store.portfolios.length, 'items:', store.portfolios.reduce((s, p) => s + p.items.length, 0))
 
   const allCardItems = store.portfolios.flatMap(p =>
     p.items.filter(i => i.type === 'card' && i.cardId).map(i => ({ ...i, portfolioId: p.id }))

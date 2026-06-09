@@ -30,7 +30,7 @@
 
         <!-- Card / Graded: show card info -->
         <div v-if="card && (itemType === 'card' || itemType === 'graded')" class="card-preview">
-          <img :src="card.images?.small" :alt="card.name" class="card-thumb" />
+          <img v-if="card.images?.small" :src="card.images.small" :alt="card.name" class="card-thumb" @error="$event.target.style.display='none'" />
           <div class="card-preview-info">
             <div class="card-preview-name">{{ card.name }}</div>
             <div class="card-preview-set">{{ card.set?.name }} · #{{ card.number }}</div>

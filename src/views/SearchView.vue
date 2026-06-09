@@ -105,7 +105,7 @@
         </div>
         <div class="panel-body">
           <div class="panel-top">
-            <img :src="selectedCard.image || selectedCard.images?.large || selectedCard.images?.small" class="panel-card-img" draggable="false" />
+            <img :src="selectedCard.image || selectedCard.images?.large || selectedCard.images?.small" class="panel-card-img" draggable="false" @error="$event.target.style.display='none'" />
             <div class="panel-card-info">
               <div class="panel-card-set">{{ selectedCard.set }} · #{{ selectedCard.number }}</div>
               <div class="panel-card-rarity">{{ selectedCard.rarity }}</div>
