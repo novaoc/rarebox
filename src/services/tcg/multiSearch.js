@@ -267,10 +267,30 @@ export async function searchRiftboundBySet(name, setCode) {
 
 const PC_BASE = 'https://www.pricecharting.com/search-products'
 
+// Keywords that indicate a product is sealed (not a single card)
+const SEALED_HINTS = [
+  'booster box', 'booster bundle', 'elite trainer', 'booster pack', 'box set',
+  ' box', 'case', ' pack', ' tin', 'collection', 'bundle', 'display', 'blister',
+  'starter deck', 'theme deck', 'gift set', 'premium', 'deck', 'trove',
+  'build & battle', 'battle deck', 'fat pack',
+]
+function isSealed(name) {
+  const n = (name || '').toLowerCase()
+  return SEALED_HINTS.some(h => n.includes(h))
+}
+
+// Accessories to skip in sealed search results
+const SKIP_ACCESSORIES = ['sleeve', 'portfolio', 'binder', 'dice', 'coin', 'playmat']
+
 async function searchSealed(query) {
   const url = `${PC_BASE}?type=prices&q=${encodeURIComponent(query)}`
   const d = await fetchJson(url)
-  const products = (d.products || []).filter(p => !/#\d/.test(p.productName || ''))
+  const products = (d.products || []).filter(p => {
+    const name = p.productName || ''
+    if (/#\d/.test(name)) return false // skip singles with collector numbers
+    if (SKIP_ACCESSORIES.some(s => name.toLowerCase().includes(s))) return false
+    return isSealed(name)
+  })
   return {
     cards: products.map(p => ({
       id: p.id || '',
