@@ -4,7 +4,7 @@
 
 # Rarebox
 
-Track your TCG collection across Pokémon, Magic, Lorcana, One Piece, and Riftbound — cards, sealed products, and graded slabs — with live prices and portfolio charts.
+Track your TCG collection across Pokémon, Magic: The Gathering, Disney Lorcana, One Piece Card Game, Yu-Gi-Oh!, and Riftbound — cards, sealed products, and graded slabs — with live prices, portfolio charts, and a trade analyzer.
 
 **Live at [rarebox.io](https://rarebox.io)** · **Docs at [docs.rarebox.io](https://docs.rarebox.io)**
 
@@ -13,13 +13,14 @@ Built by [Nova](https://github.com/novaoc).
 ## Features
 
 ### Collection Management
-- Add cards by searching any set — live results with card images and prices
-- Multi-TCG search — search across Pokémon, Magic, Lorcana, One Piece, and Riftbound in one box with TCG filter pills
-- Add sealed products (booster boxes, ETBs, tins) — prices and images from PriceCharting
-- Add graded slabs (PSA / BGS / CGC) — grade-specific pricing, available for all TCGs
+- Add cards by searching any set — live results with card images and prices from each TCG's API
+- Common search bar with TCG filter pills — search all 6 games simultaneously
+- Add sealed products (booster boxes, ETBs, tins, packs) — prices and images from PriceCharting
+- Add graded slabs (PSA / BGS / CGC / ACE) — grade-specific pricing and multipliers, available for all TCGs
 - Bulk import — paste a PTCGL/PTCGO deck list and add all cards at once
 - Multiple named portfolios, each with a color and their own value chart
-- Combined dashboard showing total collection value, cost basis, and gain/loss
+- Combined dashboard showing total collection value, cost basis, and gain/loss across all portfolios
+- Add an entire set to a portfolio in one click from any Browse Sets view
 
 ### Browse Sets (Multi-TCG)
 - Landing page with branded tiles for each TCG — tap to explore
@@ -27,35 +28,73 @@ Built by [Nova](https://github.com/novaoc).
 - **Magic: The Gathering** — every English set via Scryfall, USD prices, set symbol icons
 - **Disney Lorcana** — all sets via Lorcast, USD prices, branded set badges
 - **One Piece Card Game** — 20 English sets, 3300+ cards via optcgapi, USD market prices
-- **Riftbound (League of Legends TCG)** — 7 sets, 1000+ cards via riftcodex.com, card images from Riot CDN
+- **Yu-Gi-Oh!** — all sets via YGOPRODeck, TCGPlayer market prices
+- **Riftbound (League of Legends TCG)** — 7 sets, 1000+ cards via riftcodex.com, card images from Riot CDN, PriceCharting prices
 - Click any set → full card grid with card images → "+ Add" opens the add modal pre-filled
 
+### Card Database (Client-Side Index)
+- On first visit, selects which TCGs to track
+- Preloads all card data into IndexedDB in the background — 0 API calls on subsequent searches
+- Floating progress pill shows per-game status, ETA, and overall completion
+- Interrupted preloads resume silently on refresh
+- Search works immediately — uncached TCGs fall back to live APIs
+
+### Search
+- Unified search across all 6 TCGs — one input, live results, filter by game
+- Cached TCGs searched instantly from local IndexedDB
+- Uncached TCGs searched via live API with automatic fan-out and result merging
+- Results sorted by relevance: exact name → prefix → alphabetical
+- Sealed product search via PriceCharting — keyword-filtered for boosters, ETBs, tins, etc.
+
+### Price Alerts
+- Set "notify when price goes above/below $X" on any card
+- Alerts fire via the browser Notification API when prices cross thresholds
+- Manage active and triggered alerts from Settings
+- All alerts stored locally — no server
+
 ### Deck Builder
-- Create multiple named decks, add cards by search
+- Create multiple named decks per TCG, add cards by search
 - Track deck cost, ownership status (Need / Owned / ✓ Owned)
-- Compare decks against your collection — shows which cards you already own
-- Import current meta decks with one click
+- Compare deck cards against your collection — shows which cards you already own
+- Import current meta decks with one click — supports all 6 TCGs
+- Refresh prices on any deck with one tap
 
 ### Live Meta Decks
-- Auto-fetches current tournament meta from Limitless TCG
-- Shows top 8 competitive decks ranked by meta share and CP
-- Core cards resolved server-side with exact card match (set code + number)
-- Market prices from TCGPlayer for every card
-- Cached for 24h — instant on repeat visits
-- Updates automatically as tournament results shift
+- Auto-fetches current tournament meta from each TCG's competitive scene:
+  - **Pokémon** — Limitless TCG
+  - **Magic** — mtgtop8.com
+  - **Lorcana** — inkdecks.com
+  - **One Piece** — optcg.one
+  - **Riftbound** — RiftDecks.com
+  - **Yu-Gi-Oh!** — ygoprodeck.com
+- Shows top 10 competitive decks ranked by meta share
+- Cards resolved server-side with exact card match (set code + number)
+- Market prices from TCGPlayer / PriceCharting for every card
+- Cached for 24h with version-based invalidation — instant on repeat visits
+
+### Trade Analyzer
+- Side-by-side trade comparison — add cards to Side A and Side B via search or camera scan
+- Live price delta with winning/losing/even label
+- Grading multiplier applied per card (PSA 10 = 2x, etc.)
+- Persistent trade state across sessions (IndexedDB)
+- Camera scan integration — OCR via Tesseract.js extracts card names from photos
 
 ### Pricing & Charts
-- Live card prices from pokemontcg.io, Scryfall, Lorcast, and optcgapi
-- Sealed/graded prices from PriceCharting
-- Price history charts back to November 2022 (7D / 1M / 6M / 1Y / 3Y ranges)
+- Live card prices from pokemontcg.io, Scryfall, Lorcast, optcgapi, YGOPRODeck, riftcodex.com, and PriceCharting
+- Per-type price staleness tracking — cards refreshed every 24h, sealed/graded every 12h
+- Price history charts (7D / 1M / 6M / 1Y / 3Y ranges) from multiple historical data sources
 - Portfolio value-over-time chart with daily price snapshots (3 years retained)
+- Graded-grade multipliers for price estimation
 
-### Export & Backup
-- Export individual portfolios to Excel (summary + items sheets)
+### Export, Import & Backup
+- Export individual portfolios to Excel (.xlsx) with summary + items sheets
 - Export all portfolios to a single Excel file
 - Backup entire collection as JSON — download and restore on any device
-- Transfer to device — gzip-compressed QR code or clipboard copy/paste for moving collections between devices
+- **Collectr import** — import CSV or Excel exports from the Collectr app (maps game names, variants, grading, sealed products)
+- **Transfer to device** — gzip-compressed QR code or clipboard copy/paste for moving collections between devices
 - Stale data cleanup — deleted cards don't linger in snapshots or backups
+- Storage usage display in Settings — shows combined IndexedDB + localStorage usage via `navigator.storage.estimate()`
+- **Reset Everything** — clears all portfolios, card cache, and stored data with a single button
 
 ### Mobile
 - Touch-friendly card grids with persistent overlay buttons on touch devices
@@ -64,7 +103,8 @@ Built by [Nova](https://github.com/novaoc).
 
 ### PWA — Add to Home Screen
 - Installable as a standalone app on Android and iOS
-- Auto-detects platform and shows relevant install option
+- Auto-detects platform and shows relevant install prompt
+- Full offline support for cached data
 
 ### SEO
 - Clean URLs, per-route page titles, dynamic OG tags
@@ -76,7 +116,6 @@ Built by [Nova](https://github.com/novaoc).
 - Automatic migration from localStorage for existing users
 - Debounced writes with crash-safe flush (beforeunload)
 - Price data fetched directly from public APIs in the browser
-- Price alerts — set thresholds on cards, get browser notifications when prices cross them
 - Per-type price staleness tracking — cards (24h), sealed/graded (12h)
 - Terms & Conditions page with full Privacy Policy at [/terms](https://rarebox.io/terms)
 - Vercel Analytics and Speed Insights for anonymized usage metrics (page views, Core Web Vitals — no cookies, no cross-site tracking)
@@ -89,6 +128,7 @@ Built by [Nova](https://github.com/novaoc).
 
 ## Performance
 
+- Card database preloaded into IndexedDB — instant search with zero API calls for cached TCGs
 - Set data cached in localStorage for 24h — instant load on return visits
 - Multi-TCG API responses cached in memory (1h sets, 10min cards)
 - pokemontcg.io responses trimmed with `select=` — 50-60% smaller payloads
@@ -97,8 +137,10 @@ Built by [Nova](https://github.com/novaoc).
 - Daily price snapshots use cached prices only — zero API calls
 - API calls batched — max 3-5 concurrent requests (no burst scraping)
 - Retry with backoff on transient errors (429, 5xx, timeout) — 2 retries, 1s/2s delays
-- 15s timeout on all external fetches (no hanging requests)
+- 8s timeout on all external fetches (no hanging requests)
 - Abort-on-unmount for in-flight API calls (no stale state updates)
+- Two-phase preloader: sets first (~2s), then cards progressively per TCG
+- Failed TCGs get 2 retries with exponential backoff
 
 ## Stack
 
@@ -108,12 +150,14 @@ Built by [Nova](https://github.com/novaoc).
 - ApexCharts (price/portfolio charts)
 - Vue Router (navigation)
 - XLSX (Excel export)
+- Tesseract.js (OCR for camera scan)
 - pokemontcg.io API (Pokémon card data + live prices)
 - tcgdex API (Japanese sets/cards, price history Nov 2022+)
 - Scryfall API (Magic sets/cards/prices, set symbol icons)
 - Lorcast API (Lorcana sets/cards/prices)
 - optcgapi API (One Piece sets/cards/market prices)
-- riftcodex.com API (Riftbound sets/cards/images, CORS open)
+- YGOPRODeck API (Yu-Gi-Oh! sets/cards/prices)
+- riftcodex.com API (Riftbound sets/cards/images)
 - PriceCharting JSON API (sealed + graded prices for all TCGs)
 - Pokellector CDN (Japanese set logos)
 - Vercel (hosting + analytics)
@@ -128,7 +172,7 @@ Built by [Nova](https://github.com/novaoc).
 - `/sets/:game` → `TcgSetsView.vue` — generic sets grid → cards grid (card images, live prices). Card "+ Add" opens `AddItemModal` via its `tcgCard` prop (pre-filled, game-tagged).
 
 **Search** — `src/services/tcg/multiSearch.js`
-Fans out to all TCG APIs in parallel, normalizes results to a common shape, sorts by name relevance, and paginates. TCG filter pills let users narrow results per game.
+Fans out to all TCG APIs in parallel, normalizes results to a common shape, sorts by name relevance, and paginates. When a TCG's data is cached in IndexedDB, searches that TCG locally instead of hitting the live API.
 
 **Data layer** — `src/services/tcg/providers.js`
 Each game is normalized to a uniform interface:
@@ -146,14 +190,18 @@ getSetCards(id)  -> [{ id, name, number, image, price, rarity }]
 | Magic | Scryfall (CORS `*`) | ✅ sets, cards, USD prices, set symbol icons |
 | Lorcana | Lorcast (CORS `*`) | ✅ sets, cards, USD prices |
 | One Piece | optcgapi (CORS allowed) | ✅ 20 sets, 3300+ cards, USD market prices |
-| Riftbound | riftcodex.com (CORS `*`) | ✅ 7 sets, 1000+ cards, images from Riot CDN |
+| Yu-Gi-Oh! | YGOPRODeck (CORS `*`) | ✅ all sets, 13000+ cards, TCGPlayer prices |
+| Riftbound | riftcodex.com (CORS `*`) | ✅ 7 sets, 1000+ cards, images from Riot CDN, PriceCharting prices |
 
 **To add a TCG:** add a provider object (`getSets`/`getSetCards`) to
 `providers.js`, register it in `PROVIDERS`, and add a `TCGS` entry with
-`available:true` + `route:'/sets/<id>'`. No view changes needed.
+`available:true` + `route:'/sets/<id>'`. Optionally add a preloader in
+`cardPreloader.js`, an API endpoint in `multiSearch.js`, and a resolver in
+`resolveCard()`. No view changes needed.
 
 ## Releases
 
+- **[WIP v1.3.0](https://github.com/novaoc/rarebox/compare/v1.2.0...main)** — Yu-Gi-Oh! support (sets, cards, search, meta decks). Trade Analyzer (side-by-side comparison, camera scan). Collectr import (CSV/XLSX). Card database preloader with progress indicator. Price alerts with browser notifications. Entire set add to portfolio. Sealed product search improvements. Graded card multipliers. Storage usage display. Reset clears card cache. Navigation and transition fixes.
 - **[v1.2.0](https://github.com/novaoc/rarebox/releases/tag/v1.2.0)** — Riftbound TCG via riftcodex.com (7 sets, 1000+ cards, card images). Sealed products for all TCGs. Graded cards for all TCGs. Type filtering fix.
 - **[v1.1.0](https://github.com/novaoc/rarebox/releases/tag/v1.1.0)** — Multi-TCG Browse & Search: Magic (Scryfall), Lorcana (Lorcast), One Piece (optcgapi) with live prices. Unified search across all TCGs. Graded cards for all TCGs. Brand logos. API caching + abort-on-unmount.
 - **[v1.0.1](https://github.com/novaoc/rarebox/releases/tag/v1.0.1)** — Critical fix: Vue reactive proxies couldn't be serialized to IndexedDB
