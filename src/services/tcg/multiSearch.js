@@ -282,8 +282,9 @@ export async function searchLorcanaBySet(name, setCode) {
       const d = await fetchJson(`https://api.lorcast.com/v0/sets/${matchSet.code}/cards`)
       const cards = d.results || d || []
       const q = name.toLowerCase()
-      const match = cards.find(c => c.name.toLowerCase() === q)
-        || cards.find(c => c.name.toLowerCase().includes(q))
+      const fullName = (c) => c.version ? `${c.name} — ${c.version}` : c.name
+      const match = cards.find(c => fullName(c).toLowerCase() === q)
+        || cards.find(c => fullName(c).toLowerCase().includes(q))
         || null
 
       if (match) {
