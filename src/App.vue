@@ -175,7 +175,7 @@ const router = useRouter()
 
 const sidebarOpen = ref(false)
 const cardLoadIndicator = ref(null)
-const showLoader = ref(!isCardDatabaseReady()) // no flash — correct value from start
+const showLoader = ref(!isCardDatabaseReady() && !getTcgPrefs())
 const showNewPortfolioModal = ref(false)
 const newPortfolioName = ref('')
 const newPortfolioColor = ref('#f5a623')
@@ -256,7 +256,11 @@ onMounted(async () => {
   store.autoSnapshot()
 
   if (!isCardDatabaseReady()) {
-    // First visit: show TCG picker, preload starts after selection
+    if (getTcgPrefs()) {
+      // TCGs already selected but preload didn't finish — resume silently
+      startBackgroundPreload()
+    }
+    // First visit: loader shows (controlled by showLoader ref), preload starts on pick
     return
   }
 
