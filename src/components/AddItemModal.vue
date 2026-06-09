@@ -225,6 +225,7 @@ const visibleTypes = computed(() => {
 })
 // Whether the currently-selected non-Pokémon product is a sealed product.
 const selectedIsSealed = ref(false)
+const selectedProduct = ref(null)
 
 const gradesByCompany = {
   PSA:   ['10', '9', '8', '7', '6', '5', '4', '3', '2', '1'],
@@ -265,22 +266,43 @@ async function doSealedSearch() {
 }
 
 function selectSealed(result) {
+  selectedProduct.value = result
   form.value.name = result.name
   form.value.setName = result.set
   form.value.pcUrl = result.url
   form.value.imageUrl = result.image || ''
+  
   if (result.price) form.value.currentValue = result.price
+  
+  // Update price based on current grade if applicable
+  if (!isPokemon.value && itemType.value === 'graded') {
+    updateNonPokemonGradedPrice()
+  }
+
   // Pokémon results are always sealed; other TCGs carry an inferred `sealed` flag.
   selectedIsSealed.value = isPokemon.value ? true : (result.sealed !== false)
   sealedResults.value = []
 }
 
 function clearSealed() {
+  selectedProduct.value = null
   form.value.name = ''
   form.value.setName = ''
   form.value.currentValue = null
   form.value.pcUrl = ''
   form.value.imageUrl = ''
+}
+
+function updateNonPokemonGradedPrice() {
+  if (!selectedProduct.value || isPokemon.value || itemType.value !== 'graded') return
+  const p = selectedProduct.value.all_prices || {}
+  const g = String(form.value.grade).toLowerCase()
+  
+  let val = p.ungraded
+  if (g === '10' || g.endsWith('10')) val = p.grade10 || p.grade9 || p.ungraded
+  else if (g.includes('9')) val = p.grade9 || p.ungraded
+  
+  if (val != null) form.value.currentValue = val
 }
 
 const form = ref({
@@ -454,6 +476,13 @@ watch(() => props.card, () => {
     const priority = ['holofoil', '1stEditionHolofoil', 'unlimitedHolofoil', 'reverseHolofoil', 'normal']
     const best = priority.find(k => variants.value.some(v => v.key === k))
     form.value.priceVariant = best || variants.value[0]?.key || ''
+  }
+})
+
+// Watchers for non-Pokémon graded price updates
+watch([() => form.value.grade, () => itemType.value], () => {
+  if (!isPokemon.value && itemType.value === 'graded') {
+    updateNonPokemonGradedPrice()
   }
 })
 </script>
