@@ -94,9 +94,9 @@
       </header>
 
       <main class="main-content">
-        <router-view v-slot="{ Component }">
-          <transition name="fade" mode="out-in" :duration="500">
-            <component :is="Component" />
+        <router-view v-slot="{ Component, route }">
+          <transition name="fade" :duration="300">
+            <component :is="Component" :key="route?.fullPath" />
           </transition>
         </router-view>
         <div class="app-footer">
@@ -159,7 +159,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onErrorCaptured } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { usePortfolioStore } from './stores/portfolio'
 import InstallPrompt from './components/InstallPrompt.vue'
@@ -269,6 +269,13 @@ onMounted(async () => {
 
   // Background preload slow TCGs if not yet cached
   startBackgroundPreload()
+})
+
+// Catch any child component errors so the app doesn't silently break
+onErrorCaptured((err, instance, info) => {
+  console.error('[App] Error captured:', err, info)
+  // Don't suppress — let the error propagate
+  return false
 })
 </script>
 

@@ -337,7 +337,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, onActivated, ref } from 'vue'
 import { usePortfolioStore } from '../stores/portfolio'
 import { getCard, getJapaneseCardDetail, getMarketPrice } from '../services/pokemonApi'
 import PortfolioChart from '../components/PortfolioChart.vue'
@@ -382,6 +382,8 @@ function getPortfolioGainPct(portfolio) {
 
 // Silently refresh prices for all card items on mount (background, no blocking)
 onMounted(async () => {
+  console.log('[Dashboard] onMounted fired, portfolios:', store.portfolios.length, 'items:', store.portfolios.reduce((s, p) => s + p.items.length, 0))
+
   const allCardItems = store.portfolios.flatMap(p =>
     p.items.filter(i => i.type === 'card' && i.cardId).map(i => ({ ...i, portfolioId: p.id }))
   )

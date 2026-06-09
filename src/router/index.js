@@ -28,8 +28,16 @@ router.onError((err) => {
   console.error('Navigation error:', err)
 })
 
+// Log store state on each navigation for diagnostics
+router.beforeEach((to, from) => {
+  if (from.path !== to.path) {
+    console.log(`[nav] ${from.path} → ${to.path}`)
+  }
+})
+
 // Update document title and meta description on navigation
 router.afterEach((to) => {
+  console.log(`[nav] arrived at ${to.path}`)
   const title = to.meta.title || 'Dashboard'
   document.title = `${title} — Rarebox`
 
