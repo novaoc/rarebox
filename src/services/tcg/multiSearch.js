@@ -133,84 +133,59 @@ async function searchOnePiece(query) {
 }
 
 // ── Riftbound: client-side search from riftcodex.com ─────────────────────────
-// Fetches all cards (paginated), fetches prices from PriceCharting per set,
-// merges prices by collector number, searches client-side.
+// Optimized: parallel set fetches, no PriceCharting on bulk load (prices fetched
+// lazily via resolveRiftboundCard). Returns quickly so meta deck import doesn't time out.
 let _riftCards = null
-const PC_RIFTBOUND = 'https://www.pricecharting.com/search-products'
-// Fetch PriceCharting prices for a Riftbound set.
-// Returns { normal: {num→price}, variants: {num→{variant→price}} }
-async function fetchPCPrices(setName) {
-  try {
-    const d = await fetchJson(`${PC_RIFTBOUND}?type=prices&q=${encodeURIComponent('riftbound ' + setName)}`)
-    const products = d.products || []
-    const normal = {}
-    const variants = {}
-    for (const p of products) {
-      const name = p.productName || ''
-      const numMatch = name.match(/#(\d+)/)
-      if (!numMatch || !p.price1) continue
-      const n = numMatch[1]
-      const price = typeof p.price1 === 'string'
-        ? parseFloat(p.price1.replace(/[$,]/g, ''))
-        : p.price1
-      if (!(price > 0)) continue
-      const variantMatch = name.match(/\[([^\]]+)\]/)
-      const variant = variantMatch ? variantMatch[1].toLowerCase() : ''
-      if (variant) {
-        if (!variants[n]) variants[n] = {}
-        variants[n][variant] = price
-      } else {
-        normal[n] = price
-      }
-    }
-    return { normal, variants }
-  } catch { return { normal: {}, variants: {} } }
-}
+let _riftCardsPromise = null
 
 async function getRiftboundCards() {
   if (_riftCards) return _riftCards
-  const all = []
-  const sets = await fetchJson('https://api.riftcodex.com/sets')
-  for (const s of (sets.items || [])) {
-    // Fetch cards from riftcodex
-    let page = 1
-    let total = Infinity
-    const setCards = []
-    while (setCards.length < total && page <= 20) {
-      const d = await fetchJson(`https://api.riftcodex.com/cards?set_id=${encodeURIComponent(s.set_id)}&limit=50&page=${page}`)
-      const items = d.items || []
-      total = d.total || 0
-      for (const c of items) {
-        setCards.push({
-          id: c.id,
-          name: c.name,
-          number: String(c.collector_number || ''),
-          set: c.set?.label || s.name,
-          image: c.media?.image_url || '',
-          price: null,
-          rarity: c.classification?.rarity || '',
-          game: 'riftbound',
-          _raw: c,
-        })
-      }
-      page++
+  if (_riftCardsPromise) return _riftCardsPromise
+
+  _riftCardsPromise = (async () => {
+    try {
+      const setsRes = await fetchJson('https://api.riftcodex.com/sets')
+      const sets = setsRes.items || []
+      if (!sets.length) return []
+
+      // Fetch all sets' cards in parallel
+      const results = await Promise.allSettled(sets.map(async (s) => {
+        const setCards = []
+        let page = 1
+        let total = Infinity
+        while (setCards.length < total && page <= 5) {
+          const d = await fetchJson(
+            `https://api.riftcodex.com/cards?set_id=${encodeURIComponent(s.set_id)}&limit=100&page=${page}`
+          )
+          const items = d.items || []
+          total = d.total || 0
+          for (const c of items) {
+            setCards.push({
+              id: c.id,
+              name: c.name,
+              number: String(c.collector_number || ''),
+              set: c.set?.label || s.name,
+              image: c.media?.image_url || '',
+              price: null,
+              rarity: c.classification?.rarity || '',
+              game: 'riftbound',
+              _raw: c,
+            })
+          }
+          page++
+        }
+        return setCards
+      }))
+
+      _riftCards = results.flatMap(r => r.status === 'fulfilled' ? r.value : [])
+      return _riftCards
+    } catch {
+      _riftCards = []
+      return []
     }
-    // Fetch PriceCharting prices for this set (one request)
-    const priceMap = await fetchPCPrices(s.name)
-    for (const card of setCards) {
-      if (!card.number) continue
-      const variantMatch = card.name.match(/\(([^)]+)\)/)
-      const variant = variantMatch ? variantMatch[1].toLowerCase() : ''
-      if (variant && priceMap.variants[card.number]?.[variant]) {
-        card.price = priceMap.variants[card.number][variant]
-      } else if (priceMap.normal[card.number] != null) {
-        card.price = priceMap.normal[card.number]
-      }
-    }
-    all.push(...setCards)
-  }
-  _riftCards = all
-  return all
+  })()
+
+  return _riftCardsPromise
 }
 
 async function searchRiftbound(query) {
