@@ -11,7 +11,7 @@
             <button class="btn btn-primary btn-sm" @click="saveName">Save</button>
           </div>
         </div>
-        <div class="deck-meta text-muted">{{ deck.cards.length }} unique cards · {{ stats?.totalCards || 0 }} total</div>
+        <div class="deck-meta text-muted"><span class="badge badge-info">{{ gameLabel(deck.game) }}</span> {{ deck.cards.length }} unique cards · {{ stats?.totalCards || 0 }} total</div>
       </div>
       <div class="deck-builder-actions">
         <button
@@ -37,7 +37,7 @@
             <input
               v-model="query"
               class="input search-input"
-              placeholder="Search cards to add..."
+              :placeholder="'Search ' + gameLabel(deck?.game) + ' cards...'"
               @input="onInput"
               @keyup.enter="doSearch"
             />
@@ -60,9 +60,9 @@
             <img :src="card.images?.small" class="search-result-img" loading="lazy" />
             <div class="search-result-info">
               <div class="search-result-name">{{ card.name }}</div>
-              <div class="search-result-set">{{ card.set?.name }} · #{{ card.number }}</div>
+              <div class="search-result-set">{{ card.set }} · #{{ card.number }}</div>
             </div>
-            <div class="search-result-price text-accent" v-if="getPrice(card)">${{ getPrice(card).toFixed(2) }}</div>
+            <div class="search-result-price text-accent" v-if="getPrice(card) != null">${{ getPrice(card).toFixed(2) }}</div>
             <div class="search-result-price text-muted" v-else>—</div>
             <button class="btn btn-primary btn-icon btn-sm add-btn" @click.stop="addCard(card)">+</button>
           </div>
@@ -158,17 +158,22 @@ import { ref, computed, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useDeckStore } from '../stores/decks'
 import { usePortfolioStore } from '../stores/portfolio'
-import { searchCards, getMarketPrice } from '../services/pokemonApi'
+import { multiSearch } from '../services/tcg/multiSearch'
+import { getMarketPrice } from '../services/pokemonApi'
 
 const route = useRoute()
 const router = useRouter()
 const deckStore = useDeckStore()
 const portfolioStore = usePortfolioStore()
 
+const GAME_LABELS = {
+  pokemon: 'Pokémon', mtg: 'MTG', lorcana: 'Lorcana',
+  'one-piece': 'One Piece', riftbound: 'Riftbound', yugioh: 'Yu-Gi-Oh',
+}
+
 const deck = computed(() => deckStore.decks.find(d => d.id === route.params.id))
 const stats = computed(() => deck.value ? deckStore.getDeckStats(deck.value.id) : null)
 
-// Name editing
 const editingName = ref(false)
 const editName = ref('')
 const nameInputRef = ref(null)
@@ -208,7 +213,7 @@ let debounceTimer = null
 
 function onInput() {
   clearTimeout(debounceTimer)
-  if (query.value.length >= 3) {
+  if (query.value.length >= 2) {
     debounceTimer = setTimeout(doSearch, 500)
   }
 }
@@ -218,8 +223,12 @@ async function doSearch() {
   searching.value = true
   searched.value = true
   try {
-    const data = await searchCards(query.value, 1, 20)
-    searchResults.value = data.data || []
+    const result = await multiSearch(query.value, {
+      page: 1,
+      pageSize: 20,
+      providers: [deck.value?.game || 'pokemon'],
+    })
+    searchResults.value = result.cards || []
   } catch {
     searchResults.value = []
   } finally {
@@ -234,6 +243,7 @@ function clearSearch() {
 }
 
 function getPrice(card) {
+  if (card.price != null) return card.price
   const r = getMarketPrice(card)
   return r?.price || null
 }
@@ -246,7 +256,6 @@ function addCard(card) {
 const sortedCards = computed(() => {
   if (!deck.value) return []
   return [...deck.value.cards].sort((a, b) => {
-    // Sort: needed first, then by name
     const aOwned = getOwnedQty(a.cardId) >= a.quantity
     const bOwned = getOwnedQty(b.cardId) >= b.quantity
     if (aOwned !== bOwned) return aOwned ? 1 : -1
@@ -254,7 +263,6 @@ const sortedCards = computed(() => {
   })
 })
 
-// Ownership map — cardId → total quantity owned across all portfolios
 const ownedMap = computed(() => {
   const map = {}
   for (const p of portfolioStore.portfolios) {
@@ -284,6 +292,10 @@ function changeQty(card, delta) {
 
 function removeCard(cardId) {
   deckStore.removeCardFromDeck(deck.value.id, cardId)
+}
+
+function gameLabel(game) {
+  return GAME_LABELS[game] || game
 }
 </script>
 

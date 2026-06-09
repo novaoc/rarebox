@@ -166,84 +166,59 @@ async function searchYugioh(query) {
 }
 
 // ── Riftbound: client-side search from riftcodex.com ─────────────────────────
-// Fetches all cards (paginated), fetches prices from PriceCharting per set,
-// merges prices by collector number, searches client-side.
+// Optimized: parallel set fetches, no PriceCharting on bulk load (prices fetched
+// lazily via resolveRiftboundCard). Returns quickly so meta deck import doesn't time out.
 let _riftCards = null
-const PC_RIFTBOUND = 'https://www.pricecharting.com/search-products'
-// Fetch PriceCharting prices for a Riftbound set.
-// Returns { normal: {num→price}, variants: {num→{variant→price}} }
-async function fetchPCPrices(setName) {
-  try {
-    const d = await fetchJson(`${PC_RIFTBOUND}?type=prices&q=${encodeURIComponent('riftbound ' + setName)}`)
-    const products = d.products || []
-    const normal = {}
-    const variants = {}
-    for (const p of products) {
-      const name = p.productName || ''
-      const numMatch = name.match(/#(\d+)/)
-      if (!numMatch || !p.price1) continue
-      const n = numMatch[1]
-      const price = typeof p.price1 === 'string'
-        ? parseFloat(p.price1.replace(/[$,]/g, ''))
-        : p.price1
-      if (!(price > 0)) continue
-      const variantMatch = name.match(/\[([^\]]+)\]/)
-      const variant = variantMatch ? variantMatch[1].toLowerCase() : ''
-      if (variant) {
-        if (!variants[n]) variants[n] = {}
-        variants[n][variant] = price
-      } else {
-        normal[n] = price
-      }
-    }
-    return { normal, variants }
-  } catch { return { normal: {}, variants: {} } }
-}
+let _riftCardsPromise = null
 
 async function getRiftboundCards() {
   if (_riftCards) return _riftCards
-  const all = []
-  const sets = await fetchJson('https://api.riftcodex.com/sets')
-  for (const s of (sets.items || [])) {
-    // Fetch cards from riftcodex
-    let page = 1
-    let total = Infinity
-    const setCards = []
-    while (setCards.length < total && page <= 20) {
-      const d = await fetchJson(`https://api.riftcodex.com/cards?set_id=${encodeURIComponent(s.set_id)}&limit=50&page=${page}`)
-      const items = d.items || []
-      total = d.total || 0
-      for (const c of items) {
-        setCards.push({
-          id: c.id,
-          name: c.name,
-          number: String(c.collector_number || ''),
-          set: c.set?.label || s.name,
-          image: c.media?.image_url || '',
-          price: null,
-          rarity: c.classification?.rarity || '',
-          game: 'riftbound',
-          _raw: c,
-        })
-      }
-      page++
+  if (_riftCardsPromise) return _riftCardsPromise
+
+  _riftCardsPromise = (async () => {
+    try {
+      const setsRes = await fetchJson('https://api.riftcodex.com/sets')
+      const sets = setsRes.items || []
+      if (!sets.length) return []
+
+      // Fetch all sets' cards in parallel
+      const results = await Promise.allSettled(sets.map(async (s) => {
+        const setCards = []
+        let page = 1
+        let total = Infinity
+        while (setCards.length < total && page <= 5) {
+          const d = await fetchJson(
+            `https://api.riftcodex.com/cards?set_id=${encodeURIComponent(s.set_id)}&limit=100&page=${page}`
+          )
+          const items = d.items || []
+          total = d.total || 0
+          for (const c of items) {
+            setCards.push({
+              id: c.id,
+              name: c.name,
+              number: String(c.collector_number || ''),
+              set: c.set?.label || s.name,
+              image: c.media?.image_url || '',
+              price: null,
+              rarity: c.classification?.rarity || '',
+              game: 'riftbound',
+              _raw: c,
+            })
+          }
+          page++
+        }
+        return setCards
+      }))
+
+      _riftCards = results.flatMap(r => r.status === 'fulfilled' ? r.value : [])
+      return _riftCards
+    } catch {
+      _riftCards = []
+      return []
     }
-    // Fetch PriceCharting prices for this set (one request)
-    const priceMap = await fetchPCPrices(s.name)
-    for (const card of setCards) {
-      if (!card.number) continue
-      const variantMatch = card.name.match(/\(([^)]+)\)/)
-      const variant = variantMatch ? variantMatch[1].toLowerCase() : ''
-      if (variant && priceMap.variants[card.number]?.[variant]) {
-        card.price = priceMap.variants[card.number][variant]
-      } else if (priceMap.normal[card.number] != null) {
-        card.price = priceMap.normal[card.number]
-      }
-    }
-    all.push(...setCards)
-  }
-  _riftCards = all
-  return all
+  })()
+
+  return _riftCardsPromise
 }
 
 async function searchRiftbound(query) {
@@ -255,6 +230,64 @@ async function searchRiftbound(query) {
     (c.set || '').toLowerCase().includes(q)
   ).slice(0, 50)
   return { cards: matches, total: matches.length }
+}
+
+// Fast path for Riftbound: only fetch cards for a specific set by set_id or name.
+// Avoids loading all sets' cards (~10+ HTTP requests). Used by findRegularCard.
+export async function searchRiftboundBySet(name, setCode) {
+  try {
+    const setsRes = await fetchJson('https://api.riftcodex.com/sets')
+    const sets = setsRes.items || []
+
+    // Match by set_id first, then by set name prefix (handles
+    // fallback data using "core" / "spiritforged" labels)
+    const matchSet = sets.find(s => s.set_id?.toLowerCase() === setCode?.toLowerCase())
+      || sets.find(s => s.name?.toLowerCase().startsWith(setCode?.toLowerCase()))
+      || sets.find(s => s.name?.toLowerCase().includes(setCode?.toLowerCase()))
+
+    if (matchSet) {
+      const cards = []
+      let page = 1
+      let total = Infinity
+      while (cards.length < total && page <= 5) {
+        const d = await fetchJson(
+          `https://api.riftcodex.com/cards?set_id=${encodeURIComponent(matchSet.set_id)}&limit=100&page=${page}`
+        )
+        const items = d.items || []
+        total = d.total || 0
+        for (const c of items) {
+          cards.push({
+            id: c.id,
+            name: c.name,
+            number: String(c.collector_number || ''),
+            set: c.set?.label || matchSet.name,
+            image: c.media?.image_url || '',
+            price: null,
+            rarity: c.classification?.rarity || '',
+            game: 'riftbound',
+            _raw: c,
+          })
+        }
+        page++
+      }
+
+      const q = name.toLowerCase()
+      return cards.find(c => c.name.toLowerCase() === q)
+        || cards.find(c => c.name.toLowerCase().includes(q))
+        || cards.find(c => c.number.toLowerCase() === q)
+        || null
+    }
+
+    // No matching set found — fall back to full card load
+    const allCards = await getRiftboundCards()
+    const q = name.toLowerCase()
+    return allCards.find(c => c.name.toLowerCase() === q)
+      || allCards.find(c => c.name.toLowerCase().includes(q))
+      || allCards.find(c => c.number.toLowerCase() === q)
+      || null
+  } catch {
+    return null
+  }
 }
 
 // ── Sealed products: PriceCharting ──────────────────────────────────────────
@@ -278,6 +311,158 @@ async function searchSealed(query) {
     })),
     total: products.length,
   }
+}
+
+// ── Yu-Gi-Oh: YGOPRODeck ────────────────────────────────────────────────────
+async function searchYugioh(query) {
+  const url = `https://db.ygoprodeck.com/api/v7/cardinfo.php?fname=${encodeURIComponent(query)}`
+  const d = await fetchJson(url)
+  const arr = d.data || []
+  return {
+    cards: arr.map(c => {
+      const setInfo = c.card_sets?.[0] || {}
+      return {
+        id: `ygo-${c.id}`,
+        name: c.name,
+        number: setInfo.set_code || `${c.id}`,
+        set: setInfo.set_name || c.archetype || '',
+        image: c.card_images?.[0]?.image_url_small || '',
+        price: num(c.card_prices?.[0]?.tcgplayer_price) || num(c.card_prices?.[0]?.cardmarket_price),
+        rarity: setInfo.set_rarity || '',
+        game: 'yugioh',
+        _raw: c,
+      }
+    }),
+    total: arr.length,
+  }
+}
+
+// ── Card resolve (for deck price refresh) ─────────────────────────────────────
+
+async function resolvePokemonCard(cardId) {
+  const url = `https://api.pokemontcg.io/v2/cards/${cardId}`
+  const d = await fetchJson(url)
+  if (!d.data) return null
+  return {
+    id: d.data.id,
+    name: d.data.name,
+    number: d.data.number || '',
+    set: d.data.set?.name || '',
+    image: d.data.images?.small || '',
+    price: extractPokemonPrice(d.data),
+    rarity: d.data.rarity || '',
+    game: 'pokemon',
+    _raw: d.data,
+  }
+}
+
+async function resolveMtgCard(cardId) {
+  const url = `https://api.scryfall.com/cards/${cardId}`
+  const d = await fetchJson(url)
+  const imgs = d.image_uris || d.card_faces?.[0]?.image_uris || {}
+  return {
+    id: d.id,
+    name: d.name,
+    number: d.collector_number || '',
+    set: d.set_name || '',
+    image: imgs.small || '',
+    price: num(d.prices?.usd) || num(d.prices?.usd_foil),
+    rarity: d.rarity || '',
+    game: 'mtg',
+    _raw: d,
+  }
+}
+
+async function resolveYugiohCard(cardId) {
+  const id = cardId.replace('ygo-', '')
+  const url = `https://db.ygoprodeck.com/api/v7/cardinfo.php?id=${id}`
+  const d = await fetchJson(url)
+  const c = d.data?.[0]
+  if (!c) return null
+  const setInfo = c.card_sets?.[0] || {}
+  return {
+    id: cardId,
+    name: c.name,
+    number: setInfo.set_code || `${c.id}`,
+    set: setInfo.set_name || c.archetype || '',
+    image: c.card_images?.[0]?.image_url_small || '',
+    price: num(c.card_prices?.[0]?.tcgplayer_price) || num(c.card_prices?.[0]?.cardmarket_price),
+    rarity: setInfo.set_rarity || '',
+    game: 'yugioh',
+    _raw: c,
+  }
+}
+
+async function resolveLorcanaCard(cardId) {
+  const url = `https://api.lorcast.com/v0/cards/${cardId}`
+  const d = await fetchJson(url)
+  if (!d) return null
+  const img = d.image_uris?.digital || {}
+  return {
+    id: d.id,
+    name: d.name,
+    number: d.collector_number || '',
+    set: d.set_name || d.set_code || '',
+    image: img.small || '',
+    price: num(d.prices?.usd) || num(d.prices?.usd_foil),
+    rarity: d.rarity || '',
+    game: 'lorcana',
+    _raw: d,
+  }
+}
+
+async function resolveOnePieceCard(cardId) {
+  const cards = await getOptCards()
+  const c = cards.find(x => x.card_set_id === cardId)
+  if (!c) return null
+  return {
+    id: c.card_set_id,
+    name: c.card_name,
+    number: c.card_set_id,
+    set: c.set_name || '',
+    image: c.card_image || '',
+    price: c.market_price || c.inventory_price || null,
+    rarity: c.rarity || '',
+    game: 'one-piece',
+    _raw: c,
+  }
+}
+
+async function resolveRiftboundCard(cardId) {
+  const url = `https://api.riftcodex.com/cards/${cardId}`
+  try {
+    const d = await fetchJson(url)
+    if (!d) return null
+    return {
+      id: d.id,
+      name: d.name,
+      number: String(d.collector_number || ''),
+      set: d.set?.label || '',
+      image: d.media?.image_url || '',
+      price: null,
+      rarity: d.classification?.rarity || '',
+      game: 'riftbound',
+      _raw: d,
+    }
+  } catch {
+    // Fallback: search by name via getRiftboundCards cache
+    const cards = await getRiftboundCards()
+    const match = cards.find(c => c.id === cardId || c.name.toLowerCase() === cardId.toLowerCase())
+    return match || null
+  }
+}
+
+// Resolve a card by ID for deck price refresh — routes to the correct API
+export async function resolveCard(cardId, game) {
+  try {
+    if (game === 'pokemon') return await resolvePokemonCard(cardId)
+    if (game === 'mtg') return await resolveMtgCard(cardId)
+    if (game === 'yugioh') return await resolveYugiohCard(cardId)
+    if (game === 'lorcana') return await resolveLorcanaCard(cardId)
+    if (game === 'one-piece') return await resolveOnePieceCard(cardId)
+    if (game === 'riftbound') return await resolveRiftboundCard(cardId)
+    return null
+  } catch { return null }
 }
 
 // ── Main search ─────────────────────────────────────────────────────────────

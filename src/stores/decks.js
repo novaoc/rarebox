@@ -1,7 +1,8 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { usePortfolioStore } from './portfolio'
-import { getMarketPrice, getCard, searchCards } from '../services/pokemonApi'
+import { getMarketPrice } from '../services/pokemonApi'
+import { multiSearch, resolveCard, searchRiftboundBySet } from '../services/tcg/multiSearch'
 
 const STORAGE_KEY = 'rarebox_decks'
 
@@ -29,11 +30,12 @@ export const useDeckStore = defineStore('decks', () => {
 
   // ── CRUD ──────────────────────────────────────────────────────────────
 
-  function createDeck(name) {
+  function createDeck(name, game = 'pokemon') {
     const deck = {
       id: generateId(),
       name,
-      cards: [], // [{ cardId, name, setName, setCode, number, quantity, price, image }]
+      game,
+      cards: [],
       createdAt: new Date().toISOString(),
     }
     decks.value.push(deck)
@@ -63,16 +65,23 @@ export const useDeckStore = defineStore('decks', () => {
     if (existing) {
       existing.quantity += quantity
     } else {
-      const result = getMarketPrice(card)
+      const rawSet = card.set
+      const setName = typeof rawSet === 'object' ? (rawSet?.name || '') : (rawSet || '')
+      const setCode = typeof rawSet === 'object' ? (rawSet?.id || '') : ''
+      const price = card.price != null ? card.price : (getMarketPrice(card)?.price || null)
+      const image = card.image || card.images?.small || ''
+      const game = card.game || deck.game || 'pokemon'
+
       deck.cards.push({
         cardId: card.id,
         name: card.name,
-        setName: card.set?.name || '',
-        setCode: card.set?.id || '',
+        setName,
+        setCode,
         number: card.number || '',
         quantity,
-        price: result?.price || null,
-        image: card.images?.small || '',
+        price,
+        image,
+        game,
       })
     }
     persist()
@@ -95,6 +104,7 @@ export const useDeckStore = defineStore('decks', () => {
         quantity: cardData.quantity || 1,
         price: cardData.price || null,
         image: cardData.image || '',
+        game: cardData.game || deck.game || 'pokemon',
       })
     }
     persist()
@@ -126,7 +136,6 @@ export const useDeckStore = defineStore('decks', () => {
     if (!deck) return null
 
     const portfolioStore = usePortfolioStore()
-    // Build a map of cardId → total quantity owned across all portfolios
     const ownedMap = {}
     for (const p of portfolioStore.portfolios) {
       for (const item of p.items) {
@@ -149,7 +158,7 @@ export const useDeckStore = defineStore('decks', () => {
       totalCards += needed
       ownedCards += owned
       neededCards += stillNeeded
-      totalCost += (card.price || 0) * stillNeeded // only count cost of cards we don't own
+      totalCost += (card.price || 0) * stillNeeded
     }
 
     return {
@@ -164,41 +173,50 @@ export const useDeckStore = defineStore('decks', () => {
 
   // ── Import from meta deck data ────────────────────────────────────────
 
-  // Find the regular (cheapest) printing of a card in a set
-  async function findRegularCard(name, setCode) {
-    const result = await searchCards(`${name}`, 1, 50)
-    if (!result?.data?.length) return null
-
-    // Filter to cards in the right set
-    const inSet = result.data.filter(c => c.set?.id === setCode)
-    const candidates = inSet.length > 0 ? inSet : result.data
-
-    // Sort: prefer lower card numbers (regular prints before alt arts)
-    // and prefer commoner rarities
-    const rarityOrder = {
-      'Common': 0, 'Uncommon': 1, 'Rare': 2, 'Rare Holo': 3,
-      'Double Rare': 4, 'Ultra Rare': 5, 'Illustration Rare': 6,
-      'Special Illustration Rare': 7, 'Hyper Rare': 8, 'Secret Rare': 9,
+  async function findRegularCard(name, setCode, game = 'pokemon') {
+    // Riftbound fast path: only fetch one set's cards instead of all sets
+    if (game === 'riftbound') {
+      return await searchRiftboundBySet(name, setCode)
     }
 
-    candidates.sort((a, b) => {
-      const numA = parseInt(a.number) || 999
-      const numB = parseInt(b.number) || 999
-      // If both numbers are low (< 200), sort by rarity
-      if (numA < 200 && numB < 200) {
-        return (rarityOrder[a.rarity] ?? 5) - (rarityOrder[b.rarity] ?? 5)
+    const result = await multiSearch(name, { page: 1, pageSize: 50, providers: [game] })
+    if (!result?.cards?.length) return null
+
+    const q = (setCode || '').toLowerCase()
+
+    const matches = result.cards.filter(c => {
+      if (game === 'pokemon') {
+        if (c.id && c.id.startsWith(q.replace(/[^a-z0-9]/g, ''))) return true
       }
-      // Otherwise prefer lower number
-      return numA - numB
+      if (game === 'mtg') {
+        if (c._raw?.set?.toLowerCase() === q) return true
+      }
+      if (game === 'lorcana') {
+        if (c._raw?.set_code?.toLowerCase() === q) return true
+        if (c._raw?.set_name?.toLowerCase().includes(q)) return true
+      }
+      if (game === 'one-piece') {
+        if (c.id && c.id.startsWith(q)) return true
+      }
+      if (game === 'riftbound') {
+        if (c._raw?.set?.set_id?.toLowerCase() === q) return true
+        if ((c.set || '').toLowerCase().includes(q)) return true
+      }
+      if (game === 'yugioh') {
+        if (c.number && c.number.toLowerCase().startsWith(q)) return true
+      }
+      return false
     })
 
-    return candidates[0]
+    const candidates = matches.length > 0 ? matches : result.cards
+    candidates.sort((a, b) => (a.price ?? 999) - (b.price ?? 999))
+
+    return candidates[0] || null
   }
 
   async function importMetaDeck(metaDeck) {
-    const deck = createDeck(metaDeck.name)
+    const deck = createDeck(metaDeck.name, metaDeck.game || 'pokemon')
     const promises = metaDeck.cards.map(async (card) => {
-      // Live cards already have cardId, image, price — use directly
       if (card.cardId) {
         addCardRaw(deck.id, {
           cardId: card.cardId,
@@ -209,38 +227,49 @@ export const useDeckStore = defineStore('decks', () => {
           quantity: card.quantity,
           price: card.price || null,
           image: card.image || '',
+          game: card.game || metaDeck.game || 'pokemon',
         })
         return
       }
 
-      // Fallback cards: resolve by name+set
       let fullCard = null
       try {
-        fullCard = await findRegularCard(card.name, card.setCode)
+        fullCard = await findRegularCard(card.name, card.setCode, metaDeck.game || 'pokemon')
       } catch {}
 
       if (fullCard) {
-        const result = getMarketPrice(fullCard)
         addCardRaw(deck.id, {
           cardId: fullCard.id,
           name: card.name,
-          setName: fullCard.set?.name || card.setName || '',
-          setCode: fullCard.set?.id || card.setCode || '',
+          setName: fullCard.set || card.setName || '',
+          setCode: card.setCode || '',
           number: fullCard.number || '',
           quantity: card.quantity,
-          price: result?.price || result || null,
-          image: fullCard.images?.small || '',
+          price: fullCard.price ?? null,
+          image: fullCard.image || '',
+          game: metaDeck.game || 'pokemon',
         })
       } else {
+        const game = metaDeck.game || 'pokemon'
+        // Build a meaningful cardId fallback per TCG
+        let fallbackId = `${card.setCode || ''}-${card.name}`
+        if (game === 'pokemon' && card.number) {
+          fallbackId = `${(card.setCode || '').toLowerCase()}-${card.number}`
+        } else if (game === 'one-piece' && card.number) {
+          fallbackId = `${card.setCode}-${card.number}`
+        } else if (game === 'yugioh' && card.number) {
+          fallbackId = `ygo-${card.number}`
+        }
         addCardRaw(deck.id, {
-          cardId: `${card.setCode}-${card.name}`,
+          cardId: fallbackId,
           name: card.name,
           setName: card.setName || '',
           setCode: card.setCode || '',
-          number: '',
+          number: card.number || '',
           quantity: card.quantity,
           price: null,
           image: '',
+          game,
         })
       }
     })
@@ -252,11 +281,10 @@ export const useDeckStore = defineStore('decks', () => {
     const deck = decks.value.find(d => d.id === deckId)
     if (!deck) return
     const promises = deck.cards.map(async (card) => {
-      if (card.price) return // skip cards that already have prices
+      if (card.price) return
       try {
-        const fullCard = await getCard(card.cardId)
-        const result = getMarketPrice(fullCard)
-        card.price = result?.price || result || null
+        const fullCard = await resolveCard(card.cardId, card.game)
+        if (fullCard?.price != null) card.price = fullCard.price
       } catch {}
     })
     await Promise.allSettled(promises)
