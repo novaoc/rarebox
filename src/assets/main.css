@@ -40,18 +40,25 @@ html, body, #app {
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   -webkit-tap-highlight-color: transparent;
-  touch-action: manipulation;
-  /* Lock down overscroll app-wide to prevent body rubber-banding */
-  overscroll-behavior: none;
-  overflow: hidden;
+  touch-action: pan-y;
+  overscroll-behavior-x: none;
+  overscroll-behavior-y: contain;
+}
+
+/* Locked layout containers */
+.app-layout, .main-wrapper, .dashboard, .portfolio-view {
+  touch-action: pan-y;
+  user-select: none;
+  -webkit-user-drag: none;
 }
 
 /* Prevent iOS drag/select/callout on all interactive elements */
 img, button, a, .card-result, .set-card, .card-img-wrap, .set-logo-wrap,
-.card-detail-panel, .bottom-sheet, .card-overlay, .card-img-placeholder {
+.card-detail-panel, .bottom-sheet, .card-overlay, .card-img-placeholder, .modal {
   -webkit-user-drag: none;
   -webkit-touch-callout: none;
   user-select: none;
+  touch-action: manipulation;
 }
 
 /* Scrollbars */
@@ -174,7 +181,7 @@ a:hover { text-decoration: underline; }
   z-index: 1000;
   padding: 20px;
   backdrop-filter: blur(4px);
-  touch-action: none; /* Disable all gestures on overlay */
+  touch-action: none;
 }
 .modal {
   background: var(--bg-secondary);
@@ -183,9 +190,10 @@ a:hover { text-decoration: underline; }
   width: 100%;
   max-width: 560px;
   max-height: 90vh;
-  overflow: hidden; /* Manage scrolling in modal-body */
+  overflow-y: auto;
   box-shadow: var(--shadow);
-  touch-action: pan-y; /* Allow only vertical scroll inside */
+  touch-action: pan-y;
+  overscroll-behavior: contain;
 }
 .modal-header {
   display: flex;
@@ -195,7 +203,7 @@ a:hover { text-decoration: underline; }
   margin-bottom: 20px;
 }
 .modal-header h3 { font-size: 16px; font-weight: 600; }
-.modal-body { padding: 0 24px; overflow-y: auto; }
+.modal-body { padding: 0 24px; }
 .modal-footer {
   display: flex;
   align-items: center;
@@ -371,7 +379,7 @@ a:hover { text-decoration: underline; }
   .grid-4 { grid-template-columns: 1fr 1fr; }
 
   /* Modal full-width on phones */
-  .modal-overlay { padding: 12px; align-items: flex-end; }
+  .modal-overlay { padding: 0; align-items: flex-end; }
   .modal { max-height: 95vh; border-radius: var(--radius-lg) var(--radius-lg) 0 0; }
 
   /* Cards tighter padding */
