@@ -4,6 +4,7 @@
 
 const CACHE_KEY = 'rarebox_meta_decks_cache'
 const CACHE_TTL = 1000 * 60 * 60 * 24 // 24 hours
+const CACHE_VERSION = 2 // bump to invalidate stale fallback data
 
 function getCacheKey(game) {
   return `${CACHE_KEY}_${game || 'pokemon'}`
@@ -15,7 +16,7 @@ export async function fetchLiveMetaDecks(game = 'pokemon') {
   // Check cache first
   try {
     const cached = JSON.parse(localStorage.getItem(cacheKey))
-    if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+    if (cached && cached.version === CACHE_VERSION && Date.now() - cached.timestamp < CACHE_TTL) {
       return cached.decks
     }
   } catch {}
@@ -38,10 +39,18 @@ export async function fetchLiveMetaDecks(game = 'pokemon') {
   const extras = fallback.filter(d => !existingNames.has(d.archetype || d.name))
   const merged = [...validServer, ...extras].slice(0, 10)
 
-  localStorage.setItem(cacheKey, JSON.stringify({
-    timestamp: Date.now(),
-    decks: merged,
-  }))
+  // Don't cache fallback-only data — it gets stale and prevents
+  // users from seeing deck data updates until 24h expire.
+  if (validServer.length > 0) {
+    localStorage.setItem(cacheKey, JSON.stringify({
+      version: CACHE_VERSION,
+      timestamp: Date.now(),
+      decks: merged,
+    }))
+  } else {
+    // No server data — remove any stale cache so fallback updates take effect immediately
+    try { localStorage.removeItem(cacheKey) } catch {}
+  }
   return merged
 }
 
