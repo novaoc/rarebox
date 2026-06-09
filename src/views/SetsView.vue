@@ -327,6 +327,7 @@
 
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
+import { tokenMatch } from '../utils/search.js'
 import { getSets, getCardsBySet, getMarketPrice, formatVariantLabel, getJapaneseSets, getJapaneseCardsBySet, getJapaneseCardDetail } from '../services/pokemonApi'
 import { usePortfolioStore } from '../stores/portfolio'
 import PriceChart from '../components/PriceChart.vue'
@@ -401,14 +402,14 @@ const filteredSets = computed(() => {
   const q = setFilter.value.toLowerCase()
   if (!q) return sets.value
   return sets.value.filter(s =>
-    s.name.toLowerCase().includes(q) || s.series?.toLowerCase().includes(q)
+    tokenMatch(q, s.name, s.series)
   )
 })
 
 const filteredCards = computed(() => {
   const q = cardFilter.value.toLowerCase()
   if (!q) return cards.value
-  return cards.value.filter(c => c.name.toLowerCase().includes(q))
+  return cards.value.filter(c => tokenMatch(q, c.name, c.number))
 })
 
 async function loadSets() {

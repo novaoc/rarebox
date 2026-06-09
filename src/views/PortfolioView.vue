@@ -432,6 +432,7 @@
 
 <script setup>
 import { ref, computed, watch, nextTick, onMounted, reactive } from 'vue'
+import { tokenMatch } from '../utils/search.js'
 import { useRoute, useRouter } from 'vue-router'
 import { usePortfolioStore } from '../stores/portfolio'
 import { exportPortfolioToExcel } from '../utils/excel'
@@ -547,7 +548,7 @@ const filteredItems = computed(() => {
   if (activeFilter.value !== 'all') items = items.filter(i => i.type === activeFilter.value)
   if (itemSearch.value) {
     const q = itemSearch.value.toLowerCase()
-    items = items.filter(i => getItemName(i).toLowerCase().includes(q) || getItemSub(i).toLowerCase().includes(q))
+    items = items.filter(i => tokenMatch(q, getItemName(i), getItemSub(i)))
   }
   return items
 })

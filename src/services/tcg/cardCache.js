@@ -7,6 +7,7 @@
  * - searchCache() filters the in-memory index (no IDB queries per search)
  */
 import db from '../../db.js'
+import { tokenMatch } from '../../utils/search.js'
 
 // ── Schema ──────────────────────────────────────────────────────────────────
 db.version(3).stores({
@@ -129,6 +130,10 @@ export async function saveGameCards(game, cards) {
       cachedAt: now,
     })))
   })
+  // Keep the in-memory index in sync so freshly saved cards are searchable
+  // immediately (the preloader saves per game, possibly in multiple phases —
+  // e.g. Pokémon card data lands seconds in, prices minutes later).
+  await buildSearchIndex()
 }
 
 /** Clear all cached cards. */
@@ -155,10 +160,7 @@ export function searchCache(query, { page = 1, pageSize = 20, providers } = {}) 
   const matches = []
   for (const card of _allCards) {
     if (active && !active.has(card.game)) continue
-    const name = (card.name || '').toLowerCase()
-    const set = (card.set || '').toLowerCase()
-    const number = (card.number || '').toLowerCase()
-    if (name.includes(q) || set.includes(q) || number.includes(q)) {
+    if (tokenMatch(q, card.name, card.set, card.number)) {
       matches.push(card)
     }
   }

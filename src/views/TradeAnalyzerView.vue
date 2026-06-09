@@ -230,7 +230,7 @@ async function doSearch() {
   if (q.length < 2) return
   searchBusy.value = true
   try {
-    const res = await multiSearch(q, { page: 1, pageSize: 15, category: cat })
+    const res = await multiSearch(q, { page: 1, pageSize: 30, category: cat })
     // Guard: discard if query or category changed while we were fetching
     if (searchQuery.value.trim() !== q || searchCategory.value !== cat) return
     const cards = (res.cards || []) as SearchResult[]

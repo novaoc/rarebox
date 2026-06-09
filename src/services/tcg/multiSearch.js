@@ -8,6 +8,7 @@
 
 import { searchCache, isGameCached } from './cardCache.js'
 import { getProvider } from './providers.js'
+import { tokenMatch } from '../../utils/search.js'
 
 const TIMEOUT = 8000
 
@@ -118,11 +119,7 @@ async function getOptCards() {
 
 async function searchOnePiece(query) {
   const cards = await getOptCards()
-  const q = query.toLowerCase()
-  const matches = cards.filter(c =>
-    (c.card_name || '').toLowerCase().includes(q) ||
-    (c.card_set_id || '').toLowerCase().includes(q)
-  ).slice(0, 50) // cap at 50 to avoid huge payloads
+  const matches = cards.filter(c => tokenMatch(query, c.card_name, c.card_set_id)).slice(0, 50) // cap at 50 to avoid huge payloads
   return {
     cards: matches.map(c => ({
       id: c.card_set_id,
@@ -197,12 +194,7 @@ async function getRiftboundCards() {
 
 async function searchRiftbound(query) {
   const cards = await getRiftboundCards()
-  const q = query.toLowerCase()
-  const matches = cards.filter(c =>
-    (c.name || '').toLowerCase().includes(q) ||
-    (c.number || '').toLowerCase().includes(q) ||
-    (c.set || '').toLowerCase().includes(q)
-  ).slice(0, 50)
+  const matches = cards.filter(c => tokenMatch(query, c.name, c.number, c.set)).slice(0, 50)
   await hydrateRiftboundPrices(matches)
   return { cards: matches, total: matches.length }
 }

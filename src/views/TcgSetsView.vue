@@ -183,6 +183,7 @@
 
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
+import { tokenMatch } from '../utils/search.js'
 import { useRoute } from 'vue-router'
 import { getProvider, TCGS } from '../services/tcg/providers'
 import { usePortfolioStore } from '../stores/portfolio'
@@ -216,13 +217,13 @@ onUnmounted(abortPending)
 const filteredSets = computed(() => {
   const q = setFilter.value.trim().toLowerCase()
   if (!q) return sets.value
-  return sets.value.filter(s => s.name.toLowerCase().includes(q) || (s.code || '').toLowerCase().includes(q))
+  return sets.value.filter(s => tokenMatch(q, s.name, s.code))
 })
 
 const filteredCards = computed(() => {
   const q = cardFilter.value.trim().toLowerCase()
   if (!q) return cards.value
-  return cards.value.filter(c => c.name.toLowerCase().includes(q) || String(c.number).toLowerCase().includes(q))
+  return cards.value.filter(c => tokenMatch(q, c.name, String(c.number)))
 })
 
 async function loadSets() {

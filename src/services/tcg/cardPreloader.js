@@ -9,6 +9,7 @@
  */
 
 import { saveGameCards, isCacheFresh } from './cardCache.js'
+import { getProvider } from './providers.js'
 
 const BULK_TIMEOUT = 300_000   // 5 min for large downloads
 const API_TIMEOUT = 30_000     // 30s for normal API calls
@@ -51,47 +52,145 @@ async function fetchWithRetry(fn, retries = 2, onProgress = () => {}) {
 }
 
 // ── Pokemon ─────────────────────────────────────────────────────────────────
-// Paginated: 250 cards per request, ~82 pages for 20k cards.
+// Two-phase, mirroring the MTG bulk approach:
+//
+// Phase 1: card DATA from the official pokemon-tcg-data GitHub repo via the
+//   jsDelivr CDN — ~173 per-set JSON files fetched in parallel. Seconds, not
+//   minutes, and no rate limits. Cards become searchable immediately.
+// Phase 2: PRICES from api.pokemontcg.io (the bulk repo carries none) with a
+//   slim select=id,tcgplayer payload and parallel pages. That API averages
+//   7-30s per page, which is exactly why the old fully-sequential 82-page
+//   fetch took 10-45 minutes. Prices fill in in the background; a failure
+//   here still leaves a usable card database.
+
+const PKM_BULK = 'https://cdn.jsdelivr.net/gh/PokemonTCG/pokemon-tcg-data@master'
+
+function pickPokemonPrice(tcgplayer) {
+  const prices = tcgplayer?.prices || {}
+  return num(
+    prices.holofoil?.market || prices['1stEditionHolofoil']?.market ||
+    prices.unlimitedHolofoil?.market || prices.reverseHolofoil?.market ||
+    prices.normal?.market
+  )
+}
+
+/** Run `fn(item)` over items with a fixed concurrency. Failures are skipped. */
+async function parallelPool(items, concurrency, fn) {
+  const queue = [...items]
+  await Promise.all(Array.from({ length: Math.min(concurrency, queue.length) }, async () => {
+    while (queue.length > 0) {
+      const item = queue.shift()
+      try { await fn(item) } catch { /* per-item failures are non-fatal */ }
+    }
+  }))
+}
+
+async function fetchPokemonBulk(onProgress) {
+  const sets = await fetchJson(`${PKM_BULK}/sets/en.json`)
+  if (!Array.isArray(sets) || sets.length === 0) throw new Error('bulk set index empty')
+
+  const allCards = []
+  let done = 0
+  onProgress({ game: 'pokemon', phase: `Downloading ${sets.length} sets…`, loaded: 0, total: sets.length })
+
+  await parallelPool(sets, 12, async (s) => {
+    const cards = await fetchJson(`${PKM_BULK}/cards/en/${s.id}.json`)
+    for (const c of (cards || [])) {
+      allCards.push({
+        id: c.id, name: c.name, set: s.name || '', number: c.number || '',
+        image: c.images?.small || '',
+        price: null, // bulk repo has no prices — phase 2 fills them in
+        rarity: c.rarity || '',
+      })
+    }
+    done++
+    onProgress({ game: 'pokemon', phase: `Sets ${done}/${sets.length} (${allCards.length.toLocaleString()} cards)`, loaded: done, total: sets.length })
+  })
+
+  if (allCards.length === 0) throw new Error('No cards fetched from bulk data')
+  return allCards
+}
+
+async function fetchPokemonPrices(allCards, onProgress) {
+  const PAGE_SIZE = 250
+  const first = await fetchJson(
+    `https://api.pokemontcg.io/v2/cards?page=1&pageSize=${PAGE_SIZE}&select=id,tcgplayer`
+  )
+  const totalPages = first.totalCount ? Math.ceil(first.totalCount / PAGE_SIZE) : 90
+  const priceById = new Map()
+  for (const c of (first.data || [])) priceById.set(c.id, pickPokemonPrice(c.tcgplayer))
+
+  let fetched = 1
+  const pages = Array.from({ length: totalPages - 1 }, (_, i) => i + 2)
+  await parallelPool(pages, 6, async (page) => {
+    const d = await fetchJson(`https://api.pokemontcg.io/v2/cards?page=${page}&pageSize=${PAGE_SIZE}&select=id,tcgplayer`)
+    for (const c of (d.data || [])) priceById.set(c.id, pickPokemonPrice(c.tcgplayer))
+    fetched++
+    onProgress({ game: 'pokemon', phase: `Prices ${fetched}/${totalPages}`, loaded: fetched, total: totalPages })
+  })
+
+  let priced = 0
+  for (const card of allCards) {
+    const p = priceById.get(card.id)
+    if (p != null) { card.price = p; priced++ }
+  }
+  return priced
+}
 
 async function fetchPokemon(onProgress) {
+  let allCards
+  try {
+    // Phase 1 — bulk card data (seconds)
+    allCards = await fetchPokemonBulk(onProgress)
+  } catch (err) {
+    // Bulk source down — fall back to the slow paginated API with full fields
+    console.warn('Pokemon bulk fetch failed, falling back to paginated API:', err.message)
+    return fetchPokemonPaginated(onProgress)
+  }
+
+  // Cards are usable right now — save before the (slow) price pass
+  await saveGameCards('pokemon', allCards)
+  onProgress({ game: 'pokemon', phase: `${allCards.length.toLocaleString()} cards ready — fetching prices…`, loaded: 0, total: 0 })
+
+  // Phase 2 — prices (background quality-of-life; non-fatal)
+  try {
+    const priced = await fetchPokemonPrices(allCards, onProgress)
+    if (priced > 0) await saveGameCards('pokemon', allCards)
+  } catch (err) {
+    console.warn('Pokemon price pass failed (cards remain usable):', err.message)
+  }
+
+  return allCards.length
+}
+
+// Legacy fallback: sequential paginated fetch with full fields.
+async function fetchPokemonPaginated(onProgress) {
   const PAGE_SIZE = 250
   const allCards = []
-  let page = 1
   let consecutiveErrors = 0
 
-  // First, get total count from page 1
   const first = await fetchJson(
     `https://api.pokemontcg.io/v2/cards?page=1&pageSize=${PAGE_SIZE}&select=id,name,number,set,rarity,tcgplayer,images`
   )
   const totalPages = first.totalCount ? Math.ceil(first.totalCount / PAGE_SIZE) : 100
   onProgress({ game: 'pokemon', phase: 'Fetching cards…', loaded: 0, total: first.totalCount || 0 })
 
-  for (const c of (first.data || [])) {
-    const prices = c.tcgplayer?.prices || {}
-    allCards.push({
-      id: c.id, name: c.name, set: c.set?.name || '', number: c.number || '',
-      image: c.images?.small || '',
-      price: num(prices.holofoil?.market || prices['1stEditionHolofoil']?.market || prices.unlimitedHolofoil?.market || prices.reverseHolofoil?.market || prices.normal?.market),
-      rarity: c.rarity || '',
-    })
-  }
+  const mapCard = c => ({
+    id: c.id, name: c.name, set: c.set?.name || '', number: c.number || '',
+    image: c.images?.small || '',
+    price: pickPokemonPrice(c.tcgplayer),
+    rarity: c.rarity || '',
+  })
+  for (const c of (first.data || [])) allCards.push(mapCard(c))
 
-  for (page = 2; page <= totalPages; page++) {
+  for (let page = 2; page <= totalPages; page++) {
     try {
       const d = await fetchJson(
         `https://api.pokemontcg.io/v2/cards?page=${page}&pageSize=${PAGE_SIZE}&select=id,name,number,set,rarity,tcgplayer,images`
       )
       const cards = d.data || []
       if (cards.length === 0) break
-      for (const c of cards) {
-        const prices = c.tcgplayer?.prices || {}
-        allCards.push({
-          id: c.id, name: c.name, set: c.set?.name || '', number: c.number || '',
-          image: c.images?.small || '',
-          price: num(prices.holofoil?.market || prices['1stEditionHolofoil']?.market || prices.unlimitedHolofoil?.market || prices.reverseHolofoil?.market || prices.normal?.market),
-          rarity: c.rarity || '',
-        })
-      }
+      for (const c of cards) allCards.push(mapCard(c))
       consecutiveErrors = 0
       onProgress({
         game: 'pokemon',
@@ -278,56 +377,32 @@ async function fetchYugioh(onProgress) {
 }
 
 // ── Riftbound ───────────────────────────────────────────────────────────────
-// Small dataset: ~1,064 cards across 7 sets. Fully preloadable.
+// Small dataset: ~1,064 cards across 7 sets. Delegates to the browse provider
+// so the cache gets the same variant-aware prices (a number-only price map
+// here used to give Signature cards the plain printing's price).
 
 async function fetchRiftbound(onProgress) {
   onProgress({ game: 'riftbound', phase: 'Fetching sets…', loaded: 0, total: 0 })
 
-  const setsRes = await fetchJson('https://api.riftcodex.com/sets')
-  const sets = setsRes.items || setsRes.data || setsRes || []
+  const provider = getProvider('riftbound')
+  const sets = await provider.getSets()
 
   onProgress({ game: 'riftbound', phase: `${sets.length} sets…`, loaded: 0, total: sets.length })
 
   const allCards = []
-  const PC_BASE = 'https://www.pricecharting.com/search-products'
-
   for (let i = 0; i < sets.length; i++) {
     const s = sets[i]
     try {
-      // Paginate cards for this set
-      let page = 1
-      let total = Infinity
-      const setCards = []
-      while (setCards.length < total && page <= 20) {
-        const d = await fetchJson(`https://api.riftcodex.com/cards?set_id=${encodeURIComponent(s.set_id || s.slug)}&limit=50&page=${page}`)
-        const items = d.items || d.data || d || []
-        total = d.total || items.length || 0
-        setCards.push(...items)
-        page++
-      }
-
-      // Fetch PriceCharting prices
-      let priceMap = {}
-      try {
-        const pcData = await fetchJson(`${PC_BASE}?type=prices&q=riftbound+${encodeURIComponent(s.name || s.label || '')}`)
-        for (const p of (pcData.products || [])) {
-          const numMatch = (p.productName || '').match(/#(\d+)/)
-          if (numMatch && p.price1) {
-            priceMap[numMatch[1]] = num(p.price1)
-          }
-        }
-      } catch { /* prices optional */ }
-
-      for (const c of setCards) {
-        const cNum = String(c.collector_number || c.number || '')
+      const cards = await provider.getSetCards(s.id)
+      for (const c of cards) {
         allCards.push({
-          id: `${s.set_id || s.slug}-${cNum}`,
-          name: c.name || '',
-          set: s.name || s.label || '',
-          number: cNum,
-          image: c.media?.image_url || c.image || '',
-          price: priceMap[cNum] || null,
-          rarity: c.classification?.rarity || c.rarity || '',
+          id: c.id,
+          name: c.name,
+          set: c.set || s.name,
+          number: c.number,
+          image: c.image,
+          price: c.price ?? null,
+          rarity: c.rarity || '',
         })
       }
     } catch { /* skip failed sets */ }
@@ -338,8 +413,6 @@ async function fetchRiftbound(onProgress) {
       loaded: i + 1,
       total: sets.length,
     })
-
-    await sleep(50)
   }
 
   await saveGameCards('riftbound', allCards)
