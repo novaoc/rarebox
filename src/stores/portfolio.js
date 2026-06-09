@@ -438,61 +438,41 @@ export const usePortfolioStore = defineStore('portfolio', () => {
     const SCRY_BASE = 'https://api.scryfall.com/cards/named'
     const mtgCache = new Map()
 
-    // ── Reverse mapping: JP English set name → tcgdex set ID ─────────
-    const JP_NAME_TO_ID = {}
-    const JP_EN = {
-      PMCG1:'Base Set',PMCG2:'Jungle',PMCG3:'Fossil',
-      neo1:'Neo Genesis',neo2:'Neo Discovery',neo3:'Neo Revelation',neo4:'Neo Destiny',
-      S1:'Sword & Shield',S2:'Rebel Clash',S3:'Darkness Ablaze',
-      S4:'Vivid Voltage',S4a:'Shiny Star V',S5a:'Battle Region',
-      S5I:'Evolving Skies (JP)',S5R:'Fusion Arts',
-      S6:'Silver Tempest (JP)',S6a:'Eevee Heroes',S6H:'Lost Origin (JP)',
-      S7:'Brilliant Stars (JP)',S7R:'Dark Phantasma',S7D:'Paradigm Trigger (JP)',
-      S8:'Fusion Arts',S8a:'25th Anniversary',S8b:'VMAX Climax',
-      S9:'Star Birth',S9a:'Battle Region',
-      S10:'Space Juggler',S10a:'Dark Fantasma',S10b:'Pokémon GO',
-      S10D:'Time Gazer',S10P:'Space Juggler',
-      S11:'Triplet Beat',S11a:'Heat Red Arcana',S12:'Paradigm Trigger',
-      S12a:'VSTAR Universe',
-      SV1:'Scarlet & Violet',SV1a:'Triplet Beat',SV1S:'Scarlet ex',
-      SV1V:'Violet ex',SV2:'Snow Hazard',SV2a:'Clay Burst',
-      SV2D:'Snow Hazard',SV2P:'Clay Burst',
-      SV3:'Ruler of the Black Flame',SV3a:'Raging Surf',
-      SV4:'Ancient Roar',SV4a:'Raging Surf',
-      SV4K:'Ancient Roar',SV4M:'Future Flash',
-      SV5:'Cyber Judge',SV5a:'Wild Force',
-      SV5K:'Wild Force',SV6:'Stellar Miracle',
-      SV7:'Super Electric Breaker',SV7a:'Paradise Dragona',
-      SV8:'Terastal Festival',SV8a:'Terastal Festival ex',
-      SV9:'Battle Partners',SV9a:'Glory of Team Rocket',
-      SV10:'Heat Wave Arena',SV10a:'Glory of Team Rocket',
-      SVK:'Shiny Treasure',SVLN:'Legendary Heartbeat',
-      SVLS:'Stellar Type Starter Set',SV11:'Destined Rivals',
-      SV11B:'Destined Rivals (Leaf)',SV11W:'Destined Rivals (Wind)',
-      M1S:'Mega Symphonia',M3:'Munice Zero',
+    // ── Reverse mapping: JP English set name → tcgdex set IDs ────────
+    // One English name can map to several tcgdex sets (e.g. paired sets),
+    // so keep ALL ids and let resolution try each until the card exists.
+    const { JP_EN_NAMES, jpSetToSeries } = await import('../services/pokemonApi.js')
+    const normalizeSetKey = s => s
+      .toLowerCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // pokémon → pokemon
+      .replace(/\s*\(.*\)/, '')
+      .trim()
+    const JP_NAME_TO_IDS = {}
+    for (const [id, enName] of Object.entries(JP_EN_NAMES)) {
+      const key = normalizeSetKey(enName)
+      if (!JP_NAME_TO_IDS[key]) JP_NAME_TO_IDS[key] = []
+      JP_NAME_TO_IDS[key].push(id)
     }
-    // Build reverse: lowercase English name → tcgdex ID
-    for (const [id, enName] of Object.entries(JP_EN)) {
-      const key = enName.toLowerCase().replace(/\s*\(.*\)/, '').trim()
-      if (!JP_NAME_TO_ID[key]) JP_NAME_TO_ID[key] = id
+    // Collectr sometimes uses slightly different community names
+    const JP_SET_ALIASES = {
+      'pokemon 151': 'pokemon card 151',
+      '151': 'pokemon card 151',
+      'shiny treasure': 'shiny treasure ex',
+      'terastal festival': 'terastal festival ex',
+      'rebel clash': 'rebellion crash',
     }
-
-    // tcgdex series prefix from set ID (case-sensitive — CDN uses uppercase)
-    function jpSetToSeries(setId) {
-      if (!setId) return null
-      const id = setId.startsWith('neo') ? setId : setId.toUpperCase()
-      if (id.startsWith('SV')) return 'SV'
-      if (id.startsWith('S') && !id.startsWith('ST')) return 'S'
-      if (id.startsWith('M')) return 'M'
-      if (id.startsWith('SM')) return 'SM'
-      if (id.startsWith('XY')) return 'XY'
-      if (id.startsWith('B') || id.startsWith('BW')) return 'BW'
-      if (id.startsWith('DP')) return 'DP'
-      if (id.startsWith('EX')) return 'EX'
-      if (id.startsWith('e')) return 'EX'
-      if (id.startsWith('neo')) return 'NEO'
-      if (id.startsWith('PM')) return 'BASE'
-      return 'SV' // default
+    // Cached JP set metadata for validating card numbers before CDN fallback
+    const jpSetCache = new Map()
+    async function getJpSetInfo(setId) {
+      if (!jpSetCache.has(setId)) {
+        try {
+          const res = await fetch(`https://api.tcgdex.net/v2/ja/sets/${setId}`)
+          jpSetCache.set(setId, res.ok ? await res.json() : null)
+        } catch {
+          jpSetCache.set(setId, null)
+        }
+      }
+      return jpSetCache.get(setId)
     }
 
     function padId(n) {
@@ -520,15 +500,29 @@ export const usePortfolioStore = defineStore('portfolio', () => {
         if (game === 'pokemon' && !isJP) {
           // ── Pokemon EN via pokemontcg.io ──────────────────────────
           const name = item.cardData.name.trim()
-          const number = item.cardData.number.replace(/\/.*/, '').replace(/^[A-Z]+/i, '').trim()
-          const q = `name:"${name}" number:${number}`
+          // "015/165" → "15" (pokemontcg.io numbers are unpadded);
+          // keep letter prefixes ("TG15", "SWSH284") — they're real numbers there
+          const rawNum = item.cardData.number.replace(/\/.*/, '').trim()
+          const number = /^\d+$/.test(rawNum) ? String(parseInt(rawNum, 10)) : rawNum
 
-          if (!pkmCache.has(q)) {
-            const res = await fetch(`${PKM_BASE}?q=${encodeURIComponent(q)}&pageSize=5`)
-            pkmCache.set(q, res.ok ? (await res.json()).data || [] : [])
+          async function pkmSearch(q) {
+            if (!pkmCache.has(q)) {
+              const res = await fetch(`${PKM_BASE}?q=${encodeURIComponent(q)}&pageSize=5`)
+              pkmCache.set(q, res.ok ? (await res.json()).data || [] : [])
+            }
+            return pkmCache.get(q) || []
           }
 
-          const candidates = pkmCache.get(q) || []
+          let candidates = await pkmSearch(`name:"${name}" number:${number}`)
+          // Letter-prefixed numbers that didn't match: retry with digits only
+          if (candidates.length === 0 && /^[A-Z]+\d+$/i.test(number)) {
+            const digits = String(parseInt(number.replace(/^[A-Z]+/i, ''), 10))
+            candidates = await pkmSearch(`name:"${name}" number:${digits}`)
+          }
+          // Last resort: name only (e.g. promo numbering schemes)
+          if (candidates.length === 0) {
+            candidates = await pkmSearch(`name:"${name}"`)
+          }
           const setName = (item.cardData.set?.name || '').toLowerCase()
           let match = candidates.find(c =>
             c.set?.name?.toLowerCase() === setName ||
@@ -563,35 +557,43 @@ export const usePortfolioStore = defineStore('portfolio', () => {
           }
         } else if (game === 'pokemon' && isJP) {
           // ── Pokemon JP via tcgdex API (prices + images) ──────────────
-          const setName = (item.cardData.set?.name || '').toLowerCase().replace(/\s*\(jp\)/i, '').trim()
-          // Normalise parens the same way JP_NAME_TO_ID keys are built
-          const lookupName = setName.replace(/\s*\(.*\)/, '').trim()
-          const tcgdexId = JP_NAME_TO_ID[lookupName]
-          const localId = item.cardData.number.replace(/\/.*/, '').trim()
+          let lookupName = normalizeSetKey(
+            (item.cardData.set?.name || '').replace(/\s*\(jp\)/i, '')
+          )
+          lookupName = JP_SET_ALIASES[lookupName] || lookupName
+          const candidateIds = JP_NAME_TO_IDS[lookupName] || []
+          const localId = padId(item.cardData.number.replace(/\/.*/, '').trim())
 
-          if (!lookupName || !tcgdexId) {
-            console.warn(`JP set "${setName}" (raw: "${item.cardData.set?.name}") not found in JP_NAME_TO_ID — add it to JP_EN`)
+          if (!lookupName || candidateIds.length === 0) {
+            console.warn(`JP set "${item.cardData.set?.name}" not found in JP_EN_NAMES — add it in pokemonApi.js`)
           }
 
-          if (tcgdexId && localId) {
-            let cardData = null
-            try {
-              const { getJapaneseCardDetail } = await import('../services/pokemonApi.js')
-              cardData = await getJapaneseCardDetail(`${tcgdexId}-${localId}`)
-            } catch {}
+          if (candidateIds.length > 0 && localId) {
+            const { getJapaneseCardDetail } = await import('../services/pokemonApi.js')
 
-            if (cardData) {
+            // Try every set that shares this English name — the card number
+            // tells us which one actually contains the card.
+            let cardData = null
+            let matchedId = null
+            for (const tcgdexId of candidateIds) {
+              try {
+                cardData = await getJapaneseCardDetail(`${tcgdexId}-${localId}`)
+                if (cardData) { matchedId = tcgdexId; break }
+              } catch { /* try next candidate set */ }
+            }
+
+            if (cardData && matchedId) {
               const cm = cardData.tcgplayer?.prices?.normal
               const marketPrice = cm?.market || cm?.mid || null
               const updates = {
-                cardId: `${tcgdexId}-${localId}`,
+                cardId: `${matchedId}-${localId}`,
                 _lang: 'ja',
                 cardData: {
                   ...item.cardData,
                   name: cardData.name,
                   number: cardData.number,
                   images: cardData.images || { small: '', large: '' },
-                  set: { id: tcgdexId, name: item.cardData.set?.name },
+                  set: { id: matchedId, name: item.cardData.set?.name },
                   rarity: cardData.rarity || item.cardData.rarity,
                 },
                 currentMarketPrice: marketPrice,
@@ -600,21 +602,33 @@ export const usePortfolioStore = defineStore('portfolio', () => {
               updateItem(portfolioId, item.id, updates)
               resolved++
             } else {
-              // Fallback: image-only from CDN
-              const series = jpSetToSeries(tcgdexId)
-              const imgBase = `https://assets.tcgdex.net/ja/${series}/${tcgdexId}/${padId(localId)}`
-              const updates = {
-                cardId: `${tcgdexId}-${localId}`,
-                _lang: 'ja',
-                cardData: {
-                  ...item.cardData,
-                  images: { small: imgBase + '/low.webp', large: imgBase + '/high.webp' },
-                  set: { id: tcgdexId, name: item.cardData.set?.name },
-                },
-                lastPriceUpdate: new Date().toISOString(),
+              // Card detail not in tcgdex — fall back to a CDN image, but only
+              // for a set that exists and can plausibly contain this number.
+              let fallbackId = null
+              for (const tcgdexId of candidateIds) {
+                const info = await getJpSetInfo(tcgdexId)
+                if (info && parseInt(localId, 10) <= (info.cardCount?.total || 0)) {
+                  fallbackId = tcgdexId
+                  break
+                }
               }
-              updateItem(portfolioId, item.id, updates)
-              resolved++
+              if (fallbackId) {
+                const series = jpSetToSeries(fallbackId)
+                const imgBase = `https://assets.tcgdex.net/ja/${series}/${fallbackId}/${localId}`
+                updateItem(portfolioId, item.id, {
+                  cardId: `${fallbackId}-${localId}`,
+                  _lang: 'ja',
+                  cardData: {
+                    ...item.cardData,
+                    images: { small: imgBase + '/low.webp', large: imgBase + '/high.webp' },
+                    set: { id: fallbackId, name: item.cardData.set?.name },
+                  },
+                  lastPriceUpdate: new Date().toISOString(),
+                })
+                resolved++
+              } else {
+                console.warn(`JP card ${item.cardData.name} #${localId} not found in any candidate set (${candidateIds.join(', ')})`)
+              }
             }
           }
         } else if (game === 'magic') {
@@ -657,12 +671,23 @@ export const usePortfolioStore = defineStore('portfolio', () => {
             if (candidates.length > 0) {
               const setLower = (item.cardData.set?.name || '').toLowerCase()
               const numStr = (item.cardData.number || '').toLowerCase()
-              
-              let match = candidates.find(c => {
+              const numDigits = numStr.replace(/\D/g, '').replace(/^0+/, '')
+
+              // Score candidates: an exact card-number match beats a set-name
+              // match, which beats result order. Picking the first OR-match
+              // used to grab the wrong printing for cards with many reprints.
+              let match = null
+              let bestScore = 0
+              for (const c of candidates) {
                 const cSet = (c.set || '').toLowerCase()
                 const cNum = (c.number || '').toLowerCase()
-                return cSet.includes(setLower) || setLower.includes(cSet) || cNum === numStr
-              })
+                const cDigits = cNum.replace(/\D/g, '').replace(/^0+/, '')
+                let score = 0
+                if (numStr && cNum === numStr) score += 4
+                else if (numDigits && cDigits === numDigits) score += 2
+                if (setLower && cSet && (cSet.includes(setLower) || setLower.includes(cSet))) score += 1
+                if (score > bestScore) { bestScore = score; match = c }
+              }
               if (!match) match = candidates[0]
               
               const updates = {

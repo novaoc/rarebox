@@ -18,9 +18,15 @@ async function fetchWithRetry(url, retries = MAX_RETRIES) {
           continue
         }
       }
-      if (!res.ok) throw new Error(`API error ${res.status}`)
+      if (!res.ok) {
+        const err = new Error(`API error ${res.status}`)
+        err.status = res.status
+        throw err
+      }
       return await res.json()
     } catch (e) {
+      // Client errors (404 etc.) are definitive — retrying won't help
+      if (e.status && e.status < 500) throw e
       if (e.name === 'TimeoutError' || e.name === 'AbortError') {
         if (attempt < retries) {
           await new Promise(r => setTimeout(r, 1000 * (attempt + 1)))
@@ -127,37 +133,38 @@ export function getAllVariants(card) {
 }
 
 // Japanese sets via tcgdex
-// Japanese set ID → English name mapping (subset of most popular)
-const JP_EN_NAMES = {
+// Japanese set ID → English (community) name. Verified against the tcgdex
+// /v2/ja/sets data (Japanese names + official card counts) — these are the
+// names Collectr and most EN-speaking collectors use for JP sets.
+export const JP_EN_NAMES = {
   PMCG1: 'Base Set', PMCG2: 'Jungle', PMCG3: 'Fossil',
   neo1: 'Neo Genesis', neo2: 'Neo Discovery', neo3: 'Neo Revelation', neo4: 'Neo Destiny',
-  S1: 'Sword & Shield', S2: 'Rebel Clash', S3: 'Darkness Ablaze',
-  S4: 'Vivid Voltage', S4a: 'Shiny Star V', S5a: 'Battle Region',
-  S5I: 'Evolving Skies (JP)', S5R: 'Fusion Arts',
-  S6: 'Silver Tempest (JP)', S6a: 'Eevee Heroes', S6H: 'Lost Origin (JP)',
-  S7: 'Brilliant Stars (JP)', S7R: 'Dark Phantasma', S7D: 'Paradigm Trigger (JP)',
-  S8: 'Fusion Arts', S8a: '25th Anniversary', S8b: 'VMAX Climax',
+  S1W: 'Sword', S1H: 'Shield', S1a: 'VMAX Rising',
+  S2: 'Rebellion Crash', S2a: 'Explosive Walker',
+  S3: 'Infinity Zone', S3a: 'Legendary Heartbeat',
+  S4: 'Amazing Volt Tackle', S4a: 'Shiny Star V',
+  S5I: 'Single Strike Master', S5R: 'Rapid Strike Master', S5a: 'Matchless Fighters',
+  S6H: 'Silver Lance', S6K: 'Jet-Black Spirit', S6a: 'Eevee Heroes',
+  S7D: 'Skyscraping Perfection', S7R: 'Blue Sky Stream',
+  S8: 'Fusion Arts', S8a: '25th Anniversary Collection', S8b: 'VMAX Climax',
   S9: 'Star Birth', S9a: 'Battle Region',
-  S10: 'Space Juggler', S10a: 'Dark Fantasma', S10b: 'Pokémon GO',
-  S10D: 'Time Gazer', S10P: 'Space Juggler',
-  S11: 'Triplet Beat', S11a: 'Heat Red Arcana', S12: 'Paradigm Trigger',
-  S12a: 'VSTAR Universe',
-  SV1: 'Scarlet & Violet', SV1a: 'Triplet Beat', SV1S: 'Scarlet ex',
-  SV1V: 'Violet ex', SV2: 'Snow Hazard', SV2a: 'Clay Burst',
-  SV2D: 'Snow Hazard', SV2P: 'Clay Burst',
+  S10D: 'Time Gazer', S10P: 'Space Juggler', S10a: 'Dark Phantasma', S10b: 'Pokémon GO',
+  S11: 'Lost Abyss', S11a: 'Incandescent Arcana',
+  S12: 'Paradigm Trigger', S12a: 'VSTAR Universe',
+  SV1S: 'Scarlet ex', SV1V: 'Violet ex', SV1a: 'Triplet Beat',
+  SV2D: 'Clay Burst', SV2P: 'Snow Hazard', SV2a: 'Pokémon Card 151',
   SV3: 'Ruler of the Black Flame', SV3a: 'Raging Surf',
-  SV4: 'Ancient Roar', SV4a: 'Raging Surf',
-  SV4K: 'Ancient Roar', SV4M: 'Future Flash',
-  SV5: 'Cyber Judge', SV5a: 'Wild Force',
-  SV5K: 'Wild Force', SV6: 'Stellar Miracle',
-  SV7: 'Super Electric Breaker', SV7a: 'Paradise Dragona',
-  SV8: 'Terastal Festival', SV8a: 'Terastal Festival ex',
-  SV9: 'Battle Partners', SV9a: 'Glory of Team Rocket',
-  SV10: 'Heat Wave Arena', SV10a: 'Glory of Team Rocket',
-  SVK: 'Shiny Treasure', SVLN: 'Legendary Heartbeat',
-  SVLS: 'Stellar Type Starter Set', SV11: 'Destined Rivals',
-  SV11B: 'Destined Rivals (Leaf)', SV11W: 'Destined Rivals (Wind)',
-  M1S: 'Mega Symphonia', M3: 'Munice Zero'
+  SV4K: 'Ancient Roar', SV4M: 'Future Flash', SV4a: 'Shiny Treasure ex',
+  SV5K: 'Wild Force', SV5M: 'Cyber Judge', SV5a: 'Crimson Haze',
+  SV6: 'Mask of Change', SV6a: 'Night Wanderer',
+  SV7: 'Stellar Miracle', SV7a: 'Paradise Dragona',
+  SV8: 'Super Electric Breaker', SV8a: 'Terastal Festival ex',
+  SV9: 'Battle Partners', SV9a: 'Heat Wave Arena',
+  SV10: 'Glory of Team Rocket',
+  SV11B: 'Black Bolt', SV11W: 'White Flare',
+  SVK: 'Deck Build Box Stellar Miracle',
+  SVLN: 'Starter Set Terastal Sylveon ex', SVLS: 'Starter Set Terastal Ceruledge ex',
+  M1L: 'Mega Brave', M1S: 'Mega Symphonia', M2: 'Inferno X', M3: 'Munikis Zero'
 }
 
 // Pokellector CDN logo URLs for Japanese sets (tcgdex has no set logos)
@@ -203,12 +210,20 @@ const JP_SET_LOGOS = {
 }
 
 // Determine tcgdex CDN series prefix from set ID
-function jpSetToSeries(setId) {
-  const id = setId.toUpperCase()
+export function jpSetToSeries(setId) {
+  if (!setId) return null
+  const id = setId.startsWith('neo') ? setId : setId.toUpperCase()
   if (id.startsWith('SV')) return 'SV'
-  if (id.startsWith('S') && !id.startsWith('SV') && !id.startsWith('ST')) return 'S'
+  if (id.startsWith('SM')) return 'SM'
+  if (id.startsWith('ST')) return null
+  if (id.startsWith('S')) return 'S'
   if (id.startsWith('M')) return 'M'
-  return null // no images for older sets
+  if (id.startsWith('XY')) return 'XY'
+  if (id.startsWith('BW') || id.startsWith('B')) return 'BW'
+  if (id.startsWith('DP')) return 'DP'
+  if (id.startsWith('EX') || id.startsWith('E')) return 'EX'
+  if (id.startsWith('neo')) return 'NEO'
+  return null
 }
 
 // Sort Japanese sets by era (newest first) using ID patterns
@@ -297,13 +312,16 @@ export async function getJapaneseCardsBySet(setId, page = 1, pageSize = 36) {
     rawCards = []
     for (let i = 1; i <= total; i++) {
       const localId = String(i).padStart(3, '0')
-      rawCards.push({ id: `${setId}-${localId}`, localId, name: `Card ${localId}` })
+      const image = series ? `https://assets.tcgdex.net/ja/${series}/${setId}/${localId}` : null
+      rawCards.push({ id: `${setId}-${localId}`, localId, name: `Card ${localId}`, image })
     }
   }
-  
+
   const allCards = rawCards.map(c => {
     const localId = c.localId || c.id?.split('-').pop() || ''
-    const imageBase = series ? `https://assets.tcgdex.net/ja/${series}/${setId}/${localId}` : null
+    // tcgdex card briefs carry the canonical image base URL; absence means the CDN
+    // has no scan for this card (e.g. Mega era) — show placeholder, not a 404
+    const imageBase = c.image || null
     return {
       id: c.id,
       name: c.name,
