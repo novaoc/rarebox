@@ -105,47 +105,38 @@ async function fetchPokemon(onProgress) {
   return allCards.length
 }
 
-// ── MTG ─────────────────────────────────────────────────────────────────────
-// Paginated via Scryfall search with game:paper (catches all paper cards).
-// ~95k cards, ~175 cards per page, ~545 pages.
+// ── MTG: Scryfall bulk data ────────────────────────────────────────────────
+// Uses oracle_cards (~40 MB single JSON file, ~24k unique cards) instead of
+// paginated search API (~95k prints across 545 pages at 5s each).
+// Prices included in bulk data. Saves ~45 min of sequential fetches.
 
 async function fetchMtg(onProgress) {
-  const PAGE_SIZE = 175
+  onProgress({ game: 'mtg', phase: 'Fetching bulk data index…', loaded: 0, total: 0 })
+
+  // Get bulk data catalog to find the oracle_cards download URL
+  const catalog = await fetchJson('https://api.scryfall.com/bulk-data', BULK_TIMEOUT)
+  const entry = (catalog.data || []).find(e => e.type === 'oracle_cards')
+  if (!entry?.download_uri) throw new Error('oracle_cards bulk data not found')
+
+  onProgress({ game: 'mtg', phase: 'Downloading card database (~40 MB)…', loaded: 0, total: 0 })
+
+  const d = await fetchJson(entry.download_uri, BULK_TIMEOUT)
+  const cards = Array.isArray(d) ? d : []
+
+  onProgress({ game: 'mtg', phase: `Processing ${cards.length.toLocaleString()} cards…`, loaded: 0, total: cards.length })
+
   const allCards = []
-  let url = `https://api.scryfall.com/cards/search?q=game%3Apaper&unique=prints&order=released&page=1&pageSize=${PAGE_SIZE}`
-  let page = 0
-
-  onProgress({ game: 'mtg', phase: 'Fetching cards…', loaded: 0, total: 0 })
-
-  while (url) {
-    const d = await fetchJson(url)
-    const cards = d.data || []
-
-    for (const c of cards) {
-      const img = c.image_uris || c.card_faces?.[0]?.image_uris
-      allCards.push({
-        id: c.id,
-        name: c.name,
-        set: c.set_name || '',
-        number: c.collector_number || '',
-        image: img?.small || '',
-        price: num(c.prices?.usd) || num(c.prices?.usd_foil),
-        rarity: c.rarity || '',
-      })
-    }
-
-    url = d.has_more ? d.next_page : null
-    page++
-    const totalPages = d.total_cards ? Math.ceil(d.total_cards / PAGE_SIZE) : 0
-
-    onProgress({
-      game: 'mtg',
-      phase: `Page ${page}/${totalPages} (${allCards.length.toLocaleString()} cards)`,
-      loaded: allCards.length,
-      total: d.total_cards || 0,
+  for (const c of cards) {
+    const img = c.image_uris || c.card_faces?.[0]?.image_uris
+    allCards.push({
+      id: c.id,
+      name: c.name,
+      set: c.set_name || '',
+      number: c.collector_number || '',
+      image: img?.small || '',
+      price: num(c.prices?.usd) || num(c.prices?.usd_foil),
+      rarity: c.rarity || '',
     })
-
-    await sleep(100)
   }
 
   await saveGameCards('mtg', allCards)
