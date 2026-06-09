@@ -462,9 +462,16 @@ export const usePortfolioStore = defineStore('portfolio', () => {
     // Hoist dynamic import to avoid redundant module loading inside the loop
     const { multiSearch } = await import('../services/tcg/multiSearch.js')
 
-    for (let i = 0; i < tasks.length; i++) {
-      const { portfolioId, item } = tasks[i]
-      if (onProgress) onProgress(i + 1, tasks.length, resolved)
+    // Process all cards with concurrent workers (pokemontcg.io is the bottleneck,
+    // averaging ~2s per request — sequential would be unusably slow)
+    const CONCURRENCY = 5
+    let completed = 0
+    const taskQueue = [...tasks]
+
+    async function resolveOne(task) {
+      const { portfolioId, item } = task
+      const idx = completed++
+      if (onProgress) onProgress(idx + 1, tasks.length, resolved)
 
       const game = item.game || 'pokemon'
       const isJP = item._lang === 'ja' || (item.cardData?.name || '').includes('(JP)')
@@ -573,7 +580,6 @@ export const usePortfolioStore = defineStore('portfolio', () => {
             const candidates = result?.cards || []
             
             if (candidates.length > 0) {
-              // Try to match by set name or number
               const setLower = (item.cardData.set?.name || '').toLowerCase()
               const numStr = (item.cardData.number || '').toLowerCase()
               
@@ -604,10 +610,17 @@ export const usePortfolioStore = defineStore('portfolio', () => {
           }
         }
       } catch {}
-
-      // 80ms delay between requests
-      await new Promise(r => setTimeout(r, 80))
     }
+
+    await Promise.all(
+      Array.from({ length: Math.min(CONCURRENCY, taskQueue.length) }, () =>
+        (async () => {
+          while (taskQueue.length > 0) {
+            await resolveOne(taskQueue.shift())
+          }
+        })()
+      )
+    )
 
     if (resolved > 0) persistNow()
     return resolved
