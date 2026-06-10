@@ -349,6 +349,8 @@ import { parseCollectrFile } from '../utils/collectrImport'
 import { getActiveAlerts, getTriggeredAlerts, removeAlert, clearTriggeredAlerts, clearAllAlerts } from '../utils/alerts'
 import LocalSyncModal from '../components/LocalSyncModal.vue'
 import { getCardCounts, clearCardCache, saveCardDatabaseReady, buildSearchIndex } from '../services/tcg/cardCache'
+import { useTradeStore } from '../stores/trade'
+import { saveTradeState } from '../db'
 import { refreshAll } from '../services/tcg/cardPreloader'
 const store = usePortfolioStore()
 const router = useRouter()
@@ -458,9 +460,18 @@ function clearPriceCache() {
 async function doReset() {
   await store.resetAll()
   await clearCardCache()
+  // Reset Everything means everything — trade analyzer + decks included.
+  // Write the empty trade state directly (the store's persist is debounced
+  // and would lose the race against the reload below).
+  try { useTradeStore().resetTrade() } catch {}
+  try {
+    await saveTradeState({ sideA: { items: [], totalValue: 0 }, sideB: { items: [], totalValue: 0 } })
+  } catch {}
+  try { localStorage.removeItem('rarebox_decks') } catch {}
   confirmReset.value = false
   resetConfirmText.value = ''
-  router.push('/')
+  // Full reload so every in-memory store re-initializes from wiped storage
+  window.location.href = '/'
 }
 
 function exportOne(portfolio) {
