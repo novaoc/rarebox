@@ -804,7 +804,7 @@ onMounted(async () => {
 .ld-shelf-label { font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-secondary); margin-bottom: 10px; }
 .ld-shelf-value { font-size: clamp(1.4rem, 4vw, 2rem); padding: 6px 16px; }
 .ld-spark { width: min(220px, 40vw); height: 56px; flex-shrink: 0; }
-.ld-shelf-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; margin-top: 22px; }
+.ld-shelf-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin-top: 22px; }
 .ld-shelf-img { background: var(--bg-secondary); border: var(--bw) solid var(--ink); border-radius: 10px; aspect-ratio: 63/88; padding: 5px; }
 .ld-shelf-img img { width: 100%; height: 100%; object-fit: contain; }
 .ld-shelf-name { font-size: 12.5px; font-weight: 800; margin-top: 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -833,7 +833,7 @@ onMounted(async () => {
 @media (min-width: 720px) {
   .ld-hero { grid-template-columns: 1.1fr 1fr; }
   .ld-feature-grid { grid-template-columns: 1fr 1fr; }
-  .ld-shelf-grid { grid-template-columns: repeat(4, 1fr); }
+  .ld-shelf-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .ld-import-chips { grid-template-columns: repeat(3, 1fr); }
   .ld-privacy { grid-template-columns: repeat(3, 1fr); }
 }
