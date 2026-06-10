@@ -221,7 +221,7 @@
 
               <div class="panel-actions mt-3">
                 <button class="btn btn-primary w-full" @click="openAddModal(selectedCard)">
-                  + Add to Portfolio
+                  + Add to Shelf
                 </button>
               </div>
             </div>

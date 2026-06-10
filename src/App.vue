@@ -103,7 +103,7 @@
           </button>
           <button class="more-item" role="menuitem" @click="moreOpen = false; showNewPortfolioModal = true">
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
-            New Portfolio
+            New Shelf
           </button>
           <router-link to="/settings" class="more-item" role="menuitem" @click="moreOpen = false">
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 1v4m0 14v4m11-11h-4M5 12H1m17.66-6.34-2.83 2.83M8.17 15.17l-2.83 2.83m12.49 0-2.83-2.83M8.17 8.83 5.34 6"/></svg>
@@ -118,7 +118,7 @@
       <div v-if="showNewPortfolioModal" class="modal-overlay" @click.self="showNewPortfolioModal = false">
         <div class="modal slide-up-enter-active">
           <div class="modal-header">
-            <h3>New Portfolio</h3>
+            <h3>New Shelf</h3>
             <button class="btn btn-ghost btn-icon" @click="showNewPortfolioModal = false" aria-label="Close modal">
               <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
             </button>
@@ -248,7 +248,7 @@ const currentPageTitle = computed(() => {
   if (route.name === 'TradeAnalyzer' || route.name === 'TradeLanding') return 'Trade Analyzer'
   if (route.name === 'Portfolio') {
     const p = store.portfolios.find(p => p.id === route.params.id)
-    return p?.name || 'Portfolio'
+    return p?.name || 'Shelf'
   }
   return 'Rarebox'
 })

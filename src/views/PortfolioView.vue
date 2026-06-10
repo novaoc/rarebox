@@ -34,7 +34,7 @@
                 <button @click="showBulkImport = true">↑ Bulk Import</button>
                 <button :disabled="refreshing" @click="refreshPrices">↻ Refresh Prices</button>
                 <button @click="exportPortfolio">↓ Export Excel</button>
-                <button class="text-danger" @click="confirmDelete = true">Delete Portfolio</button>
+                <button class="text-danger" @click="confirmDelete = true">Delete Shelf</button>
               </div>
             </transition>
           </div>
@@ -91,7 +91,7 @@
       <div class="card mb-4 hide-mobile">
         <div class="section-header">
           <div>
-            <div class="section-title">Portfolio Value</div>
+            <div class="section-title">Shelf Value</div>
             <div class="section-subtitle">Historical value over time</div>
           </div>
         </div>
@@ -120,7 +120,7 @@
             </div>
           </div>
           <div class="search-mini-wrap px-mobile mt-2">
-            <input v-model="itemSearch" class="input input-sm" placeholder="Search portfolio..." />
+            <input v-model="itemSearch" class="input input-sm" placeholder="Search shelf..." />
           </div>
         </div>
 
@@ -254,7 +254,7 @@
             </button>
             <button class="text-danger" @click="removeItem(activeItemMenu); activeItemMenu = null">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
-              Remove from Portfolio
+              Remove from Shelf
             </button>
           </div>
           <button class="btn btn-ghost btn-lg w-full mt-2" @click="activeItemMenu = null">Cancel</button>
@@ -395,7 +395,7 @@
       <div v-if="confirmDelete" class="modal-overlay" @click.self="confirmDelete = false">
         <div class="modal" style="max-width:400px">
           <div class="modal-header">
-            <h3>Delete Portfolio</h3>
+            <h3>Delete Shelf</h3>
             <button class="btn btn-ghost btn-icon" @click="confirmDelete = false">✕</button>
           </div>
           <div class="modal-body">

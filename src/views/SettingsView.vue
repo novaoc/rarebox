@@ -33,7 +33,7 @@
       <div class="settings-item">
         <div>
           <div class="settings-item-label">Storage Used</div>
-          <div class="settings-item-sub">Portfolios, items, and price cache</div>
+          <div class="settings-item-sub">Shelves, items, and price cache</div>
         </div>
         <div class="settings-item-value">{{ storageUsed }}</div>
       </div>
@@ -51,7 +51,7 @@
       <div class="settings-item danger-zone">
         <div>
           <div class="settings-item-label" style="color:var(--danger)">Reset All Data</div>
-          <div class="settings-item-sub">Delete all portfolios, items, and cached data. This cannot be undone.</div>
+          <div class="settings-item-sub">Delete all shelves, items, and cached data. This cannot be undone.</div>
         </div>
         <button class="btn btn-danger btn-sm" @click="confirmReset = true">Reset Everything</button>
       </div>
@@ -119,7 +119,7 @@
     <!-- Export -->
     <div class="settings-section card mb-4">
       <h3 class="settings-section-title">Export</h3>
-      <p class="settings-desc">Export your portfolio data to Excel for further analysis.</p>
+      <p class="settings-desc">Export your shelf data to Excel for further analysis.</p>
 
       <div v-for="portfolio in store.portfolios" :key="portfolio.id" class="settings-item">
         <div class="flex items-center gap-2">
@@ -136,8 +136,8 @@
 
       <div v-if="store.portfolios.length > 1" class="settings-item">
         <div>
-          <div class="settings-item-label">All Portfolios</div>
-          <div class="settings-item-sub">Export all portfolios to a single Excel file</div>
+          <div class="settings-item-label">All Shelves</div>
+          <div class="settings-item-sub">Export all shelves to a single Excel file</div>
         </div>
         <button class="btn btn-primary btn-sm" @click="exportAll">↓ Export All</button>
       </div>
@@ -159,7 +159,7 @@
       <div class="settings-item">
         <div>
           <div class="settings-item-label">Export Backup</div>
-          <div class="settings-item-sub">Download all portfolios, settings, and price snapshots</div>
+          <div class="settings-item-sub">Download all shelves, settings, and price snapshots</div>
         </div>
         <button class="btn btn-secondary btn-sm" @click="doExportBackup">↓ Download</button>
       </div>
@@ -177,7 +177,7 @@
 
       <div v-if="importResult" class="settings-item" style="border-bottom:none">
         <div class="import-result" :class="importResult.error ? 'error' : 'success'">
-          {{ importResult.error || `Restored ${importResult.portfolios} portfolio(s), ${importResult.snapshots} snapshot(s)` }}
+          {{ importResult.error || `Restored ${importResult.portfolios} ${importResult.portfolios === 1 ? 'shelf' : 'shelves'}, ${importResult.snapshots} snapshot(s)` }}
         </div>
       </div>
     </div>
@@ -196,7 +196,7 @@
     <!-- Collectr Import -->
     <div id="import" class="settings-section card mb-4">
       <h3 class="settings-section-title">Import from Collectr</h3>
-      <p class="settings-desc">Upload a Collectr portfolio export CSV to create portfolios in Rarebox. Maps card types, variants, grades, and sealed products automatically.</p>
+      <p class="settings-desc">Upload a Collectr export CSV to create shelves in Rarebox. Maps card types, variants, grades, and sealed products automatically.</p>
 
       <div class="settings-item">
         <div>
@@ -284,8 +284,8 @@
           <div class="modal-body">
             <p class="text-secondary mb-3">This will permanently delete:</p>
             <ul class="reset-list">
-              <li>All {{ store.portfolios.length }} portfolio{{ store.portfolios.length !== 1 ? 's' : '' }}</li>
-              <li>All {{ totalItems }} item{{ totalItems !== 1 ? 's' : '' }} across all portfolios</li>
+              <li>All {{ store.portfolios.length }} {{ store.portfolios.length !== 1 ? 'shelves' : 'shelf' }}</li>
+              <li>All {{ totalItems }} item{{ totalItems !== 1 ? 's' : '' }} across all shelves</li>
               <li>All cached price data</li>
             </ul>
             <p class="text-danger mt-3" style="font-size:13px;font-weight:600">This cannot be undone.</p>
@@ -542,7 +542,7 @@ async function handleCollectrImport(e) {
     collectrPhase.value = 'parsing'
     collectrImportStatus.value = ext === 'csv' ? 'Reading CSV…' : 'Reading Excel…'
     const portfolios = await parseCollectrFile(file)
-    if (portfolios.length === 0) throw new Error('No portfolios found in file')
+    if (portfolios.length === 0) throw new Error('No shelves found in file')
     // Phase 2: Import into store
     collectrPhase.value = 'importing'
     const totalItems = portfolios.reduce((s, p) => s + p.items.length, 0)

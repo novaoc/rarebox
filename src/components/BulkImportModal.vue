@@ -130,7 +130,7 @@
           :disabled="activeResolved.length === 0"
           @click="doImport"
         >
-          Add {{ activeResolved.length }} Card{{ activeResolved.length !== 1 ? 's' : '' }} to Portfolio
+          Add {{ activeResolved.length }} Card{{ activeResolved.length !== 1 ? 's' : '' }} to Shelf
         </button>
       </div>
 

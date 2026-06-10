@@ -17,7 +17,7 @@
       <section>
         <h2>2. Description of Service</h2>
         <p>
-          Rarebox is a free, client-side trading card game portfolio tracker supporting
+          Rarebox is a free, client-side trading card game shelf tracker supporting
           Pokémon, Magic: The Gathering, Yu-Gi-Oh!, Disney Lorcana, One Piece Card Game,
           and Riftbound. It allows you to track cards, sealed products, and graded slabs,
           monitor market values, set price alerts, build decks, browse sets, analyze
@@ -32,7 +32,7 @@
         <h2>3. How It Works</h2>
         <p>Rarebox is a Progressive Web App (PWA) that runs entirely in your browser:</p>
         <ul>
-          <li><strong>Portfolio tracking</strong> — your portfolios, items, notes, and
+          <li><strong>Shelf tracking</strong> — your shelves (your collections), items, notes, and
             daily price snapshots are stored in your browser's IndexedDB and never
             leave your device unless you export or sync them.</li>
           <li><strong>Card data</strong> — card names, images, and set information are
@@ -124,7 +124,7 @@
       <section>
         <h2>8. Local Storage &amp; Your Data</h2>
         <p>
-          All portfolio data, deck data, settings, price snapshots, and preferences
+          All shelf data, deck data, settings, price snapshots, and preferences
           are stored exclusively in your browser's IndexedDB. This data never leaves
           your device unless you explicitly export it or configure cross-device sync.
           IndexedDB is more resilient than localStorage and is not cleared by standard
@@ -175,7 +175,7 @@
         <h2>12. Age Restriction</h2>
         <p>
           Rarebox is not directed at children under the age of 13. The Service involves
-          financial concepts (market values, portfolio tracking, price history) that are
+          financial concepts (market values, shelf tracking, price history) that are
           intended for users aged 13 and older. By using the Service, you confirm you
           are at least 13 years of age. If you are under 13, do not use the Service.
         </p>
@@ -247,7 +247,7 @@
         <h2>3. Local Storage</h2>
         <p>Rarebox uses your browser's IndexedDB to save:</p>
         <ul>
-          <li><strong>Portfolios</strong> — your card collections, quantities, purchase
+          <li><strong>Shelves</strong> — your card collections, quantities, purchase
             prices, notes, and daily price snapshots</li>
           <li><strong>Decks</strong> — deck lists, card quantities, and meta deck
             imports</li>
@@ -266,7 +266,7 @@
       <section>
         <h2>4. Cross-Device Sync</h2>
         <p>
-          If you configure cross-device sync, your portfolio data is transmitted
+          If you configure cross-device sync, your shelf data is transmitted
           directly from your browser to jsonbin.io using an API key you provide.
           Rarebox does not intermediate, log, or store this data. jsonbin.io's
           privacy policy governs how they handle your data.
@@ -287,7 +287,7 @@
         </ul>
         <p>
           These requests are made directly from your browser and never include your
-          portfolio contents — only the card or product being looked up.
+          shelf contents — only the card or product being looked up.
         </p>
 
       </section>
@@ -311,7 +311,7 @@
           visits. It is cookieless, does not identify you, does not track you
           across sites, and collects no personal data — visitors are counted
           via a short-lived anonymized hash that cannot be tied back to you.
-          We never see your searches, card views, portfolio contents, or any
+          We never see your searches, card views, shelf contents, or any
           data you store in the app. No advertising networks, no
           fingerprinting, no third-party trackers.
         </p>

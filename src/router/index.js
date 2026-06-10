@@ -1,12 +1,12 @@
 import { createRouter, createWebHistory } from 'vue-router'
 
 const routes = [
-  { path: '/', name: 'Dashboard', component: () => import('../views/DashboardView.vue'), meta: { title: 'Dashboard', description: 'Track your TCG collection — Pokémon, Magic, Yu-Gi-Oh!, Lorcana, One Piece, and Riftbound. Live prices, portfolio charts, and gain/loss.' } },
+  { path: '/', name: 'Dashboard', component: () => import('../views/DashboardView.vue'), meta: { title: 'Dashboard', description: 'Track your TCG collection — Pokémon, Magic, Yu-Gi-Oh!, Lorcana, One Piece, and Riftbound. Live prices, shelf charts, and gain/loss.' } },
   { path: '/search', name: 'Search', component: () => import('../views/SearchView.vue'), meta: { title: 'Search Cards', description: 'Search any card across Pokémon, Magic, Yu-Gi-Oh!, Lorcana, One Piece, and Riftbound. Live market prices and price history charts.' } },
   { path: '/sets', name: 'Browse', component: () => import('../views/BrowseView.vue'), meta: { title: 'Browse Sets', description: 'Browse trading card games — Pokémon, Magic, Yu-Gi-Oh!, One Piece, Lorcana and more. Explore sets, cards and live prices.' } },
   { path: '/sets/pokemon', name: 'Sets', component: () => import('../views/SetsView.vue'), meta: { title: 'Pokémon Sets', description: 'Browse every Pokémon TCG set. View cards, release dates, and card counts.' } },
   { path: '/sets/:game', name: 'TcgSets', component: () => import('../views/TcgSetsView.vue'), meta: { title: 'Browse Sets', description: 'Browse sets and cards with live prices.' } },  // ⚠ must be AFTER /sets/pokemon
-  { path: '/portfolio/:id', name: 'Portfolio', component: () => import('../views/PortfolioView.vue'), meta: { title: 'Portfolio', description: 'View portfolio items, value charts, gain/loss, and manage your collection.' } },
+  { path: '/portfolio/:id', name: 'Portfolio', component: () => import('../views/PortfolioView.vue'), meta: { title: 'Shelf', description: 'View shelf items, value charts, gain/loss, and manage your collection.' } },
   { path: '/decks', name: 'Decks', component: () => import('../views/DeckListView.vue'), meta: { title: 'Decks', description: 'Build and track Pokémon TCG decks. Compare against your collection and see what you still need.' } },
   { path: '/decks/meta', name: 'MetaDecks', component: () => import('../views/MetaDecksView.vue'), meta: { title: 'Meta Decks', description: 'Browse popular competitive Pokémon TCG decks. Import with one click.' } },
   { path: '/decks/:id', name: 'DeckBuilder', component: () => import('../views/DeckBuilderView.vue'), meta: { title: 'Deck Builder', description: 'Build your deck, track card ownership, and calculate costs.' } },
@@ -21,6 +21,8 @@ const routes = [
   { path: '/designs/tactile', name: 'DesignTactile', component: () => import('../views/designs/DesignTactileView.vue'), meta: { bare: true, title: 'Design — Tactile' } },
   { path: '/designs/atelier', name: 'DesignAtelier', component: () => import('../views/designs/DesignAtelierView.vue'), meta: { bare: true, title: 'Design — Atelier' } },
   { path: '/designs/pulse', name: 'DesignPulse', component: () => import('../views/designs/DesignPulseView.vue'), meta: { bare: true, title: 'Design — Pulse' } },
+  // Shelf alias — friendly URL for portfolio pages
+  { path: '/shelf/:id', redirect: to => ({ path: '/portfolio/' + to.params.id }) },
   // 404 catch-all — redirect to dashboard
   { path: '/:pathMatch(.*)*', redirect: '/' },
 ]
@@ -58,13 +60,13 @@ router.afterEach((to) => {
     desc.setAttribute('name', 'description')
     document.head.appendChild(desc)
   }
-  desc.setAttribute('content', to.meta.description || 'Track your TCG collection — Pokémon, Magic, Yu-Gi-Oh!, Lorcana, One Piece, and Riftbound. Live prices and portfolio charts.')
+  desc.setAttribute('content', to.meta.description || 'Track your TCG collection — Pokémon, Magic, Yu-Gi-Oh!, Lorcana, One Piece, and Riftbound. Live prices and shelf charts.')
 
   // Update OG tags
   let ogTitle = document.querySelector('meta[property="og:title"]')
   if (ogTitle) ogTitle.setAttribute('content', `${title} — Rarebox`)
   let ogDesc = document.querySelector('meta[property="og:description"]')
-  if (ogDesc) ogDesc.setAttribute('content', to.meta.description || 'Track your TCG collection — Pokémon, Magic, Yu-Gi-Oh!, Lorcana, One Piece, and Riftbound. Live prices and portfolio charts.')
+  if (ogDesc) ogDesc.setAttribute('content', to.meta.description || 'Track your TCG collection — Pokémon, Magic, Yu-Gi-Oh!, Lorcana, One Piece, and Riftbound. Live prices and shelf charts.')
 })
 
 export default router

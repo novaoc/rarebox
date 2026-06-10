@@ -150,7 +150,7 @@
               </span>
             </div>
             <div class="form-group mb-3">
-              <label class="form-label">Portfolio</label>
+              <label class="form-label">Shelf</label>
               <select v-model="bulkPortfolioId" class="select">
                 <option v-for="p in store.portfolios" :key="p.id" :value="p.id">{{ p.name }}</option>
               </select>

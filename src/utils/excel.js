@@ -23,11 +23,11 @@ export function exportPortfolioToExcel(portfolio, filename = null) {
     XLSX.utils.book_append_sheet(wb, cardsWs, 'Cards')
   }
 
-  const name = filename || `${portfolio.name.replace(/[^a-z0-9]/gi, '_')}_portfolio.xlsx`
+  const name = filename || `${portfolio.name.replace(/[^a-z0-9]/gi, '_')}_shelf.xlsx`
   XLSX.writeFile(wb, name)
 }
 
-export function exportAllPortfolios(portfolios, filename = 'all_portfolios.xlsx') {
+export function exportAllPortfolios(portfolios, filename = 'all_shelves.xlsx') {
   const wb = XLSX.utils.book_new()
 
   // Combined overview
@@ -54,9 +54,9 @@ function buildSummarySheet(portfolio) {
   const gainPct = totalCost > 0 ? (gain / totalCost) * 100 : 0
 
   return [
-    ['Portfolio Summary', ''],
+    ['Shelf Summary', ''],
     ['', ''],
-    ['Portfolio Name', portfolio.name],
+    ['Shelf Name', portfolio.name],
     ['Total Items', portfolio.items.length],
     ['Total Quantity', portfolio.items.reduce((s, i) => s + (i.quantity || 1), 0)],
     ['', ''],
@@ -108,7 +108,7 @@ function buildItemsSheet(items, title = 'Items') {
 
 function buildCombinedSheet(portfolios) {
   const headers = [
-    'Portfolio', 'Type', 'Name', 'Set', 'Quantity',
+    'Shelf', 'Type', 'Name', 'Set', 'Quantity',
     'Purchase Price', 'Current Value', 'Gain/Loss', 'Return %'
   ]
 

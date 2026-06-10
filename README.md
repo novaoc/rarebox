@@ -7,7 +7,7 @@
 
 # Rarebox
 
-Track your TCG collection across Pokémon, Magic: The Gathering, Disney Lorcana, One Piece Card Game, Yu-Gi-Oh!, and Riftbound — cards, sealed products, and graded slabs — with live prices, portfolio charts, and a trade analyzer.
+Track your TCG collection across Pokémon, Magic: The Gathering, Disney Lorcana, One Piece Card Game, Yu-Gi-Oh!, and Riftbound — cards, sealed products, and graded slabs — with live prices, shelf value charts, and a trade analyzer.
 
 As of v1.4.0 the entire app wears **Tactile** — a custom design system (cream paper, ink lines, hard shadows that compress when pressed) with a bottom tab bar on phones/foldables/tablets and a top bar on desktop. Five alternative design prototypes remain live at [/designs](https://rarebox.io/designs).
 
@@ -32,8 +32,8 @@ Built by [Nova](https://github.com/novaoc).
 - Add sealed products (booster boxes, ETBs, tins, packs) — prices and images from PriceCharting
 - Add graded slabs (PSA / BGS / CGC / ACE) — grade-specific pricing and multipliers, available for all TCGs
 - Bulk import — paste a PTCGL/PTCGO deck list and add all cards at once
-- Multiple named portfolios, each with a color and their own value chart
-- Combined dashboard showing total collection value, cost basis, and gain/loss across all portfolios
+- Multiple named shelves, each with a color and their own value chart
+- Combined dashboard showing total collection value, cost basis, and gain/loss across all shelves
 - Add an entire set to a portfolio in one click from any Browse Sets view
 
 ### Browse Sets (Multi-TCG)
@@ -101,18 +101,18 @@ Built by [Nova](https://github.com/novaoc).
 - Live card prices from pokemontcg.io, Scryfall, Lorcast, optcgapi, YGOPRODeck, riftcodex.com, and PriceCharting
 - Per-type price staleness tracking — cards refreshed every 24h, sealed/graded every 12h
 - Price history charts (7D / 1M / 6M / 1Y / 3Y ranges) from multiple historical data sources
-- Portfolio value-over-time chart with daily price snapshots (3 years retained)
+- Shelf value-over-time chart with daily price snapshots (3 years retained)
 - Graded-grade multipliers for price estimation
 
 ### Export, Import & Backup
-- Export individual portfolios to Excel (.xlsx) with summary + items sheets
-- Export all portfolios to a single Excel file
+- Export individual shelves to Excel (.xlsx) with summary + items sheets
+- Export all shelves to a single Excel file
 - Backup entire collection as JSON — download and restore on any device
 - **Collectr import** — import CSV or Excel exports from the Collectr app (maps game names, variants, grading, sealed products)
 - **Transfer to device** — gzip-compressed QR code or clipboard copy/paste for moving collections between devices
 - Stale data cleanup — deleted cards don't linger in snapshots or backups
 - Storage usage display in Settings — shows combined IndexedDB + localStorage usage via `navigator.storage.estimate()`
-- **Reset Everything** — clears all portfolios, card cache, and stored data with a single button
+- **Reset Everything** — clears all shelves, card cache, and stored data with a single button
 
 ### Mobile
 - Bottom tab bar navigation with 44px+ touch targets and iOS safe-area support

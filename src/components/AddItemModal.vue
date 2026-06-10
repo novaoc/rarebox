@@ -2,7 +2,7 @@
   <div class="modal-overlay" @click.self="$emit('close')">
     <div class="modal">
       <div class="modal-header">
-        <h3>Add to Portfolio</h3>
+        <h3>Add to Shelf</h3>
         <button class="btn btn-ghost btn-icon" @click="$emit('close')">✕</button>
       </div>
 
@@ -164,7 +164,7 @@
         </div>
 
         <div class="form-group">
-          <label class="form-label">Portfolio</label>
+          <label class="form-label">Shelf</label>
           <select v-model="form.portfolioId" class="select">
             <option v-for="p in store.portfolios" :key="p.id" :value="p.id">{{ p.name }}</option>
           </select>
@@ -179,7 +179,7 @@
       <div class="modal-footer">
         <button class="btn btn-secondary" @click="$emit('close')">Cancel</button>
         <button class="btn btn-primary" :disabled="!canSubmit" @click="submit">
-          Add to Portfolio
+          Add to Shelf
         </button>
       </div>
     </div>

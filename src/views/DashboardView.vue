@@ -13,7 +13,7 @@
           <h1 class="ld-title">Collect. Track.<br /><span class="marker">Trade.</span> Win.</h1>
           <p class="ld-sub">
             Rarebox is the home for your whole binder — Pokémon, Magic, Yu-Gi-Oh!, Lorcana,
-            One Piece and Riftbound. Live market prices, portfolio analytics, deck building
+            One Piece and Riftbound. Live market prices, shelf analytics, deck building
             and a trade analyzer, all in your browser.
           </p>
           <div class="ld-ctas">
@@ -54,7 +54,7 @@
               <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/></svg>
             </div>
             <h3>Know your gains</h3>
-            <p>Portfolios with cost basis, profit and loss per card, value history charts and price alerts. Your shelf, as a number that updates itself.</p>
+            <p>Shelves with cost basis, profit and loss per card, value history charts and price alerts. Your shelf, as a number that updates itself.</p>
           </div>
           <div class="ld-feature ld-tint-pink">
             <div class="ld-feature-icon">
@@ -130,9 +130,9 @@
       <!-- Top stats -->
       <div class="stats-row mb-4">
         <div class="stat-tile">
-          <div class="label">Total Portfolio Value</div>
+          <div class="label">Total Shelf Value</div>
           <div class="value"><span class="sticker sticker-green total-value-sticker">${{ store.totalPortfolioValue.toFixed(2) }}</span></div>
-          <div class="sub">Across all portfolios</div>
+          <div class="sub">Across all shelves</div>
         </div>
         <div class="stat-tile">
           <div class="label">Total Cost Basis</div>
@@ -151,7 +151,7 @@
         <div class="stat-tile">
           <div class="label">Total Items</div>
           <div class="value">{{ totalItems }}</div>
-          <div class="sub">{{ store.portfolios.length }} portfolios</div>
+          <div class="sub">{{ store.portfolios.length }} shelves</div>
         </div>
       </div>
 
@@ -159,17 +159,17 @@
       <div class="card mb-4">
         <div class="section-header">
           <div>
-            <div class="section-title">Combined Portfolio</div>
-            <div class="section-subtitle">All portfolios combined</div>
+            <div class="section-title">All Shelves</div>
+            <div class="section-subtitle">All shelves combined</div>
           </div>
         </div>
-        <PortfolioChart :portfolios="store.portfolios" :height="300" label="All Portfolios" />
+        <PortfolioChart :portfolios="store.portfolios" :height="300" label="All Shelves" />
       </div>
 
       <!-- Individual portfolio cards -->
       <div class="section-header">
-        <div class="section-title">Portfolios</div>
-        <button class="btn btn-secondary btn-sm" @click="$emit('create-portfolio')">+ New Portfolio</button>
+        <div class="section-title">Shelves</div>
+        <button class="btn btn-secondary btn-sm" @click="$emit('create-portfolio')">+ New Shelf</button>
       </div>
 
       <div class="portfolios-grid">

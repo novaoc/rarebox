@@ -5,7 +5,7 @@
     </div>
     <div v-else-if="noData" class="chart-nodata flex-center flex-col" :style="{ height: height + 'px' }">
       <span style="font-size:40px;opacity:0.2">📈</span>
-      <span class="text-muted mt-2">Add items to see portfolio value</span>
+      <span class="text-muted mt-2">Add items to see shelf value</span>
     </div>
     <div v-else>
       <div class="chart-top">
@@ -49,7 +49,7 @@ const store = usePortfolioStore()
 const props = defineProps({
   portfolios: { type: Array, required: true },
   height: { type: Number, default: 300 },
-  label: { type: String, default: 'Portfolio Value' }
+  label: { type: String, default: 'Shelf Value' }
 })
 
 const loading = ref(true)

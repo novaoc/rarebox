@@ -65,7 +65,7 @@
           <div v-if="parsedBackup" class="sync-preview">
             <div class="sync-preview-title">Ready to import:</div>
             <div class="sync-preview-detail">
-              {{ parsedBackup.data?.portfolios?.portfolios?.length || 0 }} portfolio(s)
+              {{ (parsedBackup.data?.portfolios?.portfolios?.length || 0) === 1 ? '1 shelf' : `${parsedBackup.data?.portfolios?.portfolios?.length || 0} shelves` }}
             </div>
             <div class="sync-preview-detail" v-if="parsedBackup.exportedAt">
               Exported: {{ formatDate(parsedBackup.exportedAt) }}

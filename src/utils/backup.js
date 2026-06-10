@@ -51,11 +51,11 @@ export function validateBackup(data) {
   if (!data.data || typeof data.data !== 'object') return 'Backup has no data'
 
   const hasPortfolios = data.data.portfolios
-  if (!hasPortfolios) return 'Backup missing portfolio data'
+  if (!hasPortfolios) return 'Backup missing shelf data'
 
   // Quick shape check
   if (hasPortfolios.portfolios && !Array.isArray(hasPortfolios.portfolios)) {
-    return 'Portfolio data is corrupted'
+    return 'Shelf data is corrupted'
   }
 
   return null // valid
