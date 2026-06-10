@@ -39,7 +39,7 @@ const tcgs = TCGS
 
 .tcg-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr));
   gap: 14px;
 }
 
@@ -51,15 +51,16 @@ const tcgs = TCGS
   padding: 20px;
   border-radius: var(--radius-lg);
   background: var(--bg-card);
-  border: 1px solid var(--border);
+  border: var(--bw) solid var(--ink);
+  box-shadow: var(--shadow-xs);
   text-decoration: none;
   color: var(--text-primary);
   overflow: hidden;
-  transition: transform 0.18s, border-color 0.18s, box-shadow 0.18s;
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
 }
-.tcg-tile:hover { transform: translateY(-2px); border-color: var(--accent); box-shadow: 0 8px 24px rgba(0,0,0,0.3); }
-.tcg-disabled { opacity: 0.55; cursor: not-allowed; }
-.tcg-disabled:hover { transform: none; border-color: var(--border); box-shadow: none; }
+.tcg-tile:hover { transform: translate(-1px, -1px); box-shadow: var(--shadow-sm); }
+.tcg-disabled { opacity: 0.55; cursor: not-allowed; box-shadow: none; }
+.tcg-disabled:hover { transform: none; box-shadow: none; }
 
 .tcg-logo {
   width: 80px;
@@ -68,6 +69,11 @@ const tcgs = TCGS
   display: flex;
   align-items: center;
   justify-content: center;
+  background: #fff;
+  border: var(--bw) solid var(--ink);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-pressed);
+  padding: 10px;
 }
 .tcg-logo :deep(svg) { width: 100%; height: 100%; }
 
@@ -75,9 +81,9 @@ const tcgs = TCGS
 .tcg-name { font-size: 15px; font-weight: 700; }
 .tcg-tagline { font-size: 12px; color: var(--text-muted); margin-top: 3px; }
 
-.tcg-arrow { color: var(--text-muted); font-size: 18px; flex-shrink: 0; }
-.tcg-tile:hover .tcg-arrow { color: var(--accent); }
-.tcg-soon { flex-shrink: 0; background: var(--bg-secondary); color: var(--text-muted); }
+.tcg-arrow { color: var(--text-muted); font-size: 18px; flex-shrink: 0; transition: transform 0.12s ease, color 0.12s ease; }
+.tcg-tile:hover .tcg-arrow { color: var(--ink); transform: translateX(2px); }
+.tcg-soon { flex-shrink: 0; background: var(--bg-secondary); color: var(--text-secondary); }
 
 @media (prefers-reduced-motion: reduce) {
   .tcg-tile { transition: none; }

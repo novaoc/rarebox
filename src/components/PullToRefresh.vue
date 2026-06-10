@@ -175,15 +175,20 @@ watch(() => route.path, () => {
 
 .indicator-inner {
   background: var(--bg-card);
-  border: 1px solid var(--border);
-  color: var(--accent);
+  border: var(--bw) solid var(--ink);
+  color: var(--ink);
   width: 36px;
   height: 36px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  box-shadow: var(--shadow-xs);
+  transition: background 0.15s;
+}
+
+.can-release .indicator-inner {
+  background: var(--accent);
 }
 
 .pull-content {

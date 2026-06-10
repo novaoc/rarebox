@@ -94,18 +94,17 @@ function confirm() {
 .loader-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0,0,0,0.6);
+  background: rgba(20, 20, 20, 0.45);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 9999;
   padding: 24px;
-  backdrop-filter: blur(4px);
 }
 
 .loader-card {
-  background: var(--bg-secondary, #161b22);
-  border: 1px solid var(--border, #30363d);
+  background: var(--bg-card);
+  border: var(--bw) solid var(--ink);
   border-radius: 16px;
   padding: 32px 24px;
   max-width: 440px;
@@ -113,29 +112,30 @@ function confirm() {
   text-align: center;
   max-height: 90vh;
   overflow-y: auto;
+  box-shadow: 6px 6px 0 var(--ink);
 }
 
 .loader-logo {
-  color: var(--accent, #f5a623);
+  color: var(--ink);
   margin-bottom: 10px;
 }
 
 .loader-title {
   font-size: 20px;
-  font-weight: 700;
-  color: var(--text-primary, #e6edf3);
+  font-weight: 800;
+  color: var(--text-primary);
   margin: 0 0 4px;
 }
 
 .loader-subtitle {
   font-size: 13px;
-  color: var(--text-muted, #8b949e);
+  color: var(--text-secondary);
   margin: 0 0 16px;
 }
 
 .loader-hint {
   font-size: 11px;
-  color: var(--text-muted, #8b949e);
+  color: var(--text-muted);
   margin: 8px 0 14px;
 }
 
@@ -152,24 +152,24 @@ function confirm() {
   gap: 10px;
   padding: 10px 12px;
   border-radius: 10px;
-  border: 1.5px solid var(--border, #30363d);
-  background: var(--bg-primary, #0d1117);
-  color: var(--text-secondary, #8b949e);
+  border: var(--bw) solid var(--ink);
+  background: var(--bg-card);
+  color: var(--text-secondary);
   cursor: pointer;
-  transition: all 0.15s;
+  transition: background 0.15s, box-shadow 0.1s, transform 0.1s;
   font-size: 13px;
   font-weight: 500;
   text-align: left;
 }
 
 .tcg-option:hover {
-  border-color: var(--accent, #f5a623);
+  background: var(--bg-hover);
 }
 
 .tcg-option.selected {
-  border-color: var(--accent, #f5a623);
-  background: var(--accent-dim, rgba(245, 166, 35, 0.1));
-  color: var(--text-primary, #e6edf3);
+  background: var(--accent);
+  color: var(--ink);
+  box-shadow: var(--shadow-xs);
 }
 
 .tcg-icon { font-size: 18px; flex-shrink: 0; }
@@ -189,22 +189,24 @@ function confirm() {
 
 .tcg-meta {
   font-size: 11px;
-  color: var(--text-muted, #8b949e);
+  color: var(--text-muted);
 }
+.tcg-option.selected .tcg-meta { color: var(--text-secondary); }
 
 .tcg-check {
   font-size: 13px;
-  font-weight: 700;
-  color: var(--accent, #f5a623);
+  font-weight: 800;
+  color: var(--ink);
   flex-shrink: 0;
 }
 
 .storage-summary {
   font-size: 12px;
-  font-weight: 600;
-  color: var(--accent, #f5a623);
+  font-weight: 700;
+  color: var(--ink);
   padding: 8px 12px;
-  background: var(--accent-dim, rgba(245, 166, 35, 0.08));
+  background: var(--accent-dim);
+  border: 1.5px solid var(--ink);
   border-radius: 8px;
   margin-bottom: 4px;
 }

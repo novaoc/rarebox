@@ -160,10 +160,11 @@ async function importDeck(metaDeck) {
 }
 
 .meta-card {
-  background: var(--bg-secondary);
-  border: 1px solid var(--border);
+  background: var(--bg-card);
+  border: var(--bw) solid var(--ink);
   border-radius: var(--radius-lg);
   padding: 16px;
+  box-shadow: var(--shadow-sm);
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -192,7 +193,7 @@ async function importDeck(metaDeck) {
 
 /* Expanded card list */
 .meta-card-list {
-  border-top: 1px solid var(--border);
+  border-top: var(--bw) solid var(--border-subtle);
   padding-top: 12px;
   display: flex;
   flex-direction: column;

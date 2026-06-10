@@ -97,42 +97,39 @@ const chartOptions = ref({
   chart: {
     type: 'area',
     background: 'transparent',
+    foreColor: '#141414',
     toolbar: { show: false },
     zoom: { enabled: false },
     animations: { enabled: true, speed: 600 }
   },
-  theme: { mode: 'dark' },
+  theme: { mode: 'light' },
   dataLabels: { enabled: false },
-  stroke: { curve: 'smooth', width: 2 },
+  stroke: { curve: 'smooth', width: 3 },
   fill: {
-    type: 'gradient',
-    gradient: {
-      shadeIntensity: 1,
-      opacityFrom: 0.3,
-      opacityTo: 0.02,
-      stops: [0, 100]
-    }
+    type: 'solid',
+    colors: ['#fff3c4'],
+    opacity: 1
   },
-  colors: ['#f5a623'],
+  colors: ['#4f86f7'],
   xaxis: {
     type: 'datetime',
-    labels: { style: { colors: '#8b949e', fontSize: '11px' } },
+    labels: { style: { colors: '#5f5a51', fontSize: '11px' } },
     axisBorder: { show: false },
     axisTicks: { show: false },
   },
   yaxis: {
     labels: {
-      style: { colors: '#8b949e', fontSize: '11px' },
+      style: { colors: '#5f5a51', fontSize: '11px' },
       formatter: (v) => `$${v >= 1000 ? (v/1000).toFixed(1) + 'k' : v?.toFixed(0)}`
     }
   },
   tooltip: {
-    theme: 'dark',
+    theme: 'light',
     x: { format: 'MMM dd, yyyy' },
     y: { formatter: (v) => `$${v?.toFixed(2)}` }
   },
   grid: {
-    borderColor: '#30363d',
+    borderColor: '#e7dfd0',
     strokeDashArray: 3,
     padding: { left: 4, right: 4 }
   },
@@ -275,8 +272,8 @@ function applyRange(points) {
   const display = filtered.length >= 2 ? filtered : points
 
   const color = display.length >= 2
-    ? (display[display.length - 1].y >= display[0].y ? '#3fb950' : '#f85149')
-    : '#f5a623'
+    ? (display[display.length - 1].y >= display[0].y ? '#2fbf71' : '#e4434f')
+    : '#4f86f7'
 
   // Set x-axis tick format based on range — prevents "hours" showing on 7D/1M
   const dtFmt = rangeDateFormats[activeRange.value] || { format: 'MMM yyyy' }
@@ -336,16 +333,16 @@ onMounted(buildPortfolioHistory)
 
 .chart-controls { display: flex; gap: 4px; align-items: flex-start; }
 .range-btn {
-  background: none;
-  border: 1px solid var(--border);
-  color: var(--text-muted);
+  background: var(--bg-card);
+  border: var(--bw) solid var(--ink);
+  color: var(--text-secondary);
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 700;
   padding: 3px 8px;
-  border-radius: 4px;
+  border-radius: 8px;
   cursor: pointer;
-  transition: all 0.15s;
+  transition: background 0.15s, color 0.15s;
 }
-.range-btn:hover { color: var(--text-primary); border-color: var(--text-secondary); }
-.range-btn.active { background: var(--accent-dim); color: var(--accent); border-color: var(--accent); }
+.range-btn:hover { color: var(--text-primary); background: var(--bg-secondary); }
+.range-btn.active { background: var(--accent); color: var(--ink); box-shadow: var(--shadow-pressed); }
 </style>

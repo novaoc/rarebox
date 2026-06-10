@@ -181,24 +181,25 @@ defineExpose({ start, onProgress, finish })
 <style scoped>
 .load-pill {
   position: fixed;
-  bottom: 20px;
+  /* clear the bottom tab bar on small screens */
+  bottom: calc(var(--tabbar-height, 64px) + env(safe-area-inset-bottom, 0px) + 12px);
   right: 20px;
-  background: var(--bg-secondary, #161b22);
-  border: 1px solid var(--border, #30363d);
+  background: var(--bg-primary);
+  border: var(--bw) solid var(--ink);
   border-radius: 12px;
   padding: 10px 14px;
   min-width: 180px;
   max-width: 260px;
   z-index: 1000;
-  box-shadow: 0 4px 24px rgba(0,0,0,0.3);
+  box-shadow: var(--shadow-sm);
   cursor: pointer;
   transition: all 0.2s;
   font-size: 12px;
-  color: var(--text-primary, #e6edf3);
+  color: var(--text-primary);
 }
 
-.load-pill:hover { border-color: var(--accent, #f5a623); }
-.load-pill.done { border-color: var(--success, #3fb950); }
+.load-pill:hover { background: var(--bg-hover); }
+.load-pill.done { background: var(--success-dim); }
 
 /* Dismiss button styles */
 .pill-dismiss-btn {
@@ -208,23 +209,22 @@ defineExpose({ start, onProgress, finish })
   width: 24px;
   height: 24px;
   border-radius: 50%;
-  background: var(--bg-secondary, #161b22);
-  border: 1px solid var(--border, #30363d);
-  color: var(--text-muted, #8b949e);
+  background: var(--bg-card);
+  border: 1.5px solid var(--ink);
+  color: var(--text-secondary);
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   transition: all 0.15s;
   z-index: 10;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+  box-shadow: var(--shadow-pressed);
 }
 
 .pill-dismiss-btn:hover {
-  background: var(--bg-hover, #21262d);
-  color: var(--text-primary, #e6edf3);
+  background: var(--bg-hover);
+  color: var(--text-primary);
   transform: scale(1.1);
-  border-color: var(--accent, #f5a623);
 }
 
 .pill-collapsed {
@@ -236,8 +236,8 @@ defineExpose({ start, onProgress, finish })
 .pill-spinner {
   width: 14px;
   height: 14px;
-  border: 2px solid var(--border, #30363d);
-  border-top-color: var(--accent, #f5a623);
+  border: 2px solid var(--border-subtle);
+  border-top-color: var(--ink);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
@@ -245,8 +245,8 @@ defineExpose({ start, onProgress, finish })
 @keyframes spin { to { transform: rotate(360deg); } }
 
 .pill-time {
-  font-weight: 600;
-  color: var(--accent, #f5a623);
+  font-weight: 700;
+  color: var(--text-primary);
   font-variant-numeric: tabular-nums;
 }
 
@@ -270,32 +270,32 @@ defineExpose({ start, onProgress, finish })
 }
 
 .pill-pct {
-  font-weight: 700;
+  font-weight: 800;
   font-size: 13px;
-  color: var(--accent, #f5a623);
+  color: var(--text-primary);
   font-variant-numeric: tabular-nums;
 }
 
-.done .pill-pct { color: var(--success, #3fb950); }
+.done .pill-pct { color: #1e9e5a; }
 
 .pill-bar-wrap {
-  height: 3px;
-  background: var(--bg-hover, #21262d);
-  border-radius: 2px;
+  height: 8px;
+  background: var(--bg-card);
+  border: 1.5px solid var(--ink);
+  border-radius: 4px;
   overflow: hidden;
   margin-bottom: 4px;
 }
 
 .pill-bar {
   height: 100%;
-  background: var(--accent, #f5a623);
-  border-radius: 2px;
+  background: var(--accent);
   transition: width 0.3s ease;
 }
 
 .pill-speed {
   font-size: 10px;
-  color: var(--text-muted, #8b949e);
+  color: var(--text-secondary);
   margin-bottom: 6px;
 }
 
@@ -310,13 +310,13 @@ defineExpose({ start, onProgress, finish })
   align-items: center;
   justify-content: space-between;
   padding: 2px 0;
-  color: var(--text-muted, #8b949e);
+  color: var(--text-secondary);
   font-size: 11px;
 }
 
-.pill-game.active { color: var(--text-primary, #e6edf3); }
-.pill-game.done { color: var(--success, #3fb950); }
-.pill-game.failed { color: var(--danger, #f85149); }
+.pill-game.active { color: var(--text-primary); font-weight: 700; }
+.pill-game.done { color: #1e9e5a; }
+.pill-game.failed { color: var(--danger); }
 
 .pill-game-status {
   max-width: 100px;
@@ -329,11 +329,14 @@ defineExpose({ start, onProgress, finish })
 .pill-enter-active { transition: all 0.3s ease; }
 .pill-leave-active { transition: all 0.3s ease; }
 .pill-enter-from { opacity: 0; transform: translateY(20px); }
+
+@media (min-width: 1024px) {
+  .load-pill { bottom: 20px; }
+}
 .pill-leave-to { opacity: 0; transform: translateY(20px); }
 
 @media (max-width: 768px) {
   .load-pill {
-    bottom: 16px;
     right: 16px;
     max-width: 220px;
   }

@@ -4,7 +4,6 @@
     <div v-if="isNewUser" class="landing">
       <!-- Hero -->
       <section class="hero">
-        <div class="hero-glow"></div>
         <div class="hero-content">
           <div class="hero-icon">⬡</div>
           <h1 class="hero-title">Rarebox</h1>
@@ -245,7 +244,7 @@
       <div class="stats-row mb-4">
         <div class="stat-tile">
           <div class="label">Total Portfolio Value</div>
-          <div class="value text-accent">${{ store.totalPortfolioValue.toFixed(2) }}</div>
+          <div class="value"><span class="sticker sticker-green total-value-sticker">${{ store.totalPortfolioValue.toFixed(2) }}</span></div>
           <div class="sub">Across all portfolios</div>
         </div>
         <div class="stat-tile">
@@ -472,17 +471,6 @@ onMounted(async () => {
   padding: 80px 0 60px;
   overflow: hidden;
 }
-.hero-glow {
-  position: absolute;
-  top: -100px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 500px;
-  height: 500px;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(245, 166, 35, 0.12) 0%, transparent 70%);
-  pointer-events: none;
-}
 .hero-content { position: relative; z-index: 1; }
 .hero-icon {
   font-size: 56px;
@@ -499,10 +487,7 @@ onMounted(async () => {
   font-weight: 800;
   letter-spacing: -1px;
   margin-bottom: 16px;
-  background: linear-gradient(135deg, var(--accent), #ffcc70);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  color: var(--text-primary);
 }
 .hero-sub {
   font-size: 17px;
@@ -566,14 +551,16 @@ onMounted(async () => {
   gap: 16px;
 }
 .feature-card {
-  background: var(--bg-secondary);
-  border: 1px solid var(--border);
+  background: var(--bg-card);
+  border: var(--bw) solid var(--ink);
   border-radius: var(--radius-lg);
   padding: 20px;
-  transition: border-color 0.2s;
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.15s, box-shadow 0.15s;
 }
 .feature-card:hover {
-  border-color: var(--accent);
+  transform: translate(-2px, -2px);
+  box-shadow: var(--shadow);
 }
 .feature-card-icon {
   font-size: 28px;
@@ -597,8 +584,8 @@ onMounted(async () => {
   display: flex;
   align-items: center;
   gap: 16px;
-  background: var(--bg-primary);
-  border: 1px solid var(--border);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-subtle);
   border-radius: var(--radius);
   padding: 16px;
 }
@@ -633,13 +620,14 @@ onMounted(async () => {
   display: flex;
   gap: 12px;
   align-items: flex-start;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border);
+  background: var(--bg-card);
+  border: var(--bw) solid var(--ink);
   border-radius: var(--radius-lg);
   padding: 18px;
+  box-shadow: var(--shadow-sm);
 }
 .privacy-check {
-  color: var(--success);
+  color: #1e9e5a;
   font-size: 18px;
   font-weight: 700;
   flex-shrink: 0;
@@ -660,7 +648,7 @@ onMounted(async () => {
 .final-cta {
   text-align: center;
   padding: 60px 0 80px;
-  border-top: 1px solid var(--border);
+  border-top: var(--bw) solid var(--ink);
 }
 .final-cta h2 {
   font-size: 28px;
@@ -702,6 +690,16 @@ onMounted(async () => {
 /* ── Existing Dashboard ── */
 .stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
 
+/* Hero value sticker — the one Tactile moment on the dashboard */
+.total-value-sticker {
+  font-size: 20px;
+  padding: 2px 12px;
+  text-transform: none;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  transform: rotate(-2deg);
+}
+
 .portfolios-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
@@ -711,24 +709,25 @@ onMounted(async () => {
 
 .portfolio-card {
   background: var(--bg-card);
-  border: 1px solid var(--border);
+  border: var(--bw) solid var(--ink);
   border-radius: var(--radius-lg);
   overflow: hidden;
-  transition: all 0.2s;
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.15s, box-shadow 0.15s;
   text-decoration: none;
   color: inherit;
   display: block;
   position: relative;
 }
 .portfolio-card:hover {
-  border-color: var(--p-color, var(--accent));
-  transform: translateY(-2px);
-  box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+  transform: translate(-2px, -2px);
+  box-shadow: var(--shadow);
   text-decoration: none;
 }
 .portfolio-card-accent {
-  height: 3px;
+  height: 4px;
   background: var(--p-color, var(--accent));
+  border-bottom: var(--bw) solid var(--ink);
 }
 .portfolio-card-body { padding: 16px; }
 

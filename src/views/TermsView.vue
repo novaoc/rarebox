@@ -288,9 +288,10 @@
 
 .terms-card {
   background: var(--bg-card);
-  border: 1px solid var(--border);
+  border: var(--bw) solid var(--ink);
   border-radius: var(--radius-lg);
   padding: 32px;
+  box-shadow: var(--shadow);
 }
 .terms-card h1 { font-size: 22px; font-weight: 700; margin-bottom: 4px; }
 .terms-updated { font-size: 12px; color: var(--text-muted); margin-bottom: 24px; }

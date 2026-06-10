@@ -1,5 +1,5 @@
 <!--
-  Rarebox — Pokémon TCG Portfolio Tracker
+  Rarebox — TCG Portfolio Tracker · Tactile shell
   Built by Nova — GitHub: @novaoc
   https://rarebox.io
 -->
@@ -11,105 +11,98 @@
     <transition name="fade">
       <CardDatabaseLoader v-if="showLoader" @ready="onLoaderReady" />
     </transition>
-    <aside class="sidebar" :class="{ open: sidebarOpen }">
-      <a href="/" class="sidebar-logo" @click.prevent="hardRefresh">
-        <span class="logo-icon">
-          <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-hexagon" aria-hidden="true"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+
+    <!-- ── Top bar ──────────────────────────────────────────────────── -->
+    <header class="topbar">
+      <a href="/" class="brand" @click.prevent="hardRefresh" aria-label="Rarebox home">
+        <span class="brand-mark" aria-hidden="true">
+          <svg width="30" height="30" viewBox="0 0 30 30"><rect x="1.5" y="1.5" width="27" height="27" rx="8" fill="#ffd23f" stroke="#141414" stroke-width="2.5"/><text x="15" y="21" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="13" font-weight="900" fill="#141414">rb</text></svg>
         </span>
-        <span class="logo-text">Rarebox</span>
+        <span class="brand-word">rarebox</span>
       </a>
-      <button class="btn btn-ghost btn-icon sidebar-close" @click="sidebarOpen = false" aria-label="Close sidebar" style="position:absolute;top:16px;right:12px;z-index:10">
-        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-x" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
-      </button>
 
-      <nav class="sidebar-nav">
-        <router-link to="/" class="nav-item" @click="sidebarOpen = false">
-          <span class="nav-icon">
-            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-layout-grid" aria-hidden="true"><rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/></svg>
-          </span> Dashboard
-        </router-link>
-        <router-link to="/search" class="nav-item" @click="sidebarOpen = false">
-          <span class="nav-icon">
-            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-search" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
-          </span> Search Cards
-        </router-link>
-        <router-link to="/sets" class="nav-item" @click="sidebarOpen = false">
-          <span class="nav-icon">
-            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-layers" aria-hidden="true"><path d="m12.83 2.18a2 2 0 0 0-1.66 0L2.1 6.27a2 2 0 0 0 0 3.46l9.07 4.09a2 2 0 0 0 1.66 0l9.07-4.09a2 2 0 0 0 0-3.46z"/><path d="m2.1 14.74 9.07 4.09a2 2 0 0 0 1.66 0l9.07-4.09"/><path d="m2.1 10.54 9.07 4.09a2 2 0 0 0 1.66 0l9.07-4.09"/></svg>
-          </span> Browse Sets
-        </router-link>
-        <router-link to="/decks" class="nav-item" @click="sidebarOpen = false">
-          <span class="nav-icon">
-            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-gallery-vertical-end" aria-hidden="true"><path d="M7 2h10"/><path d="M5 6h14"/><rect width="18" height="12" x="3" y="10" rx="2"/></svg>
-          </span> Decks
-        </router-link>
-        <router-link to="/trade" class="nav-item" @click="sidebarOpen = false">
-          <span class="nav-icon">
-            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-arrow-left-right" aria-hidden="true"><path d="M8 3 4 7l4 4"/><path d="M4 7h16"/><path d="m16 21 4-4-4-4"/><path d="M20 17H4"/></svg>
-          </span> Trade
-        </router-link>
+      <nav class="topnav" aria-label="Primary">
+        <router-link to="/" class="topnav-link" :class="{ active: isTab('home') }">Dashboard</router-link>
+        <router-link to="/search" class="topnav-link" :class="{ active: isTab('search') }">Search</router-link>
+        <router-link to="/sets" class="topnav-link" :class="{ active: isTab('browse') }">Browse</router-link>
+        <router-link to="/decks" class="topnav-link" :class="{ active: isTab('decks') }">Decks</router-link>
+        <router-link to="/trade" class="topnav-link" :class="{ active: isTab('trade') }">Trade</router-link>
       </nav>
 
-      <div class="sidebar-section-label">Portfolios</div>
+      <div class="topbar-page" aria-hidden="true">
+        {{ currentPageTitle }}
+        <button v-if="currentTour" class="tour-info-btn" @click="replayTour" title="Watch tour video" aria-label="Watch tour video">i</button>
+      </div>
 
-      <nav class="sidebar-nav portfolios-nav">
-        <router-link
-          v-for="p in store.portfolios"
-          :key="p.id"
-          :to="`/portfolio/${p.id}`"
-          class="nav-item portfolio-nav-item"
-          @click="sidebarOpen = false"
-        >
-          <span class="portfolio-dot" :style="{ background: p.color }"></span>
-          <span class="portfolio-nav-name">{{ p.name }}</span>
-          <span class="portfolio-nav-count">{{ p.items.length }}</span>
-        </router-link>
-
-        <button class="nav-item add-portfolio-btn" @click="showNewPortfolioModal = true" aria-label="Add new portfolio">
-          <span class="nav-icon">
-            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-plus" aria-hidden="true"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
-          </span> New Portfolio
-        </button>
-      </nav>
-
-      <div class="sidebar-bottom">
-        <router-link to="/settings" class="nav-item" @click="sidebarOpen = false">
-          <span class="nav-icon">
-            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-settings" aria-hidden="true"><path d="M12.22 2h-.44a2 2 0 0 0-2 2l-.27 1.32a.41.41 0 0 1-.5.33l-1.32-.27a2 2 0 0 0-2.39 1.18l-.22.44a2 2 0 0 0 1.18 2.39l1.32.27a.41.41 0 0 1 .33.5l-.27 1.32a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2l.27-1.32a.41.41 0 0 1 .5-.33l1.32.27a2 2 0 0 0 2.39-1.18l.22-.44a2 2 0 0 0-1.18-2.39l-1.32-.27a.41.41 0 0 1-.33-.5l.27-1.32a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
-          </span> Settings
+      <div class="topbar-actions">
+        <router-link to="/search" class="btn btn-primary btn-sm add-card-btn">+ Add Card</router-link>
+        <router-link to="/settings" class="btn btn-ghost btn-icon settings-btn" aria-label="Settings">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
         </router-link>
       </div>
-    </aside>
+    </header>
 
-    <div class="main-wrapper">
-      <header class="topbar">
-        <button class="btn btn-ghost btn-icon hamburger" @click="sidebarOpen = !sidebarOpen" aria-label="Open sidebar">
-          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-menu" aria-hidden="true"><line x1="4" x2="20" y1="12" y2="12"/><line x1="4" x2="20" y1="6" y2="6"/><line x1="4" x2="20" y1="18" y2="18"/></svg>
-        </button>
-        <div class="topbar-breadcrumb">
-          {{ currentPageTitle }}
-          <button v-if="currentTour" class="tour-info-btn" @click="replayTour" title="Watch tour video" aria-label="Watch tour video">i</button>
-        </div>
-        <router-link to="/search" class="btn btn-primary btn-sm">
-          + Add Card
-        </router-link>
-      </header>
+    <!-- ── Main content ─────────────────────────────────────────────── -->
+    <main class="main-content">
+      <router-view v-slot="{ Component, route }">
+        <transition name="fade" :duration="300">
+          <component :is="Component" :key="route?.fullPath" />
+        </transition>
+      </router-view>
+      <div class="app-footer">
+        <router-link to="/terms" class="app-footer-link">Terms &amp; Conditions</router-link>
+        <span class="app-footer-dot">·</span>
+        <a href="https://docs.rarebox.io" target="_blank" rel="noopener" class="app-footer-link">Docs</a>
+        <span class="app-footer-dot">·</span>
+        <a href="https://github.com/novaoc/rarebox" target="_blank" rel="noopener" class="app-footer-link">GitHub</a>
+      </div>
+    </main>
 
-      <main class="main-content">
-        <router-view v-slot="{ Component, route }">
-          <transition name="fade" :duration="300">
-            <component :is="Component" :key="route?.fullPath" />
-          </transition>
-        </router-view>
-        <div class="app-footer">
-          <router-link to="/terms" class="app-footer-link">Terms &amp; Conditions</router-link>
-          <span class="app-footer-dot">·</span>
-          <a href="https://docs.rarebox.io" target="_blank" rel="noopener" class="app-footer-link">Docs</a>
-          <span class="app-footer-dot">·</span>
-          <a href="https://github.com/novaoc/rarebox" target="_blank" rel="noopener" class="app-footer-link">GitHub</a>
+    <!-- ── Bottom tab bar (phones / foldables / small tablets) ──────── -->
+    <nav class="tabbar" aria-label="Primary">
+      <router-link to="/" class="tab" :class="{ active: isTab('home') }">
+        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="7" height="7" x="3" y="3" rx="1.5"/><rect width="7" height="7" x="14" y="3" rx="1.5"/><rect width="7" height="7" x="14" y="14" rx="1.5"/><rect width="7" height="7" x="3" y="14" rx="1.5"/></svg>
+        <span>Home</span>
+      </router-link>
+      <router-link to="/search" class="tab" :class="{ active: isTab('search') }">
+        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+        <span>Search</span>
+      </router-link>
+      <router-link to="/trade" class="tab tab-hero" :class="{ active: isTab('trade') }" aria-label="Trade analyzer">
+        <span class="tab-hero-disc">
+          <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3 4 7l4 4"/><path d="M4 7h16"/><path d="m16 21 4-4-4-4"/><path d="M20 17H4"/></svg>
+        </span>
+        <span>Trade</span>
+      </router-link>
+      <router-link to="/sets" class="tab" :class="{ active: isTab('browse') }">
+        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12.83 2.18a2 2 0 0 0-1.66 0L2.1 6.27a2 2 0 0 0 0 3.46l9.07 4.09a2 2 0 0 0 1.66 0l9.07-4.09a2 2 0 0 0 0-3.46z"/><path d="m2.1 14.74 9.07 4.09a2 2 0 0 0 1.66 0l9.07-4.09"/></svg>
+        <span>Browse</span>
+      </router-link>
+      <button class="tab" :class="{ active: moreOpen }" @click="moreOpen = !moreOpen" aria-label="More options" :aria-expanded="moreOpen">
+        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="1"/><circle cx="5" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg>
+        <span>More</span>
+      </button>
+    </nav>
+
+    <!-- More sheet -->
+    <transition name="fade">
+      <div v-if="moreOpen" class="more-overlay" @click.self="moreOpen = false">
+        <div class="more-sheet" role="menu">
+          <router-link to="/decks" class="more-item" role="menuitem" @click="moreOpen = false">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 2h10"/><path d="M5 6h14"/><rect width="18" height="12" x="3" y="10" rx="2"/></svg>
+            Decks
+          </router-link>
+          <button class="more-item" role="menuitem" @click="moreOpen = false; showNewPortfolioModal = true">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+            New Portfolio
+          </button>
+          <router-link to="/settings" class="more-item" role="menuitem" @click="moreOpen = false">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 1v4m0 14v4m11-11h-4M5 12H1m17.66-6.34-2.83 2.83M8.17 15.17l-2.83 2.83m12.49 0-2.83-2.83M8.17 8.83 5.34 6"/></svg>
+            Settings
+          </router-link>
         </div>
-      </main>
-    </div>
+      </div>
+    </transition>
 
     <!-- New Portfolio Modal -->
     <transition name="fade">
@@ -118,7 +111,7 @@
           <div class="modal-header">
             <h3>New Portfolio</h3>
             <button class="btn btn-ghost btn-icon" @click="showNewPortfolioModal = false" aria-label="Close modal">
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-x" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
             </button>
           </div>
           <div class="modal-body">
@@ -161,7 +154,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onErrorCaptured } from 'vue'
+import { ref, computed, watch, onMounted, onErrorCaptured } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { usePortfolioStore } from './stores/portfolio'
 import InstallPrompt from './components/InstallPrompt.vue'
@@ -175,15 +168,30 @@ const store = usePortfolioStore()
 const route = useRoute()
 const router = useRouter()
 
-const sidebarOpen = ref(false)
+const moreOpen = ref(false)
 const cardLoadIndicator = ref(null)
 const showLoader = ref(!isCardDatabaseReady() && !getTcgPrefs())
 const showNewPortfolioModal = ref(false)
 const newPortfolioName = ref('')
-const newPortfolioColor = ref('#f5a623')
+const newPortfolioColor = ref('#ffd23f')
 const showSetsTour = ref(false)
 const showDecksTour = ref(false)
 const tourKey = ref(0)
+
+// Close the More sheet on navigation
+watch(() => route.fullPath, () => { moreOpen.value = false })
+
+// Which tab is lit for the current route
+const TAB_FOR_ROUTE = {
+  Dashboard: 'home', Portfolio: 'home',
+  Search: 'search',
+  Browse: 'browse', Sets: 'browse', TcgSets: 'browse',
+  Decks: 'decks', MetaDecks: 'decks', DeckBuilder: 'decks',
+  TradeLanding: 'trade', TradeAnalyzer: 'trade',
+}
+function isTab(tab) {
+  return TAB_FOR_ROUTE[route.name] === tab
+}
 
 // Pages that have tour videos
 const tourPages = {
@@ -202,8 +210,8 @@ function replayTour() {
 }
 
 const portfolioColors = [
-  '#f5a623', '#58a6ff', '#3fb950', '#f85149',
-  '#bc8cff', '#ff7b72', '#79c0ff', '#56d364'
+  '#ffd23f', '#ff6ba9', '#2fbf71', '#4f86f7',
+  '#e4434f', '#9a6cf5', '#1ec8c8', '#f08a3c'
 ]
 
 const currentPageTitle = computed(() => {
@@ -283,199 +291,104 @@ onErrorCaptured((err, instance, info) => {
 
 <style scoped>
 .app-layout {
-  display: flex;
-  height: 100vh;
-  overflow: hidden;
-}
-
-/* Sidebar */
-.sidebar {
-  width: var(--sidebar-width);
-  min-width: var(--sidebar-width);
-  background: var(--bg-secondary);
-  border-right: 1px solid var(--border);
+  min-height: 100vh;
   display: flex;
   flex-direction: column;
-  overflow-y: auto;
-  overflow-x: hidden;
-  flex-shrink: 0;
-  transition: transform 0.25s ease;
-  position: relative;
 }
 
-.sidebar-logo {
+/* ── Top bar ────────────────────────────────────────────────────────── */
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 60;
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 20px 16px 16px;
-  border-bottom: 1px solid var(--border);
-  text-decoration: none;
-  cursor: pointer;
-  transition: opacity 0.15s;
+  gap: 16px;
+  height: var(--header-height);
+  padding: 0 clamp(12px, 3vw, 28px);
+  background: var(--bg-primary);
+  border-bottom: var(--bw) solid var(--ink);
 }
-.sidebar-logo:hover { opacity: 0.8; }
-.logo-icon {
-  color: var(--accent);
+
+.brand {
   display: inline-flex;
-  animation: logo-float 3s ease-in-out infinite;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .logo-icon {
-    animation: none;
-  }
-  .sidebar {
-    transition: none;
-  }
-}
-
-@keyframes logo-float {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-4px); }
-}
-.logo-text { font-size: 18px; font-weight: 700; color: var(--text-primary); flex: 1; }
-.sidebar-close {
-  display: none;
   align-items: center;
-  justify-content: center;
-  width: 44px;
-  height: 44px;
-  padding: 12px;
+  gap: 9px;
+  text-decoration: none;
+  flex-shrink: 0;
+}
+.brand:hover { text-decoration: none; }
+.brand-mark { display: inline-flex; transform: rotate(-4deg); transition: transform 0.15s; }
+.brand:hover .brand-mark { transform: rotate(3deg); }
+.brand-word {
+  font-size: 19px;
+  font-weight: 900;
+  letter-spacing: -0.03em;
+  color: var(--ink);
 }
 
-.sidebar-nav {
-  display: flex;
-  flex-direction: column;
-  padding: 8px;
-  gap: 2px;
-}
-
-.nav-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 10px;
-  border-radius: var(--radius);
+.topnav { display: none; align-items: center; gap: 4px; }
+.topnav-link {
+  padding: 8px 14px;
+  border-radius: 10px;
+  border: var(--bw) solid transparent;
+  font-size: 13.5px;
+  font-weight: 700;
   color: var(--text-secondary);
   text-decoration: none;
-  font-size: 13px;
-  font-weight: 500;
-  border: none;
-  background: none;
-  cursor: pointer;
-  transition: all 0.15s;
-  width: 100%;
-  text-align: left;
-}
-.nav-item:hover { background: var(--bg-hover); color: var(--text-primary); text-decoration: none; }
-.nav-item.router-link-active {
-  background: var(--accent-dim);
-  color: var(--accent);
-}
-.nav-icon { width: 18px; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
-
-.sidebar-section-label {
-  font-size: 10px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  color: var(--text-muted);
-  padding: 12px 18px 4px;
-}
-
-.portfolios-nav { max-height: none; flex: 1; }
-
-.portfolio-nav-item { justify-content: flex-start; }
-.portfolio-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-.portfolio-nav-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.portfolio-nav-count {
-  font-size: 11px;
-  background: var(--bg-hover);
-  padding: 1px 6px;
-  border-radius: 10px;
-  color: var(--text-muted);
-  flex-shrink: 0;
-}
-.add-portfolio-btn { color: var(--text-muted); font-size: 12px; }
-.add-portfolio-btn:hover { color: var(--accent); }
-
-.sidebar-bottom {
-  padding: 8px;
-  border-top: 1px solid var(--border);
-  margin-top: auto;
-}
-
-/* Main content */
-.main-wrapper {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  min-width: 0;
-}
-
-.topbar {
-  height: var(--header-height);
-  background: var(--bg-secondary);
-  border-bottom: 1px solid var(--border);
-  display: flex;
+  min-height: 40px;
+  display: inline-flex;
   align-items: center;
-  padding: 0 20px;
-  gap: 12px;
-  flex-shrink: 0;
+}
+.topnav-link:hover { color: var(--ink); text-decoration: none; background: var(--bg-hover); }
+.topnav-link.active {
+  color: var(--ink);
+  background: var(--accent);
+  border-color: var(--ink);
+  box-shadow: var(--shadow-pressed);
 }
 
-/* iOS PWA — pad below the status bar */
-@supports (padding-top: env(safe-area-inset-top)) {
-  .topbar {
-    padding-top: env(safe-area-inset-top);
-    min-height: calc(var(--header-height) + env(safe-area-inset-top));
-  }
-}
-.topbar-breadcrumb {
+.topbar-page {
   flex: 1;
+  text-align: center;
   font-size: 15px;
-  font-weight: 600;
-  color: var(--text-primary);
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
 }
 
 .tour-info-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 20px;
-  height: 20px;
+  width: 22px; height: 22px;
   border-radius: 50%;
-  border: 1.5px solid var(--text-muted);
-  background: transparent;
-  color: var(--text-muted);
+  border: var(--bw) solid var(--ink);
+  background: var(--info);
+  color: #fff;
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 800;
+  font-style: italic;
   cursor: pointer;
-  transition: all 0.15s;
   flex-shrink: 0;
-  line-height: 1;
 }
 
-.tour-info-btn:hover {
-  background: var(--accent-dim);
-  color: var(--accent);
-  border-color: var(--accent);
-}
-.hamburger { display: none; }
+.topbar-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.add-card-btn { display: none; }
+.settings-btn { display: none; }
 
+/* ── Main content ───────────────────────────────────────────────────── */
 .main-content {
   flex: 1;
-  overflow-y: auto;
-  padding: 24px;
+  width: 100%;
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: clamp(14px, 2.5vw, 28px);
+  /* room for the bottom tab bar + iOS safe area */
+  padding-bottom: calc(var(--tabbar-height) + env(safe-area-inset-bottom, 0px) + 24px);
 }
 
 .app-footer {
@@ -483,55 +396,137 @@ onErrorCaptured((err, instance, info) => {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  padding: 24px 0 8px;
-  margin-top: 16px;
-}
-.app-footer-link {
-  font-size: 11px;
+  padding: 28px 0 8px;
+  font-size: 12px;
   color: var(--text-muted);
+}
+.app-footer-link { color: var(--text-muted); }
+.app-footer-link:hover { color: var(--ink); }
+.app-footer-dot { opacity: 0.5; }
+
+/* ── Bottom tab bar ─────────────────────────────────────────────────── */
+.tabbar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 70;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  height: calc(var(--tabbar-height) + env(safe-area-inset-bottom, 0px));
+  padding: 6px 6px calc(6px + env(safe-area-inset-bottom, 0px));
+  background: var(--bg-primary);
+  border-top: var(--bw) solid var(--ink);
+}
+
+.tab {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  border: none;
+  background: transparent;
+  border-radius: 12px;
+  font-size: 10.5px;
+  font-weight: 800;
+  color: var(--text-secondary);
   text-decoration: none;
-}
-.app-footer-link:hover { color: var(--text-secondary); text-decoration: none; }
-.app-footer-dot { font-size: 11px; color: var(--text-muted); }
-
-/* Color picker */
-.color-picker-row { display: flex; gap: 8px; flex-wrap: wrap; }
-.color-swatch {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  border: 3px solid transparent;
   cursor: pointer;
-  transition: transform 0.15s;
+  min-height: 44px;
+  -webkit-tap-highlight-color: transparent;
 }
-.color-swatch:hover { transform: scale(1.15); }
-.color-swatch.active { border-color: white; transform: scale(1.1); }
+.tab:hover { text-decoration: none; }
+.tab.active { color: var(--ink); }
+.tab.active > svg { background: var(--accent); border: var(--bw) solid var(--ink); border-radius: 9px; padding: 3px; width: 30px; height: 30px; box-shadow: var(--shadow-pressed); }
+.tab > svg { padding: 4px; width: 30px; height: 30px; }
 
-/* Mobile */
-@media (max-width: 768px) {
-  .sidebar {
-    position: fixed;
-    left: 0;
-    top: 0;
-    bottom: 0;
-    z-index: 200;
-    transform: translateX(-100%);
-    width: 260px;
-    min-width: 260px;
-  }
-  .sidebar.open { transform: translateX(0); }
-  .sidebar-close { display: flex; }
-  .hamburger { display: flex; }
-  .main-content { padding: 16px; }
+/* Center hero tab — the trade disc pops above the bar */
+.tab-hero { position: relative; }
+.tab-hero-disc {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  margin-top: -22px;
+  border-radius: 50%;
+  background: var(--pink);
+  border: var(--bw) solid var(--ink);
+  box-shadow: var(--shadow-xs);
+  color: var(--ink);
+}
+.tab-hero.active .tab-hero-disc { background: var(--accent); }
+.tab-hero:active .tab-hero-disc { box-shadow: var(--shadow-pressed); transform: translate(1px, 1px); }
+
+/* ── More sheet ─────────────────────────────────────────────────────── */
+.more-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 65;
+  background: rgba(20, 20, 20, 0.35);
+}
+.more-sheet {
+  position: absolute;
+  right: 10px;
+  bottom: calc(var(--tabbar-height) + env(safe-area-inset-bottom, 0px) + 10px);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: var(--bg-primary);
+  border: var(--bw) solid var(--ink);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+  padding: 8px;
+  min-width: 200px;
+}
+.more-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  min-height: 46px;
+  border: none;
+  background: transparent;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink);
+  text-decoration: none;
+  cursor: pointer;
+  text-align: left;
+}
+.more-item:hover { background: var(--accent-dim); text-decoration: none; }
+
+/* ── Color swatches (new portfolio modal) ───────────────────────────── */
+.color-picker-row { display: flex; gap: 10px; flex-wrap: wrap; }
+.color-swatch {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: var(--bw) solid var(--ink);
+  cursor: pointer;
+  transition: transform 0.12s;
+}
+.color-swatch:hover { transform: scale(1.1); }
+.color-swatch.active {
+  box-shadow: var(--shadow-xs);
+  transform: scale(1.12);
 }
 
-/* iOS PWA safe areas */
-@supports (padding-top: env(safe-area-inset-top)) {
-  .sidebar-logo {
-    padding-top: env(safe-area-inset-top);
-  }
-  .main-content {
-    padding-bottom: env(safe-area-inset-bottom, 0);
-  }
+/* ── Desktop ≥1024px: top nav on, tab bar off ───────────────────────── */
+@media (min-width: 1024px) {
+  .topnav { display: flex; }
+  .topbar-page { display: none; }
+  .add-card-btn { display: inline-flex; }
+  .settings-btn { display: inline-flex; }
+  .tabbar { display: none; }
+  .more-overlay { display: none; }
+  .main-content { padding-bottom: 28px; }
+}
+
+/* Compact phones */
+@media (max-width: 360px) {
+  .brand-word { display: none; }
 }
 </style>

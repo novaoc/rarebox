@@ -369,7 +369,7 @@ onMounted(async () => {
       class="delta-bar"
       :class="tradeStore.priceDelta > 0.01 ? 'delta-win' : tradeStore.priceDelta < -0.01 ? 'delta-lose' : 'delta-even'"
     >
-      <span class="text-secondary" style="font-size:13px">{{ deltaLabel }}</span>
+      <span class="delta-label">{{ deltaLabel }}</span>
       <span class="font-bold font-mono">{{ deltaFormatted }}</span>
     </div>
 
@@ -505,7 +505,7 @@ onMounted(async () => {
               @click="searchCategory = 'sealed'; searchQuery = ''; searchResults = []"
             >Sealed</button>
           </div>
-          <div v-if="scanHint" class="text-muted" style="font-size:12px;margin-bottom:6px">📷 {{ scanHint }}</div>
+          <div v-if="scanHint" class="scan-hint-chip">📷 {{ scanHint }}</div>
           <input
             v-model="searchQuery"
             @input="onSearchInput"
@@ -693,7 +693,7 @@ onMounted(async () => {
               @click="searchCategory = 'sealed'; searchQuery = ''; searchResults = []"
             >Sealed</button>
           </div>
-          <div v-if="scanHint" class="text-muted" style="font-size:12px;margin-bottom:6px">📷 {{ scanHint }}</div>
+          <div v-if="scanHint" class="scan-hint-chip">📷 {{ scanHint }}</div>
           <input
             v-model="searchQuery"
             @input="onSearchInput"
@@ -854,31 +854,35 @@ onMounted(async () => {
   gap: 12px;
 }
 
+/* Verdict banner — the Tactile moment: solid sticker, ink border, tilted */
 .delta-bar {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 10px;
-  padding: 10px 16px;
-  border-radius: var(--radius-lg);
-  margin-bottom: 20px;
+  width: fit-content;
+  margin: 4px auto 24px;
+  padding: 10px 22px;
+  border: var(--bw) solid var(--ink);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  transform: rotate(-1.5deg);
   font-size: 14px;
+  color: var(--ink);
 }
-.delta-win {
-  background: var(--success-dim);
-  border: 1px solid rgba(63, 185, 80, 0.3);
+.delta-label {
+  font-size: 13px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
-.delta-win .font-bold { color: var(--success); }
-.delta-lose {
-  background: var(--danger-dim);
-  border: 1px solid rgba(248, 81, 73, 0.3);
-}
-.delta-lose .font-bold { color: var(--danger); }
-.delta-even {
-  background: var(--accent-dim);
-  border: 1px solid rgba(245, 166, 35, 0.3);
-}
-.delta-even .font-bold { color: var(--accent); }
+.delta-bar .font-bold { font-weight: 800; }
+.delta-win { background: var(--success); }
+.delta-win .font-bold { color: var(--ink); }
+.delta-lose { background: var(--danger); }
+.delta-lose .font-bold { color: var(--ink); }
+.delta-even { background: var(--accent); }
+.delta-even .font-bold { color: var(--ink); }
 
 .trade-split {
   display: grid;
@@ -915,7 +919,8 @@ onMounted(async () => {
 .card-thumb {
   width: 40px;
   height: 56px;
-  border-radius: var(--radius);
+  border-radius: 8px;
+  border: 1px solid var(--border-subtle);
   object-fit: cover;
   flex-shrink: 0;
 }
@@ -955,9 +960,9 @@ onMounted(async () => {
 }
 
 .vs-line {
-  width: 1px;
+  width: var(--bw);
   flex: 1;
-  background: var(--border);
+  background: var(--ink);
   min-height: 20px;
 }
 
@@ -966,13 +971,30 @@ onMounted(async () => {
   margin-top: 4px;
 }
 
+/* Scan hint chip — yellow fill, ink border */
+.scan-hint-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  margin-bottom: 8px;
+  background: var(--accent);
+  border: var(--bw) solid var(--ink);
+  border-radius: 8px;
+  box-shadow: var(--shadow-pressed);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
 .search-results {
   margin-top: 8px;
   max-height: 240px;
   overflow-y: auto;
-  border: 1px solid var(--border);
+  border: var(--bw) solid var(--ink);
   border-radius: var(--radius);
-  background: var(--bg-primary);
+  background: var(--bg-card);
+  box-shadow: var(--shadow-xs);
 }
 
 .search-result-row {
@@ -981,16 +1003,18 @@ onMounted(async () => {
   gap: 10px;
   padding: 8px 12px;
   cursor: pointer;
-  transition: background 0.15s;
+  transition: background 0.15s, transform 0.12s;
+  background: var(--bg-card);
   border-bottom: 1px solid var(--border-subtle);
 }
 .search-result-row:last-child { border-bottom: none; }
-.search-result-row:hover { background: var(--bg-hover); }
+.search-result-row:hover { background: var(--bg-hover); transform: translateY(-1px); }
 
 .search-result-thumb {
   width: 28px;
   height: 40px;
   border-radius: 4px;
+  border: 1px solid var(--border-subtle);
   object-fit: cover;
   flex-shrink: 0;
 }
@@ -1019,8 +1043,8 @@ onMounted(async () => {
   margin-bottom: 16px;
   border-radius: var(--radius);
   overflow: hidden;
-  border: 1px solid var(--border);
-  background: var(--bg-primary);
+  border: var(--bw) solid var(--ink);
+  background: var(--bg-card);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1035,9 +1059,10 @@ onMounted(async () => {
 .scan-candidate-list {
   max-height: 280px;
   overflow-y: auto;
-  border: 1px solid var(--border);
+  border: var(--bw) solid var(--ink);
   border-radius: var(--radius);
-  background: var(--bg-primary);
+  background: var(--bg-card);
+  box-shadow: var(--shadow-xs);
 }
 
 .scan-candidate-row {
@@ -1046,11 +1071,12 @@ onMounted(async () => {
   gap: 10px;
   padding: 10px 12px;
   cursor: pointer;
-  transition: background 0.15s;
+  transition: background 0.15s, transform 0.12s;
+  background: var(--bg-card);
   border-bottom: 1px solid var(--border-subtle);
 }
 .scan-candidate-row:last-child { border-bottom: none; }
-.scan-candidate-row:hover { background: var(--bg-hover); }
+.scan-candidate-row:hover { background: var(--bg-hover); transform: translateY(-1px); }
 
 .scan-error {
   display: flex;
@@ -1059,10 +1085,12 @@ onMounted(async () => {
   padding: 12px 16px;
   margin-bottom: 16px;
   background: var(--danger-dim);
-  border: 1px solid rgba(248, 81, 73, 0.3);
-  border-radius: var(--radius-lg);
-  color: var(--danger);
+  border: var(--bw) solid var(--ink);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  color: var(--ink);
   font-size: 13px;
+  font-weight: 600;
   cursor: pointer;
 }
 
@@ -1072,9 +1100,14 @@ onMounted(async () => {
   align-items: center;
   justify-content: center;
   gap: 16px;
-  color: var(--text-primary);
+  padding: 28px 36px;
+  background: var(--bg-card);
+  border: var(--bw) solid var(--ink);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+  color: var(--ink);
   font-size: 15px;
-  font-weight: 500;
+  font-weight: 700;
 }
 
 .scan-processing-overlay {
@@ -1090,20 +1123,22 @@ onMounted(async () => {
   display: inline-flex;
   align-items: center;
   font-size: 10px;
-  font-weight: 600;
+  font-weight: 700;
   padding: 1px 6px;
-  border-radius: 4px;
-  background: var(--accent-dim);
-  color: var(--accent);
+  border-radius: 6px;
+  background: var(--accent);
+  border: 1.5px solid var(--ink);
+  color: var(--ink);
   cursor: pointer;
   vertical-align: middle;
   margin-left: 4px;
   letter-spacing: 0.3px;
 }
 .grade-badge.ungraded {
-  background: var(--bg-hover);
-  color: var(--text-muted);
-  font-weight: 400;
+  background: var(--bg-card);
+  border-color: var(--border-subtle);
+  color: var(--text-secondary);
+  font-weight: 600;
 }
 .grade-picker {
   margin-top: 6px;
@@ -1130,9 +1165,9 @@ onMounted(async () => {
   flex: 1;
   font-size: 12px;
   padding: 3px 6px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--bg-primary);
+  border: var(--bw) solid var(--ink);
+  border-radius: 8px;
+  background: var(--bg-card);
   color: var(--text-primary);
 }
 
@@ -1177,7 +1212,7 @@ onMounted(async () => {
   }
   .vs-line {
     width: auto;
-    height: 1px;
+    height: var(--bw);
     flex: 1;
     min-height: 0;
   }

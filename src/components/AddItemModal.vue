@@ -470,25 +470,27 @@ watch(() => props.card, () => {
   justify-content: center;
   gap: 6px;
   padding: 8px 12px;
-  border: 1px solid var(--border);
+  border: var(--bw) solid var(--border);
   border-radius: var(--radius);
-  background: none;
-  color: var(--text-secondary);
+  background: var(--bg-card);
+  color: var(--text-primary);
   font-size: 13px;
-  font-weight: 500;
+  font-weight: 700;
+  font-family: inherit;
   cursor: pointer;
-  transition: all 0.15s;
+  transition: background 0.12s, box-shadow 0.12s;
 }
-.type-tab:hover { background: var(--bg-hover); color: var(--text-primary); }
-.type-tab.active { background: var(--accent-dim); color: var(--accent); border-color: var(--accent); }
+.type-tab:hover { background: var(--bg-hover); }
+.type-tab.active { background: var(--accent); color: var(--ink); box-shadow: var(--shadow-xs); }
 
 .card-preview {
   display: flex;
   align-items: center;
   gap: 14px;
   background: var(--bg-card);
-  border: 1px solid var(--border);
+  border: var(--bw) solid var(--border);
   border-radius: var(--radius);
+  box-shadow: var(--shadow-xs);
   padding: 12px;
 }
 .card-thumb {
@@ -502,7 +504,8 @@ watch(() => props.card, () => {
 .card-preview-price { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
 
 .sealed-results {
-  border: 1px solid var(--border);
+  background: var(--bg-card);
+  border: var(--bw) solid var(--border);
   border-radius: var(--radius);
   overflow: hidden;
   max-height: 240px;
@@ -526,7 +529,7 @@ watch(() => props.card, () => {
   height: 36px;
   object-fit: contain;
   border-radius: 4px;
-  background: var(--bg-primary);
+  background: var(--bg-secondary);
   flex-shrink: 0;
 }
 .sealed-result-info { flex: 1; min-width: 0; }
@@ -535,8 +538,8 @@ watch(() => props.card, () => {
 .sealed-result-price { font-size: 13px; font-weight: 700; flex-shrink: 0; margin-left: 8px; }
 
 .sealed-selected {
-  background: var(--bg-card);
-  border: 1px solid var(--border);
+  background: var(--accent-dim);
+  border: var(--bw) solid var(--border);
   border-radius: var(--radius);
   padding: 10px 12px;
 }
@@ -547,7 +550,8 @@ watch(() => props.card, () => {
   height: 48px;
   object-fit: contain;
   border-radius: 6px;
-  background: var(--bg-primary);
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
   flex-shrink: 0;
 }
 .sealed-selected-name { font-size: 14px; font-weight: 600; }

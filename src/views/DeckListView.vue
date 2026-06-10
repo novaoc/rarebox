@@ -25,9 +25,10 @@
     <!-- Empty state -->
     <div v-if="filteredDecks.length === 0 && deckStore.decks.length === 0" class="empty-state">
       <div class="icon">🃏</div>
+      <span class="sticker">Fresh start</span>
       <h3>No decks yet</h3>
       <p>Create a deck from scratch or import a meta deck to get started.</p>
-      <div class="flex gap-2 mt-3">
+      <div class="flex gap-2 mt-3" style="flex-wrap:wrap">
         <button class="btn btn-primary" @click="showNewDeck = true">Create Deck</button>
         <router-link to="/decks/meta" class="btn btn-secondary">Browse Meta Decks</router-link>
       </div>
@@ -216,13 +217,13 @@ function createDeck() {
 
 .deck-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));
   gap: 16px;
 }
 
 .deck-card {
   background: var(--bg-card);
-  border: 1px solid var(--border);
+  border: var(--bw) solid var(--ink);
   border-radius: var(--radius-lg);
   padding: 16px;
   text-decoration: none;
@@ -230,15 +231,19 @@ function createDeck() {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  transition: all 0.2s;
+  box-shadow: var(--shadow-sm);
+  transition: box-shadow 0.12s ease, transform 0.12s ease;
   cursor: pointer;
   position: relative;
 }
 .deck-card:hover {
-  border-color: var(--accent);
-  transform: translateY(-2px);
-  box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+  transform: translate(-1px, -1px);
+  box-shadow: var(--shadow);
   text-decoration: none;
+}
+.deck-card:active {
+  transform: translate(1px, 1px);
+  box-shadow: var(--shadow-pressed);
 }
 
 .deck-card-delete {
@@ -249,6 +254,7 @@ function createDeck() {
   height: 28px;
   border-radius: 50%;
   background: var(--bg-hover);
+  border: 1.5px solid var(--ink);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -284,19 +290,19 @@ function createDeck() {
 .deck-card-progress { display: flex; align-items: center; gap: 8px; }
 .progress-bar-bg {
   flex: 1;
-  height: 4px;
-  background: var(--bg-hover);
-  border-radius: 2px;
+  height: 10px;
+  background: var(--bg-primary);
+  border: 1.5px solid var(--ink);
+  border-radius: 5px;
   overflow: hidden;
 }
 .progress-bar-fill {
   height: 100%;
-  background: var(--accent);
-  border-radius: 2px;
+  background: var(--success);
   transition: width 0.3s;
 }
 .progress-bar-fill.complete { background: var(--success); }
-.progress-label { font-size: 11px; color: var(--text-muted); font-weight: 600; min-width: 32px; text-align: right; }
+.progress-label { font-size: 11px; color: var(--text-secondary); font-weight: 700; min-width: 32px; text-align: right; }
 
 .deck-card-preview { display: flex; gap: 4px; align-items: center; }
 .deck-preview-img { width: 30px; height: 42px; object-fit: contain; border-radius: 2px; }

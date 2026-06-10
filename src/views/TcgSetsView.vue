@@ -392,50 +392,52 @@ onMounted(loadSets)
 .search-input { flex: 1; }
 .search-clear { position: absolute; right: 4px; }
 
-.sets-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; }
+.sets-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); gap: 12px; }
 .set-card {
-  background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-lg);
-  padding: 14px 16px; display: flex; align-items: center; gap: 14px; cursor: pointer; transition: all 0.2s;
+  background: var(--bg-card); border: var(--bw) solid var(--ink); border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-xs);
+  padding: 14px 16px; display: flex; align-items: center; gap: 14px; cursor: pointer;
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
 }
-.set-card:hover { border-color: var(--accent); transform: translateY(-1px); box-shadow: 0 4px 16px rgba(0,0,0,0.25); }
+.set-card:hover { transform: translate(-1px, -1px); box-shadow: var(--shadow-sm); }
 .set-logo-wrap { width: 48px; min-width: 48px; display: flex; align-items: center; justify-content: center; }
 .set-logo { max-width: 48px; max-height: 40px; object-fit: contain; }
 .set-logo-placeholder { font-size: 26px; }
-.set-badge-lorcana { font-size: 11px; font-weight: 700; background: linear-gradient(135deg, #7b2c9e, #0f9b8e); color: #fff; padding: 4px 8px; border-radius: 6px; letter-spacing: 0.5px; }
-.set-badge-one-piece { font-size: 11px; font-weight: 700; background: linear-gradient(135deg, #d7263d, #1b1b3a); color: #fff; padding: 4px 8px; border-radius: 6px; letter-spacing: 0.5px; }
-.set-badge-riftbound { font-size: 11px; font-weight: 700; background: linear-gradient(135deg, #0bc6e3, #0a2540); color: #fff; padding: 4px 8px; border-radius: 6px; letter-spacing: 0.5px; }
+.set-badge-lorcana { font-size: 11px; font-weight: 700; background: linear-gradient(135deg, #7b2c9e, #0f9b8e); color: #fff; padding: 4px 8px; border: var(--bw) solid var(--ink); border-radius: 8px; box-shadow: var(--shadow-pressed); letter-spacing: 0.5px; }
+.set-badge-one-piece { font-size: 11px; font-weight: 700; background: linear-gradient(135deg, #d7263d, #1b1b3a); color: #fff; padding: 4px 8px; border: var(--bw) solid var(--ink); border-radius: 8px; box-shadow: var(--shadow-pressed); letter-spacing: 0.5px; }
+.set-badge-riftbound { font-size: 11px; font-weight: 700; background: linear-gradient(135deg, #0bc6e3, #0a2540); color: #fff; padding: 4px 8px; border: var(--bw) solid var(--ink); border-radius: 8px; box-shadow: var(--shadow-pressed); letter-spacing: 0.5px; }
 .set-info { flex: 1; min-width: 0; }
 .set-name { font-size: 13px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .set-meta { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; margin-top: 3px; font-size: 11px; color: var(--text-muted); }
-.set-dot { color: var(--border); }
+.set-dot { color: var(--text-muted); }
 .set-series { color: var(--text-secondary); }
-.set-go { color: var(--text-muted); flex-shrink: 0; }
-.set-card:hover .set-go { color: var(--accent); }
+.set-go { color: var(--text-muted); flex-shrink: 0; transition: transform 0.12s ease, color 0.12s ease; }
+.set-card:hover .set-go { color: var(--ink); transform: translateX(2px); }
 
 .set-browse-header { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
 .set-browse-title { display: flex; align-items: center; gap: 8px; font-size: 17px; font-weight: 700; flex: 1; }
 .set-browse-filters { display: flex; gap: 8px; align-items: center; }
 
 .cards-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; margin-bottom: 24px; }
-.card-result { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; transition: all 0.2s; }
-.card-result:hover { border-color: var(--accent); transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.3); }
-.card-img-wrap { position: relative; overflow: hidden; background: #1a1f28; aspect-ratio: 2.5/3.5; }
+.card-result { background: var(--bg-card); border: var(--bw) solid var(--ink); border-radius: var(--radius-lg); box-shadow: var(--shadow-xs); overflow: hidden; transition: transform 0.12s ease, box-shadow 0.12s ease; }
+.card-result:hover { transform: translate(-1px, -1px); box-shadow: var(--shadow-sm); }
+.card-img-wrap { position: relative; overflow: hidden; background: var(--bg-secondary); aspect-ratio: 2.5/3.5; }
 .card-img { width: 100%; height: 100%; object-fit: contain; display: block; }
-.card-img-ph { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; padding: 8px; text-align: center; font-size: 11px; color: var(--text-muted); }
-.card-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.55); display: flex; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.2s; }
+.card-img-ph { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; padding: 8px; text-align: center; font-size: 11px; font-weight: 600; color: var(--text-secondary); background: var(--bg-secondary); border: var(--bw) dashed var(--border-subtle); }
+.card-overlay { position: absolute; inset: 0; background: rgba(20,20,20,0.55); display: flex; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.2s; }
 .card-result:hover .card-overlay { opacity: 1; }
-@media (hover: none) { .card-overlay { opacity: 1; background: linear-gradient(transparent 60%, rgba(0,0,0,0.7)); align-items: flex-end; padding-bottom: 8px; } }
+@media (hover: none) { .card-overlay { opacity: 1; background: linear-gradient(transparent 60%, rgba(20,20,20,0.65)); align-items: flex-end; padding-bottom: 8px; } }
 .card-meta { padding: 8px 10px; }
 .card-name { font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .card-num { font-size: 10px; }
 .card-price-row { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-top: 4px; }
-.card-price { font-size: 13px; font-weight: 700; color: var(--accent); font-variant-numeric: tabular-nums; }
+.card-price { font-size: 13px; font-weight: 800; color: var(--text-primary); font-variant-numeric: tabular-nums; }
 .card-rarity { font-size: 9px; }
 
-.skeleton-card { height: 76px; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-lg); }
-.skeleton-card-tall { aspect-ratio: 2.5/3.5; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-lg); }
+.skeleton-card { height: 76px; background: var(--bg-secondary); border: var(--bw) dashed var(--border-subtle); border-radius: var(--radius-lg); }
+.skeleton-card-tall { aspect-ratio: 2.5/3.5; background: var(--bg-secondary); border: var(--bw) dashed var(--border-subtle); border-radius: var(--radius-lg); }
 .shimmer { position: relative; overflow: hidden; }
-.shimmer::after { content: ''; position: absolute; inset: 0; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.05), transparent); animation: shimmer-anim 1.5s infinite; }
+.shimmer::after { content: ''; position: absolute; inset: 0; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.65), transparent); animation: shimmer-anim 1.5s infinite; }
 @keyframes shimmer-anim { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
 @media (prefers-reduced-motion: reduce) {
   .shimmer::after { animation: none; background: var(--bg-hover); }
@@ -455,9 +457,9 @@ onMounted(loadSets)
 }
 .bulk-card-row:hover { background: var(--bg-hover); }
 .bulk-checkbox { flex-shrink: 0; width: 16px; height: 16px; accent-color: var(--accent); }
-.bulk-card-img { width: 36px; height: 50px; object-fit: contain; border-radius: 4px; flex-shrink: 0; background: var(--bg); }
+.bulk-card-img { width: 36px; height: 50px; object-fit: contain; border-radius: 4px; flex-shrink: 0; background: var(--bg-secondary); }
 .bulk-card-info { flex: 1; min-width: 0; }
 .bulk-card-name { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .bulk-card-meta { font-size: 11px; }
-.bulk-card-price { font-size: 13px; font-weight: 700; color: var(--accent); flex-shrink: 0; font-variant-numeric: tabular-nums; }
+.bulk-card-price { font-size: 13px; font-weight: 800; color: var(--text-primary); flex-shrink: 0; font-variant-numeric: tabular-nums; }
 </style>

@@ -152,8 +152,8 @@ onUnmounted(() => {
   right: 16px;
   max-width: 480px;
   margin: 0 auto;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border);
+  background: var(--bg-card);
+  border: var(--bw) solid var(--ink);
   border-radius: var(--radius-lg);
   padding: 14px 16px;
   display: flex;
@@ -161,7 +161,7 @@ onUnmounted(() => {
   justify-content: space-between;
   gap: 12px;
   z-index: 500;
-  box-shadow: 0 -4px 24px rgba(0,0,0,0.4);
+  box-shadow: var(--shadow);
 }
 
 .install-content {
@@ -202,7 +202,7 @@ onUnmounted(() => {
   justify-content: center;
   width: 18px;
   height: 18px;
-  border: 1px solid var(--border);
+  border: 1.5px solid var(--ink);
   border-radius: 4px;
   font-size: 12px;
   vertical-align: middle;
@@ -225,8 +225,9 @@ onUnmounted(() => {
   width: 28px;
   height: 28px;
   border-radius: 50%;
-  background: var(--accent-dim);
-  color: var(--accent);
+  background: var(--accent);
+  color: var(--ink);
+  border: 1.5px solid var(--ink);
   display: flex;
   align-items: center;
   justify-content: center;

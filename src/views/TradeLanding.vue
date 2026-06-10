@@ -49,8 +49,9 @@
   max-width: 480px;
   width: 100%;
   background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 16px;
+  border: var(--bw) solid var(--ink);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
   padding: 48px 36px;
   text-align: center;
   display: flex;
@@ -63,8 +64,11 @@
   width: 72px;
   height: 72px;
   border-radius: 50%;
-  background: var(--accent-dim);
-  color: var(--accent);
+  background: var(--accent);
+  color: var(--ink);
+  border: var(--bw) solid var(--ink);
+  box-shadow: var(--shadow-xs);
+  transform: rotate(-3deg);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -99,17 +103,19 @@
   gap: 14px;
   padding: 12px 16px;
   background: var(--bg-hover);
-  border-radius: 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius);
 }
 
 .feature-num {
   width: 24px;
   height: 24px;
   border-radius: 50%;
-  background: var(--accent-dim);
-  color: var(--accent);
+  background: var(--accent);
+  color: var(--ink);
+  border: 1.5px solid var(--ink);
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 800;
   display: flex;
   align-items: center;
   justify-content: center;

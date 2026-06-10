@@ -323,10 +323,11 @@ function gameLabel(game) {
 
 /* Search panel */
 .deck-search-panel {
-  background: var(--bg-secondary);
-  border: 1px solid var(--border);
+  background: var(--bg-card);
+  border: var(--bw) solid var(--ink);
   border-radius: var(--radius-lg);
   padding: 16px;
+  box-shadow: var(--shadow-sm);
   align-self: flex-start;
 }
 .search-bar-wrapper { display: flex; gap: 8px; margin-bottom: 12px; }
@@ -355,10 +356,11 @@ function gameLabel(game) {
 
 /* Deck list panel */
 .deck-list-panel {
-  background: var(--bg-secondary);
-  border: 1px solid var(--border);
+  background: var(--bg-card);
+  border: var(--bw) solid var(--ink);
   border-radius: var(--radius-lg);
   padding: 16px;
+  box-shadow: var(--shadow-sm);
 }
 
 .deck-stats-bar {
@@ -367,18 +369,22 @@ function gameLabel(game) {
 .deck-stat-pill {
   display: flex; flex-direction: column; align-items: center;
   padding: 8px 14px; border-radius: var(--radius);
-  background: var(--bg-card); border: 1px solid var(--border);
+  background: var(--bg-primary); border: var(--bw) solid var(--ink);
+  box-shadow: var(--shadow-pressed);
   min-width: 64px;
 }
-.deck-stat-pill.needed { border-color: var(--accent); }
-.deck-stat-pill.needed .pill-num { color: var(--accent); }
-.deck-stat-pill.owned .pill-num { color: var(--success); }
-.deck-stat-pill.cost .pill-num { color: var(--text-primary); }
+.deck-stat-pill.needed { background: var(--accent-dim); }
+.deck-stat-pill.needed .pill-num { color: var(--ink); }
+.deck-stat-pill.complete { background: var(--success-dim); }
+.deck-stat-pill.owned { background: var(--success-dim); }
+.deck-stat-pill.owned .pill-num { color: var(--ink); }
+.deck-stat-pill.cost { background: var(--accent); }
+.deck-stat-pill.cost .pill-num { color: var(--ink); }
 .deck-stat-pill.pct { min-width: 80px; }
 .pill-num { font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; }
-.pill-label { font-size: 9px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); margin-top: 2px; }
-.pill-progress { width: 100%; height: 4px; background: var(--bg-hover); border-radius: 2px; overflow: hidden; margin-bottom: 4px; }
-.pill-bar { height: 100%; background: var(--accent); border-radius: 2px; transition: width 0.3s; }
+.pill-label { font-size: 9px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-secondary); margin-top: 2px; }
+.pill-progress { width: 100%; height: 8px; background: var(--bg-card); border: 1.5px solid var(--ink); border-radius: 4px; overflow: hidden; margin-bottom: 4px; }
+.pill-bar { height: 100%; background: var(--success); transition: width 0.3s; }
 .pill-bar.complete { background: var(--success); }
 
 .deck-empty { padding: 40px 20px; text-align: center; }

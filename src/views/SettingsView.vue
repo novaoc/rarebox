@@ -217,7 +217,7 @@
           <div class="settings-item-label">{{ alert.cardName }}</div>
           <div class="settings-item-sub">
             {{ alert.condition === 'above' ? '↑ Above' : '↓ Below' }} ${{ alert.threshold.toFixed(2) }}
-            <span v-if="alert.triggered" style="color:#3fb950"> · Triggered</span>
+            <span v-if="alert.triggered" class="text-success"> · Triggered</span>
           </div>
         </div>
         <button class="btn btn-ghost btn-icon btn-sm" @click="removeAlertById(alert.id)" style="color:var(--danger)">✕</button>
@@ -585,26 +585,28 @@ function goToDashboard() {
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: var(--border);
-  transition: .4s;
+  background-color: var(--bg-primary);
+  border: var(--bw) solid var(--ink);
+  transition: .25s;
   border-radius: 24px;
 }
 .toggle-label:before {
   position: absolute;
   content: "";
-  height: 18px;
-  width: 18px;
-  left: 3px;
-  bottom: 3px;
-  background-color: white;
-  transition: .4s;
+  height: 14px;
+  width: 14px;
+  left: 2px;
+  bottom: 2px;
+  background-color: #fff;
+  border: 1.5px solid var(--ink);
+  transition: .25s;
   border-radius: 50%;
 }
 .toggle-input:checked + .toggle-label {
   background-color: var(--accent);
 }
 .toggle-input:checked + .toggle-label:before {
-  transform: translateX(20px);
+  transform: translateX(22px);
 }
 
 /* PC key row — column layout */
@@ -660,8 +662,8 @@ function goToDashboard() {
   border-radius: var(--radius);
   width: 100%;
 }
-.import-result.success { background: rgba(63, 185, 80, 0.1); color: #3fb950; }
-.import-result.error { background: rgba(248, 81, 73, 0.1); color: #f85149; }
+.import-result.success { background: var(--success-dim); color: #1e9e5a; border: 1.5px solid var(--ink); font-weight: 600; }
+.import-result.error { background: var(--danger-dim); color: var(--danger); border: 1.5px solid var(--ink); font-weight: 600; }
 .backup-import-btn { cursor: pointer; }
 
 @media (max-width: 640px) {
@@ -675,20 +677,20 @@ function goToDashboard() {
   position: fixed;
   inset: 0;
   z-index: 1000;
-  background: rgba(0, 0, 0, 0.75);
-  backdrop-filter: blur(6px);
+  background: rgba(20, 20, 20, 0.45);
   display: flex;
   align-items: center;
   justify-content: center;
 }
 .import-overlay-card {
-  background: var(--bg-secondary);
-  border: 1px solid var(--border);
+  background: var(--bg-card);
+  border: var(--bw) solid var(--ink);
   border-radius: var(--radius-lg, 16px);
   padding: 48px 40px;
   max-width: 420px;
   width: 90vw;
   text-align: center;
+  box-shadow: 6px 6px 0 var(--ink);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -697,8 +699,8 @@ function goToDashboard() {
 .import-spinner {
   width: 40px;
   height: 40px;
-  border: 3px solid var(--border);
-  border-top-color: var(--accent);
+  border: 3px solid var(--border-subtle);
+  border-top-color: var(--ink);
   border-radius: 50%;
   animation: import-spin 0.8s linear infinite;
 }
@@ -708,8 +710,9 @@ function goToDashboard() {
 .import-done-icon {
   width: 48px;
   height: 48px;
-  background: var(--success, #3fb950);
+  background: var(--success);
   color: #fff;
+  border: var(--bw) solid var(--ink);
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -719,25 +722,25 @@ function goToDashboard() {
 }
 .import-status {
   font-size: 14px;
-  font-weight: 500;
+  font-weight: 600;
   color: var(--text-primary);
 }
 .import-progress-wrap {
   width: 100%;
-  height: 6px;
-  background: var(--border);
-  border-radius: 3px;
+  height: 10px;
+  background: var(--bg-primary);
+  border: 1.5px solid var(--ink);
+  border-radius: 5px;
   overflow: hidden;
 }
 .import-progress-bar {
   height: 100%;
-  background: var(--accent);
-  border-radius: 3px;
+  background: var(--info);
   transition: width 0.3s ease;
 }
 .import-progress-label {
   font-size: 12px;
-  color: var(--text-muted);
+  color: var(--text-secondary);
   font-variant-numeric: tabular-nums;
 }
 .import-phases {
@@ -748,8 +751,8 @@ function goToDashboard() {
   color: var(--text-muted);
 }
 .import-phases span.active {
-  color: var(--accent);
-  font-weight: 600;
+  color: var(--text-primary);
+  font-weight: 800;
 }
 .import-phase-dot { opacity: 0.4; }
 .import-done-btn {
@@ -757,8 +760,9 @@ function goToDashboard() {
   min-width: 180px;
 }
 .import-error {
-  color: var(--danger, #f85149);
+  color: var(--danger);
   font-size: 13px;
+  font-weight: 600;
   text-align: center;
 }
 </style>

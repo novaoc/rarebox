@@ -144,7 +144,7 @@ onBeforeUnmount(() => {
       v-if="cameraActive && prefersReducedMotion"
       class="absolute inset-0 z-10 pointer-events-none"
     >
-      <div class="absolute inset-[15%] border-2 border-rb-accent/40 rounded-lg" />
+      <div class="guide-box" />
       <div class="corner corner-tl" />
       <div class="corner corner-tr" />
       <div class="corner corner-bl" />
@@ -157,20 +157,20 @@ onBeforeUnmount(() => {
       class="absolute inset-0 z-20 flex flex-col items-center justify-center gap-4 p-6 text-center"
     >
       <div class="text-5xl mb-2">📸</div>
-      <p class="text-rb-text text-lg font-medium">
+      <p class="text-white text-lg font-medium">
         {{ cameraError || 'Camera not active' }}
       </p>
-      <p class="text-rb-text-secondary text-sm">
+      <p class="text-white/70 text-sm">
         Tap the button below to upload a photo instead
       </p>
     </div>
 
     <!-- Controls -->
-    <div class="absolute bottom-0 left-0 right-0 z-20 flex items-center justify-between p-4 bg-gradient-to-t from-black/80 to-transparent">
+    <div class="absolute bottom-0 left-0 right-0 z-20 flex items-center justify-between p-4 bg-black/70">
       <!-- Close button -->
       <button
         aria-label="Close camera"
-        class="flex items-center justify-center w-11 h-11 rounded-full bg-rb-card/80 text-rb-text hover:bg-rb-hover transition-colors"
+        class="vf-btn"
         @click="close"
       >
         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -181,18 +181,17 @@ onBeforeUnmount(() => {
       <!-- Capture button -->
       <button
         aria-label="Capture photo"
-        class="flex items-center justify-center w-16 h-16 rounded-full border-4 border-white bg-white/20 hover:bg-white/30 transition-all active:scale-95"
-        :class="{ 'opacity-50 cursor-not-allowed': !cameraActive }"
+        class="vf-capture"
         :disabled="!cameraActive"
         @click="captureFrame"
       >
-        <div class="w-12 h-12 rounded-full bg-white" />
+        <div class="vf-capture-core" />
       </button>
 
       <!-- File upload fallback -->
       <button
         aria-label="Upload photo from file"
-        class="flex items-center justify-center w-11 h-11 rounded-full bg-rb-card/80 text-rb-text hover:bg-rb-hover transition-colors"
+        class="vf-btn"
         @click="triggerFileInput"
       >
         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -216,14 +215,14 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-/* Animated scan line */
+/* Animated scan line — solid accent bar, no glow */
 .scan-line {
   position: absolute;
   left: 15%;
   right: 15%;
-  height: 2px;
-  background: linear-gradient(90deg, transparent, var(--accent, #f5a623), transparent);
-  box-shadow: 0 0 12px 2px rgba(245, 166, 35, 0.6);
+  height: 3px;
+  border-radius: 2px;
+  background: var(--accent, #ffd23f);
   animation: scanMove 2.2s ease-in-out infinite;
 }
 
@@ -246,7 +245,7 @@ onBeforeUnmount(() => {
   position: absolute;
   width: 24px;
   height: 24px;
-  border-color: var(--accent, #f5a623);
+  border-color: var(--accent, #ffd23f);
   border-style: solid;
   border-width: 0;
 }
@@ -254,6 +253,57 @@ onBeforeUnmount(() => {
 .corner-tr { top: 15%; right: 15%; border-top-width: 3px; border-right-width: 3px; border-top-right-radius: 6px; }
 .corner-bl { bottom: 15%; left: 15%; border-bottom-width: 3px; border-left-width: 3px; border-bottom-left-radius: 6px; }
 .corner-br { bottom: 15%; right: 15%; border-bottom-width: 3px; border-right-width: 3px; border-bottom-right-radius: 6px; }
+
+/* Reduced-motion static card guide */
+.guide-box {
+  position: absolute;
+  inset: 15%;
+  border: 2px solid rgba(255, 210, 63, 0.5);
+  border-radius: 12px;
+}
+
+/* Tactile controls on the dark camera surface */
+.vf-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--bg-card, #fff);
+  color: var(--ink, #141414);
+  border: var(--bw, 2px) solid var(--ink, #141414);
+  box-shadow: var(--shadow-xs);
+  cursor: pointer;
+  transition: background 0.12s, transform 0.1s, box-shadow 0.1s;
+}
+.vf-btn:hover { background: var(--bg-hover, #f6f0e2); }
+.vf-btn:active { transform: translate(1px, 1px); box-shadow: var(--shadow-pressed); }
+
+.vf-capture {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 68px;
+  height: 68px;
+  border-radius: 50%;
+  background: var(--accent, #ffd23f);
+  border: 3px solid var(--ink, #141414);
+  box-shadow: var(--shadow);
+  cursor: pointer;
+  transition: background 0.12s, transform 0.1s, box-shadow 0.1s;
+}
+.vf-capture:hover:not(:disabled) { background: var(--accent-hover, #ffc907); }
+.vf-capture:active:not(:disabled) { transform: translate(2px, 2px); box-shadow: var(--shadow-pressed); }
+.vf-capture:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.vf-capture-core {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: #fff;
+  border: var(--bw, 2px) solid var(--ink, #141414);
+}
 
 /* Flash transition */
 .flash-enter-active { transition: opacity 0.05s ease-out; }

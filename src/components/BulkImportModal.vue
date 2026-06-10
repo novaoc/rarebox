@@ -344,11 +344,13 @@ function doImport() {
   line-height: 1.6;
 }
 .hint code {
-  background: var(--bg-hover);
+  background: var(--accent-dim);
+  border: 1px solid var(--border-subtle);
   padding: 1px 6px;
   border-radius: 4px;
   font-size: 12px;
-  color: var(--accent);
+  color: var(--ink);
+  font-weight: 600;
 }
 
 .deck-input {
@@ -360,9 +362,10 @@ function doImport() {
 
 .progress-bar-wrap {
   width: 260px;
-  height: 4px;
-  background: var(--border);
-  border-radius: 2px;
+  height: 12px;
+  background: var(--bg-card);
+  border: var(--bw) solid var(--ink);
+  border-radius: 999px;
   overflow: hidden;
 }
 .progress-bar {
@@ -389,7 +392,8 @@ function doImport() {
   overflow-x: auto;
   overflow-y: auto;
   max-height: 340px;
-  border: 1px solid var(--border);
+  background: var(--bg-card);
+  border: var(--bw) solid var(--ink);
   border-radius: var(--radius);
 }
 
@@ -398,6 +402,7 @@ function doImport() {
   height: 39px;
   object-fit: contain;
   border-radius: 2px;
+  border: 1px solid var(--border-subtle);
 }
 
 .preview-card-cell {
@@ -428,7 +433,7 @@ tr.excluded {
   display: flex;
   gap: 24px;
   flex-wrap: wrap;
-  border-top: 1px solid var(--border);
+  border-top: var(--bw) solid var(--border-subtle);
   padding-top: 12px;
 }
 

@@ -99,42 +99,39 @@ const chartOptions = ref({
     id: 'price-chart',
     type: 'area',
     background: 'transparent',
+    foreColor: '#141414',
     toolbar: { show: false },
     zoom: { enabled: true },
     animations: { enabled: true, speed: 400 }
   },
-  theme: { mode: 'dark' },
+  theme: { mode: 'light' },
   dataLabels: { enabled: false },
-  stroke: { curve: 'smooth', width: 2 },
+  stroke: { curve: 'smooth', width: 3 },
   fill: {
-    type: 'gradient',
-    gradient: {
-      shadeIntensity: 1,
-      opacityFrom: 0.35,
-      opacityTo: 0.02,
-      stops: [0, 100]
-    }
+    type: 'solid',
+    colors: ['#fff3c4'],
+    opacity: 1
   },
-  colors: ['#f5a623'],
+  colors: ['#4f86f7'],
   xaxis: {
     type: 'datetime',
-    labels: { style: { colors: '#8b949e', fontSize: '11px' } },
+    labels: { style: { colors: '#5f5a51', fontSize: '11px' } },
     axisBorder: { show: false },
     axisTicks: { show: false },
   },
   yaxis: {
     labels: {
-      style: { colors: '#8b949e', fontSize: '11px' },
+      style: { colors: '#5f5a51', fontSize: '11px' },
       formatter: (v) => `$${v?.toFixed(0)}`
     }
   },
   tooltip: {
-    theme: 'dark',
+    theme: 'light',
     x: { format: 'MMM dd, yyyy' },
     y: { formatter: (v) => `$${v?.toFixed(2)}` }
   },
   grid: {
-    borderColor: '#30363d',
+    borderColor: '#e7dfd0',
     strokeDashArray: 3,
     xaxis: { lines: { show: false } },
     yaxis: { lines: { show: true } },
@@ -238,8 +235,8 @@ function applyRange(allSeries) {
   chartSeries.value = [{ name: 'Price', data: display }]
 
   const color = display.length >= 2
-    ? (display[display.length - 1].y >= display[0].y ? '#3fb950' : '#f85149')
-    : '#f5a623'
+    ? (display[display.length - 1].y >= display[0].y ? '#2fbf71' : '#e4434f')
+    : '#4f86f7'
 
   const dtFmtMap = {
     '7d': 'dd MMM', '1m': 'dd MMM', '6m': 'MMM yyyy', '1y': 'MMM yyyy', '3y': 'MMM yyyy',
@@ -280,28 +277,30 @@ onMounted(load)
 }
 .chart-controls { display: flex; gap: 4px; }
 .range-btn {
-  background: none;
-  border: 1px solid var(--border);
-  color: var(--text-muted);
+  background: var(--bg-card);
+  border: var(--bw) solid var(--ink);
+  color: var(--text-secondary);
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 700;
   padding: 3px 8px;
-  border-radius: 4px;
+  border-radius: 8px;
   cursor: pointer;
-  transition: all 0.15s;
+  transition: background 0.15s, color 0.15s;
 }
-.range-btn:hover { color: var(--text-primary); border-color: var(--text-secondary); }
-.range-btn.active { background: var(--accent-dim); color: var(--accent); border-color: var(--accent); }
+.range-btn:hover { color: var(--text-primary); background: var(--bg-secondary); }
+.range-btn.active { background: var(--accent); color: var(--ink); box-shadow: var(--shadow-pressed); }
 
 .select-sm { width: auto; padding: 4px 8px; font-size: 11px; }
 
 .price-stats {
   display: flex;
   gap: 0;
-  border: 1px solid var(--border);
+  background: var(--bg-card);
+  border: var(--bw) solid var(--ink);
   border-radius: var(--radius);
   overflow: hidden;
   margin-top: 8px;
+  box-shadow: var(--shadow-xs);
 }
 .price-stat {
   flex: 1;
@@ -309,7 +308,7 @@ onMounted(load)
   flex-direction: column;
   align-items: center;
   padding: 8px 4px;
-  border-right: 1px solid var(--border);
+  border-right: 1px solid var(--border-subtle);
 }
 .price-stat:last-child { border-right: none; }
 .stat-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); margin-bottom: 3px; }

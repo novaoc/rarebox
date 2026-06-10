@@ -227,7 +227,7 @@ async function generateQR() {
     await QRCode.toCanvas(qrCanvas.value, compressedArr, {
       width: 280,
       margin: 2,
-      color: { dark: '#f8f8f2', light: '#282a36' },
+      color: { dark: '#141414', light: '#ffffff' },
       errorCorrectionLevel: 'L',
     })
   } catch (e) {
@@ -307,25 +307,27 @@ onMounted(() => { nextTick(generateQR) })
   display: flex;
   gap: 4px;
   margin-bottom: 16px;
-  background: var(--bg-hover);
+  background: var(--bg-card);
+  border: var(--bw) solid var(--ink);
   border-radius: var(--radius);
   padding: 3px;
 }
 .sync-tab {
   flex: 1;
   padding: 8px;
-  border: none;
+  border: 1.5px solid transparent;
   background: none;
-  border-radius: 6px;
+  border-radius: 8px;
   font-size: 13px;
-  font-weight: 600;
-  color: var(--text-muted);
+  font-weight: 700;
+  color: var(--text-secondary);
   cursor: pointer;
   transition: all 0.15s;
 }
 .sync-tab.active {
   background: var(--accent);
-  color: var(--bg-primary);
+  border-color: var(--ink);
+  color: var(--ink);
 }
 .sync-tab:hover:not(.active) { color: var(--text-primary); }
 
@@ -341,13 +343,17 @@ onMounted(() => { nextTick(generateQR) })
   margin-bottom: 16px;
 }
 .qr-canvas {
+  border: var(--bw) solid var(--ink);
   border-radius: var(--radius);
+  box-shadow: var(--shadow-xs);
+  background: #fff;
 }
 
 .qr-fallback {
   padding: 20px;
   text-align: center;
   background: var(--bg-hover);
+  border: var(--bw) solid var(--border-subtle);
   border-radius: var(--radius);
   margin-bottom: 16px;
 }
@@ -372,9 +378,11 @@ onMounted(() => { nextTick(generateQR) })
 
 .sync-error {
   font-size: 13px;
+  font-weight: 600;
   color: var(--danger);
   padding: 8px 12px;
-  background: rgba(248, 81, 73, 0.1);
+  background: var(--danger-dim);
+  border: 1.5px solid var(--ink);
   border-radius: var(--radius);
   margin-top: 12px;
 }
@@ -382,13 +390,14 @@ onMounted(() => { nextTick(generateQR) })
 .sync-preview {
   margin-top: 12px;
   padding: 12px;
-  background: rgba(63, 185, 80, 0.1);
+  background: var(--success-dim);
+  border: 1.5px solid var(--ink);
   border-radius: var(--radius);
 }
 .sync-preview-title {
   font-size: 13px;
-  font-weight: 600;
-  color: #3fb950;
+  font-weight: 700;
+  color: #1e9e5a;
   margin-bottom: 4px;
 }
 .sync-preview-detail {
