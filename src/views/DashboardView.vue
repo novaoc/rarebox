@@ -761,6 +761,7 @@ onMounted(async () => {
   box-shadow: var(--shadow); padding: 6px;
 }
 .ld-card img { width: 100%; height: 100%; object-fit: contain; }
+:root[data-theme='dark'] .ld-card { background: var(--bg-card); }
 .ld-card-1 { left: 4%; transform: rotate(-7deg); z-index: 1; }
 .ld-card-2 { left: 32%; top: 4%; transform: rotate(2deg); z-index: 3; }
 .ld-card-3 { left: 60%; transform: rotate(8deg); z-index: 2; }

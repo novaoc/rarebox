@@ -77,6 +77,8 @@ const tcgs = TCGS
   padding: 6px 8px;
 }
 .tcg-logo :deep(svg) { width: 100%; height: 100%; }
+/* dark: the white stage glares on coal — logos sit on a card surface */
+:root[data-theme='dark'] .tcg-logo { background: var(--bg-card); }
 
 .tcg-body { flex: 1; min-width: 0; }
 .tcg-name { font-size: 15px; font-weight: 700; }

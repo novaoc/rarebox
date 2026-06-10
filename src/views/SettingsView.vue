@@ -716,7 +716,7 @@ function goToDashboard() {
   max-width: 420px;
   width: 90vw;
   text-align: center;
-  box-shadow: 6px 6px 0 var(--ink);
+  box-shadow: var(--shadow-lg);
   display: flex;
   flex-direction: column;
   align-items: center;

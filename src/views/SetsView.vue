@@ -775,7 +775,7 @@ onMounted(loadSets)
 }
 .bulk-modal {
   background: var(--bg-card); border: var(--bw) solid var(--ink);
-  border-radius: var(--radius-lg); box-shadow: 6px 6px 0 var(--ink);
+  border-radius: var(--radius-lg); box-shadow: var(--shadow-lg);
   width: 100%; max-width: 640px; max-height: 85vh;
   display: flex; flex-direction: column;
 }
@@ -840,6 +840,7 @@ onMounted(loadSets)
 .card-result:hover { transform: translate(-1px, -1px); box-shadow: var(--shadow-sm); }
 .card-result.selected { box-shadow: 0 0 0 3px var(--accent), var(--shadow-xs); }
 .card-img-wrap { position: relative; overflow: hidden; background: #fff; aspect-ratio: 2.5/3.5; border: var(--bw) solid var(--ink); border-radius: 10px; padding: 4px; }
+:root[data-theme='dark'] .card-img-wrap { background: var(--bg-card); }
 .card-img { width: 100%; height: 100%; object-fit: contain; display: block; transition: transform 0.3s; pointer-events: none; -webkit-user-drag: none; user-drag: none; }
 .card-result:hover .card-img { transform: scale(1.04); }
 .card-overlay {

@@ -112,7 +112,7 @@ function confirm() {
   text-align: center;
   max-height: 90vh;
   overflow-y: auto;
-  box-shadow: 6px 6px 0 var(--ink);
+  box-shadow: var(--shadow-lg);
 }
 
 .loader-logo {

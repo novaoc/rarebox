@@ -52,6 +52,7 @@
   --shadow-sm: 3px 3px 0 var(--ink);
   --shadow-xs: 2px 2px 0 var(--ink);
   --shadow-pressed: 1px 1px 0 var(--ink);
+  --shadow-lg: 6px 6px 0 var(--ink);
 
   /* Text colors that must NOT flip with the theme */
   --on-accent: #141414;        /* text sitting on yellow/green/pink fills */
@@ -94,6 +95,7 @@
   --shadow-sm: 3px 3px 0 #000;
   --shadow-xs: 2px 2px 0 #000;
   --shadow-pressed: 1px 1px 0 #000;
+  --shadow-lg: 6px 6px 0 #000;
 
   --success-text: #4cd58a;
   --accent-text: #e6b73d;
@@ -317,7 +319,7 @@ a:hover { text-decoration: underline; text-decoration-thickness: 2px; text-under
   max-width: 560px;
   max-height: 90vh;
   overflow-y: auto;
-  box-shadow: 6px 6px 0 var(--ink);
+  box-shadow: var(--shadow-lg);
   touch-action: pan-y;
   overscroll-behavior: contain;
 }
