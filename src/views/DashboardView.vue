@@ -47,7 +47,7 @@
               <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>
             </div>
             <h3>Live prices, six games</h3>
-            <p>Market prices for over 137,000 cards — singles, graded slabs and sealed product — refreshed continually. Search works offline once your games are loaded.</p>
+            <p>Market prices for over 137,000 cards — singles, graded slabs and sealed product — refreshed continually across all six games.</p>
           </div>
           <div class="ld-feature ld-tint-green">
             <div class="ld-feature-icon">
@@ -61,7 +61,7 @@
               <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3 4 7l4 4"/><path d="M4 7h16"/><path d="m16 21 4-4-4-4"/><path d="M20 17H4"/></svg>
             </div>
             <h3>Trade with receipts</h3>
-            <p>Put both sides of a trade on the table and see who wins before you shake on it. Point your camera at a card and the scanner identifies it.</p>
+            <p>Put both sides of a trade on the table and see who wins before you shake on it. Side-by-side totals, the gap, and a verdict you can show them.</p>
           </div>
           <div class="ld-feature ld-tint-blue">
             <div class="ld-feature-icon">
@@ -69,6 +69,20 @@
             </div>
             <h3>Decks that price themselves</h3>
             <p>Build decks, import the current meta with one click, and see exactly what the missing cards cost against what you already own.</p>
+          </div>
+          <div class="ld-feature ld-tint-yellow">
+            <div class="ld-feature-icon">
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h.01"/><path d="M8.5 16.429a5 5 0 0 1 7 0"/><path d="M5 12.859a10 10 0 0 1 5.17-2.69"/><path d="M19 12.859a10 10 0 0 0-2.007-1.523"/><path d="M2 8.82a15 15 0 0 1 4.177-2.643"/><path d="M22 8.82a15 15 0 0 0-11.288-3.764"/><path d="m2 2 20 20"/></svg>
+            </div>
+            <h3>Works offline, like a binder</h3>
+            <p>Your shelf lives on your device, and so does the app. Card shop basement, airplane seat, dead zone at a tournament — everything opens, everything works. It only reaches for the internet when you ask for fresh prices.</p>
+          </div>
+          <div class="ld-feature ld-tint-green">
+            <div class="ld-feature-icon">
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>
+            </div>
+            <h3>Point, scan, shelved</h3>
+            <p>Aim your camera at a card and Rarebox recognizes it by its artwork in about a second — no typing, no squinting at set symbols. Mid-trade, mid-unboxing, wherever.</p>
           </div>
         </div>
       </section>
