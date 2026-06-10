@@ -1,7 +1,7 @@
 {
-  "name": "Rarebox — TCG Portfolio Tracker",
+  "name": "Rarebox \u2014 TCG Portfolio Tracker",
   "short_name": "Rarebox",
-  "description": "Track your TCG collection — Pokémon, Magic, Yu-Gi-Oh!, Lorcana, One Piece, and Riftbound. Live prices and portfolio charts.",
+  "description": "Track your whole binder across Pok\u00e9mon, Magic, Yu-Gi-Oh!, Lorcana, One Piece and Riftbound. Live prices, price alerts, deck building and trade analysis \u2014 free, private, no account.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#faf6ef",
@@ -9,10 +9,28 @@
   "orientation": "any",
   "icons": [
     {
-      "src": "/icon-192.svg",
+      "src": "/icon-192.png",
       "sizes": "192x192",
-      "type": "image/svg+xml",
-      "purpose": "any maskable"
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ]
 }
