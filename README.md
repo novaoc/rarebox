@@ -43,7 +43,7 @@ Built by [Nova](https://github.com/novaoc).
 - **Disney Lorcana** — all sets via Lorcast, USD prices, branded set badges
 - **One Piece Card Game** — 20 English sets, 3300+ cards via optcgapi, USD market prices
 - **Yu-Gi-Oh!** — all sets via YGOPRODeck, TCGPlayer market prices
-- **Riftbound (League of Legends TCG)** — 7 sets, 1000+ cards via riftcodex.com, card images from Riot CDN, PriceCharting prices
+- **Riftbound (League of Legends TCG)** — 7 sets, 1000+ cards via riftcodex.com, card images from Riot CDN, TCGplayer market prices joined on product id (full promo coverage; PriceCharting fallback)
 - Click any set → full card grid with card images → "+ Add" opens the add modal pre-filled
 
 ### Card Database (Client-Side Index)
