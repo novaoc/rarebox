@@ -75,8 +75,11 @@ function getScrollParent(el) {
 }
 
 function atTop() {
-  if (!scrollParent) return true
-  return scrollParent.scrollTop <= 0
+  // In the tab-bar shell the page scrolls on the window, not an inner
+  // element — treating "no scroll parent" as "at top" hijacked every upward
+  // swipe once you'd scrolled down (page appeared stuck, sprang back).
+  if (scrollParent) return scrollParent.scrollTop <= 0
+  return (window.scrollY || document.documentElement.scrollTop || 0) <= 0
 }
 
 const indicatorStyle = computed(() => {
@@ -102,6 +105,8 @@ const svgStyle = computed(() => {
 })
 
 function onTouchStart(e) {
+  // re-resolve lazily — content (and scroll container) can change after mount
+  if (!scrollParent) scrollParent = getScrollParent(containerEl.value)
   if (!isAllowedRoute.value || props.refreshing || !atTop()) return
   startY.value = e.touches[0].clientY
   isPulling.value = true
