@@ -888,9 +888,18 @@ onMounted(async () => {
 
 .trade-split {
   display: grid;
-  grid-template-columns: 1fr auto 1fr;
+  /* minmax(0,1fr): long card names must not stretch a side off-screen */
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   gap: 16px;
   align-items: start;
+}
+
+/* Stacked layout up to 1023px — phones, foldables (incl. landscape), and
+   small tablets all get the vertical mobile flow; side-by-side is desktop. */
+@media (max-width: 1023px) {
+  .trade-split {
+    grid-template-columns: 1fr;
+  }
 }
 
 .side-card {
@@ -1203,10 +1212,7 @@ onMounted(async () => {
 }
 
 /* Responsive */
-@media (max-width: 768px) {
-  .trade-split {
-    grid-template-columns: 1fr;
-  }
+@media (max-width: 1023px) {
   .vs-divider {
     flex-direction: row;
     padding-top: 0;

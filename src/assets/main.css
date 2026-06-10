@@ -228,13 +228,22 @@ a:hover { text-decoration: underline; text-decoration-thickness: 2px; text-under
   box-shadow: var(--shadow-xs);
 }
 .input::placeholder { color: var(--text-muted); }
+/* date/time inputs: strip the UA's intrinsic width so they respect the
+   container (iOS Safari otherwise overflows the modal) */
+.input[type="date"], .input[type="datetime-local"], .input[type="time"] {
+  -webkit-appearance: none;
+  appearance: none;
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+}
 .select option { background: var(--bg-card); }
 .textarea { resize: vertical; min-height: 80px; }
 
 .form-group { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; }
 .form-label { font-size: 12px; font-weight: 800; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; }
-.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-.form-row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+.form-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.form-row-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
 
 /* ── Modal ──────────────────────────────────────────────────────────── */
 .modal-overlay {
@@ -295,9 +304,9 @@ a:hover { text-decoration: underline; text-decoration-thickness: 2px; text-under
 .gap-3 { gap: 12px; }
 .gap-4 { gap: 16px; }
 
-.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-.grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
-.grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+.grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.grid-4 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
 
 .mt-1 { margin-top: 4px; }
 .mt-2 { margin-top: 8px; }
