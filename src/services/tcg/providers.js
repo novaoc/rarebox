@@ -193,19 +193,21 @@ const onePiece = {
   },
 }
 
-// ── Riftbound: riftcodex.com + TCGplayer (tcgcsv) prices ────────────────────
+// ── Riftbound: riftcodex.com + TCGplayer prices (static asset) ──────────────
 // Card data + images from riftcodex (CORS *). Prices come from TCGplayer's
-// daily dump via /api/riftbound-prices (tcgcsv.com has no CORS), joined on
-// each card's tcgplayer_id — exact per-printing matches, including promo sets
-// (PR/OPP/JDG) and the tail of 280-350 card sets that PriceCharting's
-// 100-result search cap drops. PriceCharting search remains as a fallback.
+// daily dump, pre-built into /riftbound-prices.json by a daily GitHub Action
+// (scripts/build_riftbound_prices.py — tcgcsv.com is backend-only, no CORS)
+// and shipped as a static asset like the scan indexes. Joined on each card's
+// tcgplayer_id — exact per-printing matches, including promo sets (PR/OPP/JDG)
+// and the tail of 280-350 card sets that PriceCharting's 100-result search
+// cap drops. PriceCharting search remains as a fallback.
 const RIFTCODEX = 'https://api.riftcodex.com'
 const PC_SEARCH = 'https://www.pricecharting.com/search-products'
 
 // TCGplayer market prices for ALL Riftbound cards, keyed by product id.
-// One request covers every set; the serverless function caches 6h.
+// One same-origin request covers every set.
 async function fetchRiftboundTcgplayerPrices(signal) {
-  const d = await getJson('/api/riftbound-prices', { signal })
+  const d = await getJson('/riftbound-prices.json', { signal })
   return d.prices || {}
 }
 
