@@ -304,8 +304,10 @@ onErrorCaptured((err, instance, info) => {
   display: flex;
   align-items: center;
   gap: 16px;
-  height: var(--header-height);
-  padding: 0 clamp(12px, 3vw, 28px);
+  /* installed PWAs draw under the phone status bar (iOS black-translucent,
+     Android edge-to-edge) — pad the top bar clear of clock/battery */
+  height: calc(var(--header-height) + env(safe-area-inset-top, 0px));
+  padding: env(safe-area-inset-top, 0px) clamp(12px, 3vw, 28px) 0;
   background: var(--bg-primary);
   border-bottom: var(--bw) solid var(--ink);
 }
