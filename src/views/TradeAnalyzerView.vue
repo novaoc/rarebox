@@ -5,6 +5,7 @@ import { useTradeStore } from '../stores/trade'
 import { multiSearch } from '../services/tcg/multiSearch'
 import { scanCard } from '../utils/scanPipeline'
 import { preloadOcrWorker } from '../utils/ocrService'
+import { preloadScanIndexes } from '../utils/scanMatch'
 
 interface SearchResult {
   id: string
@@ -83,6 +84,7 @@ const deltaLabel = computed(() => {
 })
 
 function openScanner(side: 'A' | 'B') {
+  preloadScanIndexes()
   activeSide.value = side
   showSearch.value = null
   showScanner.value = true

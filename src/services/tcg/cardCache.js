@@ -34,6 +34,7 @@ export async function buildSearchIndex() {
     _index.get(key).push(card)
   }
   _indexReady = true
+  _byId = null
   return cards.length
 }
 
@@ -45,6 +46,18 @@ export function isSearchReady() {
 /** Check if a specific game is in the in-memory index. */
 export function isGameCached(game) {
   return _allCards ? _allCards.some(c => c.game === game) : false
+}
+
+let _byId = null
+
+/** O(1) lookup of a cached card by game+id (used by the card scanner). */
+export function getCachedCardById(game, id) {
+  if (!_allCards) return null
+  if (!_byId) {
+    _byId = new Map()
+    for (const c of _allCards) _byId.set(c.game + ':' + c.id, c)
+  }
+  return _byId.get(game + ':' + id) || null
 }
 
 /** Raw cached cards for one game (for background price merges). */

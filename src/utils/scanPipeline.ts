@@ -1,6 +1,8 @@
 import { recognizeCard, recognizeJapaneseName } from './ocrService'
-import { multiSearch } from '../services/tcg/multiSearch'
+import { multiSearch, resolveCard } from '../services/tcg/multiSearch'
 import { getJapaneseCardDetail } from '../services/pokemonApi'
+import { getCachedCardById } from '../services/tcg/cardCache'
+import { identifyCard, CONFIDENT_DIST, CANDIDATE_DIST } from './scanMatch'
 
 export interface ScannedCard {
   id: string
@@ -105,7 +107,72 @@ async function searchJapanese(queries: string[], cardNumber: string | null): Pro
   return detailed.filter(Boolean) as ScannedCard[]
 }
 
+// Resolve a hash match (id+game) to a displayable card via the local cache
+// first, then the per-game APIs.
+async function resolveMatch(m: { id: string, game: string, lang: string }): Promise<ScannedCard | null> {
+  try {
+    if (m.game === 'pokemon' && m.lang === 'ja') {
+      const d: any = await getJapaneseCardDetail(m.id)
+      if (!d) return null
+      return {
+        id: d.id, name: d.name, setName: d.set?.name || '', number: d.number || '',
+        image: d.images?.small || '', price: d.tcgplayer?.prices?.normal?.market ?? null,
+        game: 'pokemon',
+      }
+    }
+    const cached: any = getCachedCardById(m.game, m.id)
+    if (cached) {
+      return {
+        id: cached.id, name: cached.name, setName: cached.set || '', number: cached.number || '',
+        image: cached.image || '', price: cached.price ?? null, game: m.game,
+      }
+    }
+    const r: any = await resolveCard(m.id, m.game)
+    if (!r) return null
+    return {
+      id: r.id, name: r.name, setName: r.set || r.setName || '', number: r.number || '',
+      image: r.image || '', price: r.price ?? null, game: m.game,
+    }
+  } catch (e) {
+    console.warn('[scan] resolveMatch failed for', m.id, e)
+    return null
+  }
+}
+
 export async function scanCard(imageData: string, onProgress?: (pct: number) => void): Promise<ScanResult> {
+  // ── Primary: perceptual-hash image matching (how real card scanners work).
+  // The match IS the identification — name/set/number come from the database.
+  try {
+    onProgress?.(10)
+    const matches = await identifyCard(imageData)
+    const plausible = matches.filter(m => m.dist <= CANDIDATE_DIST)
+    console.info('[scan] image match:', matches.slice(0, 4).map(m => `${m.id}@${m.dist}`))
+    if (plausible.length > 0) {
+      onProgress?.(60)
+      const confident = plausible[0].dist <= CONFIDENT_DIST
+      // A confident hit with clear separation auto-adds; otherwise offer the
+      // plausible set as candidates.
+      const wanted = confident && (plausible.length === 1 || plausible[1].dist - plausible[0].dist >= 8)
+        ? [plausible[0]]
+        : plausible
+      const resolved = (await Promise.all(wanted.map(resolveMatch))).filter(Boolean) as ScannedCard[]
+      console.info('[scan] resolved', resolved.length, 'of', wanted.length, 'matches')
+      onProgress?.(100)
+      if (resolved.length > 0) {
+        return {
+          card: resolved.length === 1 ? resolved[0] : null,
+          candidates: resolved,
+          ocrText: 'image-match',
+          ocrConfidence: 100,
+          usedQuery: resolved[0].name,
+        }
+      }
+    }
+  } catch (e) {
+    console.warn('[scan] image match failed, falling back to OCR:', e)
+  }
+
+  // ── Fallback: OCR pipeline (older path — also covers games with no index)
   const ocr = await recognizeCard(imageData, onProgress)
   console.info('[scan] OCR read', {
     queries: ocr.queries,

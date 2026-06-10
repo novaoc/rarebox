@@ -89,8 +89,9 @@ Built by [Nova](https://github.com/novaoc).
 - Live price delta with winning/losing/even label
 - Grading multiplier applied per card (PSA 10 = 2x, etc.)
 - Persistent trade state across sessions (IndexedDB)
-- Camera scan integration — OCR via Tesseract.js (v7) reads the card name and collector number with targeted band passes; Japanese cards resolved via tcgdex with fuzzy prefix search
-- When a scan can't find a match, the search box opens pre-filled with the recognized text — fix a character or two instead of retaking the photo
+- Camera scan identifies cards by **perceptual-hash image matching** (pHash + dHash against a precomputed index of 30,000+ reference card images — the technique used by industrial card sorters), giving the exact printing in under a second with no text reading
+- Hash indexes ship as static files (~840KB total for Pokémon EN/JP, Riftbound, Lorcana, One Piece); regenerate with `python3 scripts/build_scan_index.py <game>`
+- OCR (Tesseract.js v7, English + Japanese) remains as the fallback for unindexed games and low-confidence matches; failed scans pre-fill the search box with the recognized text
 
 ### Pricing & Charts
 - Live card prices from pokemontcg.io, Scryfall, Lorcast, optcgapi, YGOPRODeck, riftcodex.com, and PriceCharting
