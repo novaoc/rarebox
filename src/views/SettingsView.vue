@@ -183,7 +183,7 @@
     </div>
 
     <!-- Collectr Import -->
-    <div class="settings-section card mb-4">
+    <div id="import" class="settings-section card mb-4">
       <h3 class="settings-section-title">Import from Collectr</h3>
       <p class="settings-desc">Upload a Collectr portfolio export CSV to create portfolios in Rarebox. Maps card types, variants, grades, and sealed products automatically.</p>
 

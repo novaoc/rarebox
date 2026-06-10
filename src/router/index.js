@@ -28,7 +28,9 @@ const routes = [
 const router = createRouter({
   history: createWebHistory(),
   routes,
-  scrollBehavior: () => ({ top: 0 })
+  scrollBehavior: (to) => to.hash
+    ? { el: to.hash, top: 76, behavior: 'smooth' }
+    : { top: 0 }
 })
 
 // Catch navigation errors so transitions don't silently hang

@@ -119,7 +119,10 @@
         <span class="sticker ld-cta-sticker">100% free</span>
         <h2>Your binder deserves better.</h2>
         <p>Start with one card or import a thousand — it's your shelf either way.</p>
-        <router-link to="/search" class="btn btn-primary btn-lg">Get started — it's free</router-link>
+        <div class="ld-cta-actions">
+          <router-link to="/search" class="btn btn-primary btn-lg">Get started — it's free</router-link>
+          <router-link to="/settings#import" class="btn btn-secondary btn-lg">Import your collection</router-link>
+        </div>
       </section>
     </div>
 
@@ -825,6 +828,7 @@ onMounted(async () => {
 .ld-cta-sticker { position: absolute; top: -14px; right: 18px; transform: rotate(3deg); }
 .ld-cta h2 { font-size: clamp(1.5rem, 4.5vw, 2.3rem); font-weight: 900; letter-spacing: -0.02em; }
 .ld-cta p { color: var(--text-secondary); margin: 10px 0 20px; }
+.ld-cta-actions { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
 
 @media (min-width: 720px) {
   .ld-hero { grid-template-columns: 1.1fr 1fr; }
