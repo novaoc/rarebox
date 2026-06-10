@@ -1,5 +1,6 @@
-// Fetches live meta deck data from our serverless endpoint
-// Server does all the scraping + card resolution
+// Fetches live meta deck data from a static asset built daily in CI
+// (scripts/build_meta_decks.py does the scraping + card resolution —
+// the app is local-only, no serverless endpoints)
 // Client just caches the result for 24h
 
 const CACHE_KEY = 'rarebox_meta_decks_cache'
@@ -21,10 +22,10 @@ export async function fetchLiveMetaDecks(game = 'pokemon') {
     }
   } catch {}
 
-  // Try serverless endpoint
+  // Try the pre-built static asset
   let serverDecks = []
   try {
-    const res = await fetch(`/api/meta-decks?game=${game}`)
+    const res = await fetch(`/meta-decks/${game}.json`)
     if (res.ok) {
       const data = await res.json()
       if (data.decks?.length) serverDecks = data.decks

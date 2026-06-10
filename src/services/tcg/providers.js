@@ -9,7 +9,7 @@
 // Data sources (English, free):
 //   • MTG       — Scryfall   (api.scryfall.com)    CORS *  — browser-direct
 //   • Lorcana   — Lorcast    (api.lorcast.com)     CORS *  — browser-direct
-//   • One Piece — optcgapi   (via /api/optcg proxy — optcgapi has no CORS)
+//   • One Piece — optcgapi   (optcgapi.com)        CORS *  — browser-direct
 //   • Riftbound — riftcodex  (api.riftcodex.com)   CORS *  — browser-direct
 //   • Yu-Gi-Oh! — YGOPRODeck (db.ygoprodeck.com)   CORS *  — browser-direct
 //   • Pokémon keeps its richer dedicated flow (SetsView) — not handled here.
@@ -193,11 +193,36 @@ const onePiece = {
   },
 }
 
-// ── Riftbound: riftcodex.com + PriceCharting prices ─────────────────────────
-// Card data + images from riftcodex (CORS *). Prices from PriceCharting JSON
-// search — matches by collector number after fetching both sources.
+// ── Riftbound: riftcodex.com + TCGplayer prices (static asset) ──────────────
+// Card data + images from riftcodex (CORS *). Prices come from TCGplayer's
+// daily dump, pre-built into /riftbound-prices.json by a daily GitHub Action
+// (scripts/build_riftbound_prices.py — tcgcsv.com is backend-only, no CORS)
+// and shipped as a static asset like the scan indexes. Joined on each card's
+// tcgplayer_id — exact per-printing matches, including promo sets (PR/OPP/JDG)
+// and the tail of 280-350 card sets that PriceCharting's 100-result search
+// cap drops. PriceCharting search remains as a fallback.
 const RIFTCODEX = 'https://api.riftcodex.com'
 const PC_SEARCH = 'https://www.pricecharting.com/search-products'
+
+// TCGplayer market prices for ALL Riftbound cards, keyed by product id.
+// One same-origin request covers every set.
+async function fetchRiftboundTcgplayerPrices(signal) {
+  const d = await getJson('/riftbound-prices.json', { signal })
+  return d.prices || {}
+}
+
+// riftcodex promo sets all live under one PriceCharting console. Search
+// queries with the full riftcodex label ("riftbound Riftbound Promotional
+// Cards") return nothing, and `riftbound ${setName}` never equals
+// "riftbound promo" — so promos priced $0 until this mapping.
+const RIFT_PC_PROMO_SETS = new Set([
+  'riftbound promotional cards',
+  'riftbound organized play promotional cards',
+  'riftbound judge promotional cards',
+])
+function riftPcConsole(setName) {
+  return RIFT_PC_PROMO_SETS.has(setName.toLowerCase()) ? 'Riftbound Promo' : `Riftbound ${setName}`
+}
 
 // Fetch PriceCharting prices for a Riftbound set.
 // PC caps each search at 100 products, and one bulk query drops the less
@@ -206,10 +231,11 @@ const PC_SEARCH = 'https://www.pricecharting.com/search-products'
 // console name.
 // Returns { normal: {num→price}, variants: {num→{variant→price}} }
 async function fetchRiftboundPrices(setName, signal) {
+  const pcConsole = riftPcConsole(setName)
   const queries = [
-    `riftbound ${setName}`,
-    `riftbound ${setName} signature`,
-    `riftbound ${setName} alternate art`,
+    pcConsole,
+    `${pcConsole} signature`,
+    `${pcConsole} alternate art`,
   ]
   const results = await Promise.allSettled(queries.map(q =>
     getJson(`${PC_SEARCH}?type=prices&q=${encodeURIComponent(q)}`, { signal })
@@ -226,7 +252,7 @@ async function fetchRiftboundPrices(setName, signal) {
     }
   }
 
-  const expectedConsole = `riftbound ${setName}`.toLowerCase()
+  const expectedConsole = pcConsole.toLowerCase()
   const normal = {}   // "299" → price (plain cards)
   const variants = {} // "299" → {"signature": price, "alternate art": price}
   for (const p of products) {
@@ -287,8 +313,8 @@ const riftbound = {
       const cards = []
       let page = 1
       let total = Infinity
-      while (cards.length < total && page <= 20) {
-        const d = await getJson(`${RIFTCODEX}/cards?set_id=${encodeURIComponent(setId)}&limit=50&page=${page}`, { signal })
+      while (cards.length < total && page <= 10) {
+        const d = await getJson(`${RIFTCODEX}/cards?set_id=${encodeURIComponent(setId)}&limit=100&page=${page}`, { signal })
         const items = d.items || []
         total = d.total || 0
         for (const c of items) {
@@ -300,27 +326,43 @@ const riftbound = {
             image: c.media?.image_url || '',
             price: null,
             rarity: c.classification?.rarity || '',
+            tcgplayerId: c.tcgplayer_id ? String(c.tcgplayer_id) : '',
           })
         }
         page++
       }
 
-      // 2. Fetch PriceCharting prices for this set (one request, cached)
-      const setName = cards[0]?.set || setId
-      const priceMap = await cached(`riftbound:prices:${setId}`, 600_000, async (sig) => {
-        return fetchRiftboundPrices(setName, sig)
-      })
+      // 2. Join TCGplayer market prices on product id — exact per printing,
+      // so a Signature/promo can never inherit its plain card's price.
+      let priced = 0
+      try {
+        const tcgp = await cached('riftbound:tcgp-prices', 3600_000, fetchRiftboundTcgplayerPrices)
+        for (const card of cards) {
+          const p = tcgp[card.tcgplayerId]
+          if (!p) continue
+          // Promos/Signatures are foil-only; plain cards use the normal print.
+          const val = p.normal ?? p.foil
+          if (val > 0) { card.price = val; priced++ }
+        }
+      } catch { /* proxy unreachable — fall back to PriceCharting below */ }
 
-      // 3. Merge prices — plain cards get the plain price, variants get their
-      // variant price. A variant printing must NEVER inherit the plain price
-      // (a $600 Signature shown at $50 is worse than no price at all).
-      for (const card of cards) {
-        if (!card.number) continue
-        const variant = riftVariantFromName(card.name)
-        if (variant) {
-          card.price = priceMap.variants[card.number]?.[variant] ?? null
-        } else if (priceMap.normal[card.number] != null) {
-          card.price = priceMap.normal[card.number]
+      // 3. Fallback: PriceCharting fuzzy search (pre-TCGplayer pipeline).
+      // Plain cards get the plain price, variants their variant price — a
+      // variant must NEVER inherit the plain price ($600 Signature at $50
+      // is worse than no price at all).
+      if (priced === 0) {
+        const setName = cards[0]?.set || setId
+        const priceMap = await cached(`riftbound:prices:${setId}`, 600_000, async (sig) => {
+          return fetchRiftboundPrices(setName, sig)
+        })
+        for (const card of cards) {
+          if (!card.number) continue
+          const variant = riftVariantFromName(card.name)
+          if (variant) {
+            card.price = priceMap.variants[card.number]?.[variant] ?? null
+          } else if (priceMap.normal[card.number] != null) {
+            card.price = priceMap.normal[card.number]
+          }
         }
       }
 
