@@ -216,11 +216,21 @@ function isTab(tab) {
 
 // Pages that have tour videos
 const tourPages = {
-  Sets:  { storageKey: 'rarebox_sets_tour_seen',  showRef: showSetsTour },
+  Browse: { storageKey: 'rarebox_sets_tour_seen', showRef: showSetsTour },
   Decks: { storageKey: 'rarebox_deck_tour_seen',  showRef: showDecksTour },
   TradeLanding:  { storageKey: 'rarebox_trade_tour_seen', showRef: showTradeTour },
   TradeAnalyzer: { storageKey: 'rarebox_trade_tour_seen', showRef: showTradeTour },
 }
+
+// First visit to a tour page auto-plays its tour once (TourModal marks the
+// storage key seen). The ⓘ next to the page title replays it any time.
+watch(() => route.name, (name) => {
+  const tour = tourPages[name]
+  if (tour && !localStorage.getItem(tour.storageKey)) {
+    tourKey.value++
+    tour.showRef.value = true
+  }
+}, { immediate: true })
 
 const currentTour = computed(() => tourPages[route.name] || null)
 
