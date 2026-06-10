@@ -1,1 +1,7 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 30 30"><rect x="1.5" y="1.5" width="27" height="27" rx="8" fill="#ffd23f" stroke="#141414" stroke-width="2.5"/><text x="15" y="20.5" text-anchor="middle" font-family="-apple-system,sans-serif" font-size="12" font-weight="900" fill="#141414">RB</text></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <g transform="rotate(-6 16 16)">
+    <rect x="5" y="5" width="24" height="24" rx="7" fill="#141414"/>
+    <rect x="2.5" y="2.5" width="24" height="24" rx="7" fill="#ffd23f" stroke="#141414" stroke-width="2.5"/>
+    <text x="14.5" y="19.5" text-anchor="middle" font-family="-apple-system,'Segoe UI',sans-serif" font-size="12" font-weight="900" fill="#141414">RB</text>
+  </g>
+</svg>
