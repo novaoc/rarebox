@@ -72,8 +72,8 @@
   /* Accents follow Material's dark guidance: lighter, desaturated tones
      (their 200-50 rule — saturated colors vibrate on dark) paired with
      dark text. Daylight yellow becomes muted gold. */
-  --accent: #d9a92f;
-  --accent-hover: #e6b73d;
+  --accent: #e8c558;
+  --accent-hover: #f0d172;
   --pink: #ea93b7;
   --purple: #ea93b7;
   --success: #4cc285;
@@ -94,7 +94,7 @@
   --text-secondary: #b5ac98;
   --text-muted: #7d7565;
 
-  --accent-dim: rgba(217, 169, 47, 0.15);
+  --accent-dim: rgba(232, 197, 88, 0.14);
   --success-dim: rgba(47, 191, 113, 0.16);
   --danger-dim: rgba(228, 67, 79, 0.18);
   --info-dim: rgba(79, 134, 247, 0.18);
@@ -107,7 +107,7 @@
   --shadow-lg: 6px 6px 0 #000;
 
   --success-text: #4cd58a;
-  --accent-text: #e6b73d;
+  --accent-text: #eccf76;
   --danger-text: #ef8e8b;
   --scroll-thumb: #44402f;
   color-scheme: dark;
