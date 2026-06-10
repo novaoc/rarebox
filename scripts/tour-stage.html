@@ -448,11 +448,16 @@ const scenes = {
       }],
       [2300, () => {
         const ks = [['lugia', 760, 150, -7], ['luffy', 1010, 170, 8], ['megachar', 880, 120, 2]]
-        ks.forEach(([k, x, y, r], i) => setTimeout(() => {
+        ks.forEach(([k, x, y, r], i) => {
           const c = tcard(k, x, y, r, 226)
-          c.classList.add('on')
-          c.style.animation = `bob ${5 + i}s ease-in-out ${i * .6}s infinite alternate`
-        }, i * 240))
+          c.style.transition = 'all 1.1s cubic-bezier(.16, 1, .3, 1)'
+          c.style.transform = 'translateY(40px) rotate(' + r + 'deg)'
+          requestAnimationFrame(() => requestAnimationFrame(() => {
+            c.classList.add('on')
+            c.style.transform = ''
+          }))
+          setTimeout(() => { c.style.animation = `bob ${5 + i}s ease-in-out ${i * .6}s infinite alternate` }, 1200)
+        })
         const st = document.createElement('style')
         st.textContent = '@keyframes bob { from { margin-top: 0 } to { margin-top: -14px } }'
         document.head.appendChild(st)
@@ -479,7 +484,13 @@ function headlineReset() {
   requestAnimationFrame(() => {})
 }
 
-scenes[SCENE]()
+// Preload every card image first — otherwise frames animate in while the
+// artwork is still downloading and pictures pop in late ("snappy").
+Promise.all(Object.values(CARDS).map(c => new Promise(res => {
+  const i = new Image()
+  i.onload = res; i.onerror = res
+  i.src = c.img
+}))).then(() => scenes[SCENE]())
 </script>
 </body>
 </html>
