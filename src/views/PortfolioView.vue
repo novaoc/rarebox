@@ -742,7 +742,7 @@ function deletePortfolio() { store.deletePortfolio(portfolio.value.id); router.p
 .mobile-item-stats { display: flex; align-items: center; gap: 6px; font-size: 12px; }
 .mobile-item-gain { margin-left: auto; padding: 1px 8px; border: 1.5px solid var(--on-accent); border-radius: 999px; font-weight: 800; font-size: 11px; flex-shrink: 0; }
 .gain-pos { background: var(--success); color: var(--on-accent); }
-.gain-neg { background: var(--danger); color: #fff; }
+.gain-neg { background: var(--danger); color: var(--on-danger); }
 .mobile-item-menu { width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; color: var(--text-secondary); }
 
 /* Custom Checkbox */

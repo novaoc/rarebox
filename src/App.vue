@@ -474,9 +474,9 @@ onErrorCaptured((err, instance, info) => {
   margin-top: -22px;
   border-radius: 50%;
   background: var(--pink);
-  border: var(--bw) solid var(--ink);
+  border: var(--bw) solid var(--on-accent);
   box-shadow: var(--shadow-xs);
-  color: var(--ink);
+  color: var(--on-accent);
 }
 .tab-hero.active .tab-hero-disc { background: var(--accent); }
 .tab-hero:active .tab-hero-disc { box-shadow: var(--shadow-pressed); transform: translate(1px, 1px); }
