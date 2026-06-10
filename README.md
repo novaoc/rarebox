@@ -6,9 +6,20 @@
 
 Track your TCG collection across Pokémon, Magic: The Gathering, Disney Lorcana, One Piece Card Game, Yu-Gi-Oh!, and Riftbound — cards, sealed products, and graded slabs — with live prices, portfolio charts, and a trade analyzer.
 
+As of v1.4.0 the entire app wears **Tactile** — a custom design system (cream paper, ink lines, hard shadows that compress when pressed) with a bottom tab bar on phones/foldables/tablets and a top bar on desktop. Five alternative design prototypes remain live at [/designs](https://rarebox.io/designs).
+
 **Live at [rarebox.io](https://rarebox.io)** · **Docs at [docs.rarebox.io](https://docs.rarebox.io)**
 
 Built by [Nova](https://github.com/novaoc).
+
+## Design — Tactile
+
+- Custom design system in `src/assets/main.css`: semantic tokens (cream `#faf6ef`, ink `#141414`, four accent fills), 2px ink borders, hard offset shadows with press-compression on every button
+- Navigation: bottom tab bar (Home · Search · Trade · Browse · More) under 1024px with safe-area support and a raised Trade disc; slim top bar with inline nav on desktop — the sidebar is retired
+- "RB" sticker logomark across top bar, favicon, and PWA icon
+- Marketing landing page with a rotating cross-TCG card showcase — 14 iconic cards across all six games (Lugia 1st Ed, Manga Luffy, Blue-Eyes, Riftbound Signatures, Traveling Chocobo, The Soul Stone…), prices seeded from Rarebox's own feeds and re-fetched live on every view; the "shelf" total is computed from the cards actually displayed
+- Tactile is rationed for daily use: stickers/rotations only on moments (total value, trade verdict, empty states)
+- Design Lab: five complete brand directions (Mono, Aurora, Tactile, Atelier, Pulse) at `/designs`, each verified at 280px (foldable cover), 360px, 717px (unfolded foldable), 834px and 1280px+
 
 ## Features
 
@@ -44,6 +55,7 @@ Built by [Nova](https://github.com/novaoc).
 - Cached TCGs searched instantly from local IndexedDB
 - Uncached TCGs searched via live API with automatic fan-out and result merging
 - Results sorted by relevance: exact name → prefix → alphabetical
+- Token-based matching — every word must appear, so "ahri inquisitive" finds "Ahri - Inquisitive" across punctuation
 - Sealed product search via PriceCharting — keyword-filtered for boosters, ETBs, tins, etc.
 
 ### Price Alerts
@@ -77,7 +89,8 @@ Built by [Nova](https://github.com/novaoc).
 - Live price delta with winning/losing/even label
 - Grading multiplier applied per card (PSA 10 = 2x, etc.)
 - Persistent trade state across sessions (IndexedDB)
-- Camera scan integration — OCR via Tesseract.js extracts card names from photos
+- Camera scan integration — OCR via Tesseract.js (v7) reads the card name and collector number with targeted band passes; Japanese cards resolved via tcgdex with fuzzy prefix search
+- When a scan can't find a match, the search box opens pre-filled with the recognized text — fix a character or two instead of retaking the photo
 
 ### Pricing & Charts
 - Live card prices from pokemontcg.io, Scryfall, Lorcast, optcgapi, YGOPRODeck, riftcodex.com, and PriceCharting
@@ -97,9 +110,11 @@ Built by [Nova](https://github.com/novaoc).
 - **Reset Everything** — clears all portfolios, card cache, and stored data with a single button
 
 ### Mobile
+- Bottom tab bar navigation with 44px+ touch targets and iOS safe-area support
 - Touch-friendly card grids with persistent overlay buttons on touch devices
 - Bottom sheet panels for card details, search results, and portfolio items
 - Responsive charts, stacked headers, column hiding on smaller screens
+- Layouts verified down to 280px (foldable cover screens) and across tablet/foldable widths
 
 ### PWA — Add to Home Screen
 - Installable as a standalone app on Android and iOS
@@ -129,6 +144,7 @@ Built by [Nova](https://github.com/novaoc).
 ## Performance
 
 - Card database preloaded into IndexedDB — instant search with zero API calls for cached TCGs
+- Pokémon card data loads in ~10 seconds via the official bulk dataset on jsDelivr (20,000+ cards); prices stream in via a background pass with incremental saves and automatic resume
 - Set data cached in localStorage for 24h — instant load on return visits
 - Multi-TCG API responses cached in memory (1h sets, 10min cards)
 - pokemontcg.io responses trimmed with `select=` — 50-60% smaller payloads
@@ -201,6 +217,7 @@ getSetCards(id)  -> [{ id, name, number, image, price, rarity }]
 
 ## Releases
 
+- **[v1.4.0](https://github.com/novaoc/rarebox/releases/tag/v1.4.0)** — **The Tactile release.** Complete app redesign: Tactile design system (cream/ink, hard shadows), bottom tab bar navigation on mobile/foldables, RB sticker branding, new marketing landing with a rotating live-priced cross-TCG showcase, and a Design Lab with five brand prototypes at /designs. **Speed:** Pokémon card DB loads in ~10s via bulk data (was 10-45 min); background price pass with incremental saves + auto-resume. **Search:** token-based multi-word matching everywhere; priceless-cache fallthrough to live APIs; trade search shows 30 results. **Scanner rebuilt:** tesseract.js v7, Japanese card support via tcgdex, name/number band passes, failed scans pre-fill the search box. **Fixes:** JP card images (tcgdex URLs + corrected set-name table), Collectr import resolution (multi-set candidates, set aliases, validated numbers), restored portfolio price refresh (Riftbound/MTG/One Piece prices on mobile), variant-correct Riftbound prices (Signatures no longer show plain prices), Yu-Gi-Oh per-printing prices, duplicate portfolio rows on desktop, deck builder images, Settings refresh button (was a silent no-op), Reset Everything now wipes trade analyzer + decks, image error fallbacks across all views.
 - **[v1.3.0](https://github.com/novaoc/rarebox/releases/tag/v1.3.0)** — Yu-Gi-Oh! support (sets, cards, search, meta decks). Trade Analyzer (side-by-side comparison, camera scan). Collectr import (CSV/XLSX). Card database preloader with progress indicator. Price alerts with browser notifications. Entire set add to portfolio. Sealed product search improvements. Graded card multipliers. Storage usage display. Reset clears card cache. Navigation and transition fixes. **Critical bug fixes:** trade/portfolio state persistence conflict resolved (separate IDB keys), price alerts now auto-checked on dashboard, non-Pokemon cards refresh prices on dashboard load, Collectr import resolves all 6 TCGs. **Lorcana fixes:** meta deck cards load correctly (set field paths, version-aware name matching). **Riftbound fixes:** meta deck cards show correct images/sets/prices. 404 catch-all route. Dynamic imports hoisted per PR review.
 - **[v1.2.0](https://github.com/novaoc/rarebox/releases/tag/v1.2.0)** — Riftbound TCG via riftcodex.com (7 sets, 1000+ cards, card images). Sealed products for all TCGs. Graded cards for all TCGs. Type filtering fix.
 - **[v1.1.0](https://github.com/novaoc/rarebox/releases/tag/v1.1.0)** — Multi-TCG Browse & Search: Magic (Scryfall), Lorcana (Lorcast), One Piece (optcgapi) with live prices. Unified search across all TCGs. Graded cards for all TCGs. Brand logos. API caching + abort-on-unmount.
