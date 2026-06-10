@@ -22,17 +22,9 @@
           </div>
         </div>
         <div class="ld-hero-visual" aria-hidden="true">
-          <div class="ld-card ld-card-1">
-            <img src="https://images.pokemontcg.io/base1/4.png" alt="" loading="lazy" @error="$event.target.style.display='none'" />
-            <span class="ld-price-tag">$412.00</span>
-          </div>
-          <div class="ld-card ld-card-2">
-            <img src="https://images.pokemontcg.io/me2/13.png" alt="" loading="lazy" @error="$event.target.style.display='none'" />
-            <span class="ld-price-tag ld-tag-green">$96.40</span>
-          </div>
-          <div class="ld-card ld-card-3">
-            <img src="https://images.pokemontcg.io/sv3pt5/151.png" alt="" loading="lazy" @error="$event.target.style.display='none'" />
-            <span class="ld-price-tag ld-tag-pink">$38.25</span>
+          <div v-for="(c, i) in heroCards" :key="c.key" class="ld-card" :class="'ld-card-' + (i + 1)">
+            <img :src="c.img" :alt="c.name" loading="lazy" @error="$event.target.style.display='none'" />
+            <span class="ld-price-tag" :class="['', 'ld-tag-green', 'ld-tag-pink'][i]">{{ fmtPrice(c.price) }}</span>
           </div>
         </div>
       </section>
@@ -40,7 +32,7 @@
       <!-- ── Marquee ───────────────────────────────────────────────── -->
       <div class="ld-marquee" aria-hidden="true">
         <div class="ld-marquee-track">
-          <span v-for="i in 2" :key="i" class="ld-marquee-seg">
+          <span v-for="i in 8" :key="i" class="ld-marquee-seg">
             POKÉMON&nbsp;&nbsp;★&nbsp;&nbsp;MAGIC&nbsp;&nbsp;★&nbsp;&nbsp;YU-GI-OH!&nbsp;&nbsp;★&nbsp;&nbsp;LORCANA&nbsp;&nbsp;★&nbsp;&nbsp;ONE&nbsp;PIECE&nbsp;&nbsp;★&nbsp;&nbsp;RIFTBOUND&nbsp;&nbsp;★&nbsp;&nbsp;
           </span>
         </div>
@@ -87,17 +79,18 @@
           <div class="ld-shelf-head">
             <div>
               <div class="ld-shelf-label">Your shelf, as a number</div>
-              <span class="sticker sticker-green ld-shelf-value">$12,847.32</span>
+              <span class="sticker sticker-green ld-shelf-value">{{ fmtPrice(shelfTotal) }}</span>
             </div>
             <svg class="ld-spark" viewBox="0 0 220 56" fill="none" aria-hidden="true">
               <polyline points="0,46 22,42 44,44 66,36 88,38 110,28 132,30 154,20 176,24 198,12 220,8" stroke="#141414" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
           </div>
           <div class="ld-shelf-grid">
-            <div class="ld-shelf-card" v-for="c in shelfCards" :key="c.name">
+            <div class="ld-shelf-card" v-for="c in shelfCards" :key="c.key">
               <div class="ld-shelf-img"><img :src="c.img" :alt="c.name" loading="lazy" @error="$event.target.style.display='none'" /></div>
               <div class="ld-shelf-name">{{ c.name }}</div>
-              <span class="ld-shelf-price">{{ c.price }}</span>
+              <div class="ld-shelf-sub">{{ c.sub }}</div>
+              <span class="ld-shelf-price">{{ fmtPrice(c.price) }}</span>
             </div>
           </div>
         </div>
@@ -242,12 +235,96 @@ const isNewUser = computed(() => {
   return store.portfolios.every(p => p.items.length === 0)
 })
 
-const shelfCards = [
-  { name: 'Charizard', img: 'https://images.pokemontcg.io/base1/4.png', price: '$412.00' },
-  { name: 'Pikachu', img: 'https://images.pokemontcg.io/base1/58.png', price: '$8.40' },
-  { name: 'Mega Charizard X ex', img: 'https://images.pokemontcg.io/me2/13.png', price: '$96.40' },
-  { name: 'Mew ex', img: 'https://images.pokemontcg.io/sv3pt5/151.png', price: '$38.25' },
+// ── Landing showcase — a rotating, cross-TCG pool. Prices are seeded with
+// values from rarebox's own feeds and refreshed live on every page view.
+const SHOWCASE = [
+  { key: 'charizard', name: 'Charizard', sub: 'Base Set · Pokémon', img: 'https://images.pokemontcg.io/base1/4.png', price: 614.49, live: { t: 'ptcg', id: 'base1-4' } },
+  { key: 'lugia', name: 'Lugia (1st Edition)', sub: 'Neo Genesis · Pokémon', img: 'https://images.pokemontcg.io/neo1/9.png', price: 1599.98, live: { t: 'ptcg', id: 'neo1-9' } },
+  { key: 'trmewtwo', name: "Team Rocket's Mewtwo ex", sub: 'Destined Rivals · Pokémon', img: 'https://images.pokemontcg.io/sv10/231.png', price: 569.18, live: { t: 'ptcg', id: 'sv10-231' } },
+  { key: 'pikachu', name: 'Pikachu', sub: 'Base Set · Pokémon', img: 'https://images.pokemontcg.io/base1/58.png', price: 7.59, live: { t: 'ptcg', id: 'base1-58' } },
+  { key: 'mewex', name: 'Mew ex', sub: '151 · Pokémon', img: 'https://images.pokemontcg.io/sv3pt5/151.png', price: 9.6, live: { t: 'ptcg', id: 'sv3pt5-151' } },
+  { key: 'megachar', name: 'Mega Charizard X ex', sub: 'Phantasmal Flames · Pokémon', img: 'https://images.pokemontcg.io/me2/13.png', price: 4.38, live: { t: 'ptcg', id: 'me2-13' } },
+  { key: 'luffy', name: 'Monkey.D.Luffy (Manga)', sub: 'OP-05 · One Piece', img: 'https://optcgapi.com/media/static/Card_Images/OP05-119_r2.jpg', price: 3975.0, live: { t: 'optcg', set: 'OP-05', id: 'OP05-119', match: 'Manga' } },
+  { key: 'bewd', name: 'Blue-Eyes White Dragon', sub: 'Legend of Blue Eyes · Yu-Gi-Oh!', img: 'https://images.ygoprodeck.com/images/cards_small/89631139.jpg', price: 681.49, live: { t: 'ygo', name: 'Blue-Eyes White Dragon', set: 'LOB-E001' } },
+  { key: 'ahrisig', name: 'Ahri Signature', sub: 'Origins · Riftbound', img: 'https://cmsassets.rgpub.io/sanity/images/dsfx7636/game_data_live/e5fe571a8f09c0a9e76345ec32b446480f54617c-1488x2078.png', price: 2250.67, live: { t: 'pc', q: 'riftbound origins ahri', match: '[Signature] #303' } },
+  { key: 'mfsig', name: 'Miss Fortune Signature', sub: 'Origins · Riftbound', img: 'https://cmsassets.rgpub.io/sanity/images/dsfx7636/game_data_live/37153cce7f58b2fceb28ea9ff91deb0411f849e2-1488x2078.png', price: 968.75, live: { t: 'pc', q: 'riftbound origins miss fortune', match: '[Signature] #309' } },
+  { key: 'jinx', name: 'Jinx - Loose Cannon', sub: 'Origins · Riftbound', img: 'https://cmsassets.rgpub.io/sanity/images/dsfx7636/game_data_live/8a7dbbed04133926e58843f1d586f51178ef2ebd-1488x2078.png', price: 65.0, live: { t: 'pc', q: 'riftbound origins jinx', match: 'Jinx - Loose Cannon #301' } },
+  { key: 'mickey', name: 'Mickey Mouse - Brave Little Tailor', sub: 'First Chapter · Lorcana', img: 'https://cards.lorcast.io/card/digital/small/crd_e74ef94562b9440e8dd95ada098728d6.avif', price: 42.89, live: { t: 'lorcast', q: 'mickey brave little tailor', num: '115' } },
+  { key: 'chocobo', name: 'Traveling Chocobo (foil)', sub: 'Final Fantasy · Magic', img: 'https://cards.scryfall.io/small/front/7/1/71b97e69-f198-41ec-9385-015ec2f0160f.jpg', price: 5950.0, live: { t: 'scry', id: '71b97e69-f198-41ec-9385-015ec2f0160f' } },
+  { key: 'soulstone', name: 'The Soul Stone (foil)', sub: 'Spider-Man · Magic', img: 'https://cards.scryfall.io/small/front/f/9/f9d80efc-e829-4257-83e8-f37b0b68de57.jpg', price: 1224.49, live: { t: 'scry', id: 'f9d80efc-e829-4257-83e8-f37b0b68de57' } },
 ]
+
+const heroCards = ref([])
+const shelfCards = ref([])
+const shelfTotal = computed(() => shelfCards.value.reduce((sum, c) => sum + (c.price || 0), 0))
+
+function fmtPrice(p) {
+  if (p == null) return '—'
+  return '$' + p.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
+function pickShowcase() {
+  const pool = [...SHOWCASE].sort(() => Math.random() - 0.5)
+  // hero: 3 cards from 3 different games for the multi-TCG story
+  const hero = []
+  const seenGames = new Set()
+  const rest = []
+  for (const c of pool) {
+    const game = c.sub.split('·').pop().trim()
+    if (hero.length < 3 && !seenGames.has(game)) { hero.push(c); seenGames.add(game) }
+    else rest.push(c)
+  }
+  heroCards.value = hero.map(c => ({ ...c }))
+  shelfCards.value = rest.slice(0, 4).map(c => ({ ...c }))
+  for (const card of [...heroCards.value, ...shelfCards.value]) refreshShowcasePrice(card)
+}
+
+// Live price refresh through the same sources the app tracks prices with.
+// Failures keep the seeded price — never a blank tag.
+async function refreshShowcasePrice(card) {
+  const l = card.live
+  if (!l) return
+  try {
+    if (l.t === 'ptcg') {
+      const r = await fetch(`https://api.pokemontcg.io/v2/cards/${l.id}?select=tcgplayer`)
+      const ps = (await r.json())?.data?.tcgplayer?.prices || {}
+      for (const v of ['holofoil', '1stEditionHolofoil', 'unlimitedHolofoil', 'reverseHolofoil', 'normal']) {
+        if (ps[v]?.market) { card.price = ps[v].market; return }
+      }
+    } else if (l.t === 'scry') {
+      const r = await fetch(`https://api.scryfall.com/cards/${l.id}`)
+      const d = await r.json()
+      const p = parseFloat(d?.prices?.usd || d?.prices?.usd_foil)
+      if (p > 0) card.price = p
+    } else if (l.t === 'ygo') {
+      const r = await fetch(`https://db.ygoprodeck.com/api/v7/cardinfo.php?name=${encodeURIComponent(l.name)}`)
+      const d = (await r.json())?.data?.[0]
+      const set = (d?.card_sets || []).find(x => x.set_code === l.set)
+      const p = parseFloat(set?.set_price || d?.card_prices?.[0]?.tcgplayer_price)
+      if (p > 0) card.price = p
+    } else if (l.t === 'pc') {
+      const r = await fetch(`https://www.pricecharting.com/search-products?type=prices&q=${encodeURIComponent(l.q)}`, { headers: { Accept: 'application/json' } })
+      const products = (await r.json())?.products || []
+      const hit = products.find(x => (x.productName || '').includes(l.match))
+      const p = hit && parseFloat(String(hit.price1).replace(/[$,]/g, ''))
+      if (p > 0) card.price = p
+    } else if (l.t === 'lorcast') {
+      const r = await fetch(`https://api.lorcast.com/v0/cards/search?q=${encodeURIComponent(l.q)}`)
+      const hit = ((await r.json())?.results || []).find(x => String(x.collector_number) === l.num)
+      const p = hit && parseFloat(hit.prices?.usd_foil || hit.prices?.usd)
+      if (p > 0) card.price = p
+    } else if (l.t === 'optcg') {
+      const r = await fetch(`https://optcgapi.com/api/sets/${l.set}/`)
+      const arr = await r.json()
+      const hit = (Array.isArray(arr) ? arr : []).find(x =>
+        x.card_set_id === l.id && (x.card_name || '').includes(l.match) && !(x.card_name || '').includes('Alternate')
+      )
+      if (hit?.market_price > 0) card.price = hit.market_price
+    }
+  } catch { /* seeded price stays */ }
+}
+
+onMounted(pickShowcase)
 
 function scrollToFeatures() {
   featuresRef.value?.scrollIntoView({ behavior: 'smooth' })
@@ -728,6 +805,7 @@ onMounted(async () => {
 .ld-shelf-img { background: var(--bg-secondary); border: var(--bw) solid var(--ink); border-radius: 10px; aspect-ratio: 63/88; padding: 5px; }
 .ld-shelf-img img { width: 100%; height: 100%; object-fit: contain; }
 .ld-shelf-name { font-size: 12.5px; font-weight: 800; margin-top: 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ld-shelf-sub { font-size: 10.5px; color: var(--text-muted); font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ld-shelf-price { display: inline-block; margin-top: 4px; background: var(--accent); border: 1.5px solid var(--ink); border-radius: 7px; padding: 1px 8px; font-size: 11.5px; font-weight: 800; }
 
 .ld-import { padding: clamp(34px, 6vw, 64px) 0 0; text-align: center; }
