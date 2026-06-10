@@ -35,6 +35,7 @@
       </div>
 
       <div class="topbar-actions">
+        <button v-if="currentTour" class="tour-info-btn tour-info-desktop" @click="replayTour" title="Watch tour video" aria-label="Watch tour video">i</button>
         <button class="btn btn-ghost btn-icon theme-btn" @click="toggleTheme" :aria-label="theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'">
           <svg v-if="theme === 'dark'" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32 1.41 1.41M2 12h2m16 0h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
           <svg v-else xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
@@ -403,7 +404,7 @@ onErrorCaptured((err, instance, info) => {
   border-radius: 50%;
   border: var(--bw) solid var(--ink);
   background: var(--info);
-  color: #fff;
+  color: var(--on-info);
   font-size: 12px;
   font-weight: 800;
   font-style: italic;
@@ -412,6 +413,7 @@ onErrorCaptured((err, instance, info) => {
 }
 
 .topbar-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.tour-info-desktop { display: none; } /* mobile uses the one in .topbar-page */
 .add-card-btn { display: none; }
 .settings-btn { display: none; }
 .theme-btn { display: inline-flex; }
@@ -554,6 +556,7 @@ onErrorCaptured((err, instance, info) => {
 @media (min-width: 1024px) {
   .topnav { display: flex; }
   .topbar-page { display: none; }
+  .tour-info-desktop { display: inline-flex; align-items: center; justify-content: center; }
   .add-card-btn { display: inline-flex; }
   .settings-btn { display: inline-flex; }
   .tabbar { display: none; }
