@@ -6,6 +6,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { loadState, saveState, isStale as _isStale, hasNeverPriced as _hasNeverPriced } from '../db'
+import { getAdjustedPrice } from '../utils/conditionMultipliers'
 
 // Legacy localStorage keys (for migration)
 const LEGACY_PORTFOLIOS_KEY = 'rarebox_portfolios'
@@ -152,9 +153,14 @@ export const usePortfolioStore = defineStore('portfolio', () => {
     return portfolios.value.reduce((total, p) => {
       return total + p.items.reduce((sum, item) => {
         const qty = item.quantity || 1
-        const value = item.type === 'card'
+        const basePrice = item.type === 'card'
           ? (item.currentMarketPrice || item.purchasePrice || 0)
           : (item.currentValue || item.purchasePrice || 0)
+        
+        const value = item.type === 'card' 
+          ? getAdjustedPrice(basePrice, item.condition, !!item.grading)
+          : basePrice
+
         return sum + value * qty
       }, 0)
     }, 0)
@@ -273,16 +279,25 @@ export const usePortfolioStore = defineStore('portfolio', () => {
     const totalCost = items.reduce((s, i) => s + (i.purchasePrice || 0) * (i.quantity || 1), 0)
     const totalValue = items.reduce((s, i) => {
       const qty = i.quantity || 1
-      const val = i.type === 'card'
+      const basePrice = i.type === 'card'
         ? (i.currentMarketPrice || i.purchasePrice || 0)
         : (i.currentValue || i.purchasePrice || 0)
+
+      const val = i.type === 'card'
+        ? getAdjustedPrice(basePrice, i.condition, !!i.grading)
+        : basePrice
+
       return s + val * qty
     }, 0)
     const gain = totalValue - totalCost
     const gainPct = totalCost > 0 ? (gain / totalCost) * 100 : 0
     const topGainer = items.reduce((best, item) => {
       const cost = (item.purchasePrice || 0)
-      const val = item.type === 'card' ? (item.currentMarketPrice || cost) : (item.currentValue || cost)
+      const basePrice = item.type === 'card' ? (item.currentMarketPrice || cost) : (item.currentValue || cost)
+      const val = item.type === 'card'
+        ? getAdjustedPrice(basePrice, item.condition, !!item.grading)
+        : basePrice
+
       const g = cost > 0 ? (val - cost) / cost * 100 : 0
       return g > (best?.gain || -Infinity) ? { item, gain: g } : best
     }, null)
@@ -301,9 +316,14 @@ export const usePortfolioStore = defineStore('portfolio', () => {
 
     const values = {}
     for (const item of portfolio.items) {
-      const price = item.type === 'card'
+      const basePrice = item.type === 'card'
         ? (item.currentMarketPrice || item.purchasePrice || 0)
         : (item.currentValue || item.purchasePrice || 0)
+      
+      const price = item.type === 'card'
+        ? getAdjustedPrice(basePrice, item.condition, !!item.grading)
+        : basePrice
+
       if (price > 0) values[item.id] = price
     }
 
