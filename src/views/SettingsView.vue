@@ -28,7 +28,7 @@
     <!-- Data & Privacy -->
     <div class="settings-section card mb-4">
       <h3 class="settings-section-title">Data & Privacy</h3>
-      <p class="settings-desc">All data is stored locally in your browser. Nothing is sent to any server.</p>
+      <p class="settings-desc">All data is stored locally in your browser. Nothing is sent to any server — no accounts, no cookies, no analytics. Once loaded, the app even works offline.</p>
 
       <div class="settings-item">
         <div>
@@ -245,15 +245,15 @@
       <div class="about-grid">
         <div class="about-item">
           <div class="about-label">Version</div>
-          <div class="about-val">1.1.0</div>
+          <div class="about-val">v{{ appVersion }}</div>
         </div>
         <div class="about-item">
-          <div class="about-label">Card Prices</div>
-          <div class="about-val">pokemontcg.io</div>
+          <div class="about-label">Games</div>
+          <div class="about-val">Pokémon · MTG · Yu-Gi-Oh! · Lorcana · One Piece · Riftbound</div>
         </div>
         <div class="about-item">
-          <div class="about-label">Price History</div>
-          <div class="about-val">tcgdex (Nov 2022+)</div>
+          <div class="about-label">Scanner</div>
+          <div class="about-val">On-device image matching</div>
         </div>
         <div class="about-item">
           <div class="about-label">Sealed / Graded</div>
@@ -264,11 +264,15 @@
       <div class="settings-notes mt-3">
         <div class="note">
           <span>📊</span>
-          <p>Card price history comes from the <strong>tcgdex/price-history</strong> GitHub repository (TCGPlayer data). History goes back to November 2022. Current prices are fetched live from <strong>pokemontcg.io</strong>.</p>
+          <p>Live prices come from each game's public database — <strong>pokemontcg.io</strong> (Pokémon), <strong>Scryfall</strong> (Magic), <strong>YGOPRODeck</strong> (Yu-Gi-Oh!), <strong>Lorcast</strong> (Lorcana), and <strong>PriceCharting</strong> (One Piece, Riftbound, sealed &amp; graded). Pokémon price history comes from the <strong>tcgdex/price-history</strong> repository (TCGPlayer data, Nov 2022+).</p>
         </div>
         <div class="note">
-          <span>📦</span>
-          <p>Sealed product and graded slab prices are fetched directly from <strong>PriceCharting</strong> — no backend, no API key needed.</p>
+          <span>📡</span>
+          <p>Rarebox works <strong>fully offline</strong> once loaded — shelves, decks, search and browse all run from your device. Only price refreshes and new card lookups need a connection.</p>
+        </div>
+        <div class="note">
+          <span>🔒</span>
+          <p><strong>No analytics, no accounts, no cookies.</strong> Your collection never leaves this device unless you export it yourself.</p>
         </div>
       </div>
     </div>
@@ -370,6 +374,7 @@ const router = useRouter()
 const confirmReset = ref(false)
 const resetConfirmText = ref('')
 const showLocalSync = ref(false)
+const appVersion = __APP_VERSION__ // injected by Vite from package.json
 const hideLoader = ref(localStorage.getItem('hide_load_indicator') === 'true')
 const themePref = ref(getThemePref())
 function setTheme(opt) { themePref.value = opt; setThemePref(opt) }

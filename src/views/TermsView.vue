@@ -234,12 +234,13 @@
       <section>
         <h2>2. Data We Collect</h2>
         <p>
-          <strong>We do not collect any personal data.</strong> Rarebox has no user
-          accounts and no login systems and sets no cookies. The only usage data is
-          anonymous, cookieless page-view counting via Vercel Web Analytics (see
-          Section 6). The only servers involved are static hosting and a few
-          stateless serverless functions that proxy public price data — they store
-          nothing about you.
+          <strong>We do not collect any data. None.</strong> Rarebox has no user
+          accounts, no login systems, no cookies, and no analytics of any kind —
+          we don't even count page views. The only servers involved are static
+          hosting and a few stateless serverless functions that proxy public
+          price data — they store nothing about you. The app also works fully
+          offline, which is the strongest privacy statement a web app can make:
+          your collection doesn't need to talk to anyone.
         </p>
       </section>
 
@@ -305,15 +306,14 @@
       </section>
 
       <section>
-        <h2>6. Analytics</h2>
+        <h2>6. Analytics &amp; Tracking</h2>
         <p>
-          Rarebox uses Vercel Web Analytics to count anonymous page views and
-          visits. It is cookieless, does not identify you, does not track you
-          across sites, and collects no personal data — visitors are counted
-          via a short-lived anonymized hash that cannot be tied back to you.
-          We never see your searches, card views, shelf contents, or any
-          data you store in the app. No advertising networks, no
-          fingerprinting, no third-party trackers.
+          There are none. Rarebox contains no analytics scripts, no advertising
+          networks, no fingerprinting, and no third-party trackers — not even
+          anonymous page-view counting. We never see your searches, card views,
+          shelf contents, or any data you store in the app, and we have no way
+          to. If a future version ever changes this, it will be stated here
+          first, plainly.
         </p>
       </section>
 
