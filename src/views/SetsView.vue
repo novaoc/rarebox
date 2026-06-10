@@ -839,7 +839,7 @@ onMounted(loadSets)
 }
 .card-result:hover { transform: translate(-1px, -1px); box-shadow: var(--shadow-sm); }
 .card-result.selected { box-shadow: 0 0 0 3px var(--accent), var(--shadow-xs); }
-.card-img-wrap { position: relative; overflow: hidden; background: var(--bg-secondary); aspect-ratio: 2.5/3.5; }
+.card-img-wrap { position: relative; overflow: hidden; background: #fff; aspect-ratio: 2.5/3.5; border: var(--bw) solid var(--ink); border-radius: 10px; padding: 4px; }
 .card-img { width: 100%; height: 100%; object-fit: contain; display: block; transition: transform 0.3s; pointer-events: none; -webkit-user-drag: none; user-drag: none; }
 .card-result:hover .card-img { transform: scale(1.04); }
 .card-overlay {

@@ -16,7 +16,7 @@
     <header class="topbar">
       <a href="/" class="brand" @click.prevent="hardRefresh" aria-label="Rarebox home">
         <span class="brand-mark" aria-hidden="true">
-          <svg width="30" height="30" viewBox="0 0 30 30"><rect x="1.5" y="1.5" width="27" height="27" rx="8" fill="#ffd23f" stroke="#141414" stroke-width="2.5"/><text x="15" y="21" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="13" font-weight="900" fill="#141414">rb</text></svg>
+          <svg width="30" height="30" viewBox="0 0 30 30"><rect x="1.5" y="1.5" width="27" height="27" rx="8" fill="#ffd23f" stroke="#141414" stroke-width="2.5"/><text x="15" y="20.5" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="12" font-weight="900" fill="#141414">RB</text></svg>
         </span>
         <span class="brand-word">rarebox</span>
       </a>

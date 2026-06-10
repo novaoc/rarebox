@@ -3,7 +3,7 @@
     <!-- Header -->
     <div class="deck-builder-header">
       <div>
-        <router-link to="/decks" class="btn btn-ghost btn-sm" style="margin-bottom:8px">← All Decks</router-link>
+        <router-link to="/decks" class="btn btn-secondary btn-sm" style="margin-bottom:8px">← All Decks</router-link>
         <div class="deck-title-row">
           <h2 v-if="!editingName" @click="startEditName">{{ deck.name }} <span class="edit-icon text-muted" style="font-size:13px;margin-left:6px">✎</span></h2>
           <div v-else class="name-edit-row">
@@ -57,7 +57,7 @@
             class="search-result"
             @click="addCard(card)"
           >
-            <img :src="card.images?.small" class="search-result-img" loading="lazy" />
+            <img :src="card.image || card.images?.small" class="search-result-img" loading="lazy" @error="$event.target.style.display='none'" />
             <div class="search-result-info">
               <div class="search-result-name">{{ card.name }}</div>
               <div class="search-result-set">{{ card.set }} · #{{ card.number }}</div>

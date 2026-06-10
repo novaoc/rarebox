@@ -47,6 +47,11 @@ export function isGameCached(game) {
   return _allCards ? _allCards.some(c => c.game === game) : false
 }
 
+/** Raw cached cards for one game (for background price merges). */
+export async function getGameCards(game) {
+  return db.cards.where('game').equals(game).toArray()
+}
+
 /** Total cards in the index. */
 export function getCardCount() {
   return _allCards ? _allCards.length : 0

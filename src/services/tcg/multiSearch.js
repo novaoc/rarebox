@@ -548,7 +548,11 @@ export async function multiSearch(query, { page = 1, pageSize = 20, category = '
     if (isGameCached(k)) {
       try {
         const cached = searchCache(query, { page: 1, pageSize: 500, providers: [k] })
-        if (cached.cards.length > 0) return cached
+        // A hit set where NO card has a price means the cache predates the
+        // price pass (Pokemon bulk data lands before prices) - the live API
+        // returns results WITH prices, so prefer it in that window.
+        const priced = cached.cards.filter(c => c.price != null).length
+        if (cached.cards.length > 0 && priced >= cached.cards.length * 0.3) return cached
       } catch { /* fall through to live */ }
     }
     return ALL_PROVIDERS[k](query, page, pageSize).catch(() => ({ cards: [], total: 0 }))

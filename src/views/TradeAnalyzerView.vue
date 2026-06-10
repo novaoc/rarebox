@@ -526,7 +526,7 @@ onMounted(async () => {
                 <div class="search-result-name">{{ card.name }}</div>
                 <div class="search-result-sub">{{ card.set }} &middot; #{{ card.number }}</div>
               </div>
-              <span class="font-bold font-mono" style="font-size:12px;flex-shrink:0">${{ (card.price || 0).toFixed(2) }}</span>
+              <span class="font-bold font-mono" style="font-size:12px;flex-shrink:0">{{ card.price != null ? '$' + card.price.toFixed(2) : '—' }}</span>
             </div>
           </div>
         </div>
@@ -714,7 +714,7 @@ onMounted(async () => {
                 <div class="search-result-name">{{ card.name }}</div>
                 <div class="search-result-sub">{{ card.set }} &middot; #{{ card.number }}</div>
               </div>
-              <span class="font-bold font-mono" style="font-size:12px;flex-shrink:0">${{ (card.price || 0).toFixed(2) }}</span>
+              <span class="font-bold font-mono" style="font-size:12px;flex-shrink:0">{{ card.price != null ? '$' + card.price.toFixed(2) : '—' }}</span>
             </div>
           </div>
         </div>
@@ -781,7 +781,7 @@ onMounted(async () => {
                   <div class="search-result-sub">{{ card.set }} &middot; #{{ card.number }}</div>
                 </div>
                 <span class="font-bold font-mono" style="font-size:12px;flex-shrink:0">
-                  ${{ (card.price || 0).toFixed(2) }}
+                  {{ card.price != null ? '$' + card.price.toFixed(2) : '—' }}
                 </span>
               </div>
             </div>
@@ -808,7 +808,7 @@ onMounted(async () => {
               <div>
                 <div style="font-weight:500;font-size:14px">{{ pendingCard.name }}</div>
                 <div style="font-size:12px;color:var(--text-muted)">{{ pendingCard.set }} · #{{ pendingCard.number }}</div>
-                <div style="font-size:14px;font-weight:600;margin-top:4px">${{ (pendingCard.price || 0).toFixed(2) }}</div>
+                <div style="font-size:14px;font-weight:600;margin-top:4px">{{ pendingCard.price != null ? '$' + pendingCard.price.toFixed(2) : '—' }}</div>
               </div>
             </div>
             <label class="grade-toggle" style="margin-top:12px">

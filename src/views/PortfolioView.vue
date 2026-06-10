@@ -731,6 +731,8 @@ function deletePortfolio() { store.deletePortfolio(portfolio.value.id); router.p
 
 /* Mobile Card View */
 .mobile-item-list { display: flex; flex-direction: column; gap: 10px; padding: 12px 16px 16px; }
+/* Desktop default: mobile-only blocks hidden (was missing — both layouts rendered) */
+.show-mobile { display: none !important; }
 .mobile-item-card { display: flex; align-items: center; padding: 10px 12px; background: var(--bg-card); border: var(--bw) solid var(--ink); border-radius: var(--radius); box-shadow: var(--shadow-pressed); gap: 10px; cursor: pointer; }
 .mobile-item-card.selected { background: var(--accent-dim); }
 .mobile-item-thumb { width: 50px; height: 70px; object-fit: contain; border-radius: 4px; flex-shrink: 0; }
@@ -800,6 +802,7 @@ function deletePortfolio() { store.deletePortfolio(portfolio.value.id); router.p
   .mobile-full-width { width: 100%; }
   .hide-mobile { display: none !important; }
   .show-mobile { display: block !important; }
+  .mobile-item-list.show-mobile { display: flex !important; }
   .item-detail-panel { position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 150; max-height: 100vh; overflow-y: auto; border: none; border-radius: 0; box-shadow: none; margin: 0; background: var(--bg-primary); }
   .panel-body-row { flex-direction: column; gap: 24px; padding: 0 16px 24px; }
 }

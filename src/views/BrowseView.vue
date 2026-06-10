@@ -63,9 +63,10 @@ const tcgs = TCGS
 .tcg-disabled:hover { transform: none; box-shadow: none; }
 
 .tcg-logo {
-  width: 80px;
-  min-width: 80px;
-  height: 80px;
+  /* the brand SVGs are 200x80 — give them a wide stage, not a square */
+  width: 150px;
+  min-width: 150px;
+  height: 68px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -73,7 +74,7 @@ const tcgs = TCGS
   border: var(--bw) solid var(--ink);
   border-radius: var(--radius);
   box-shadow: var(--shadow-pressed);
-  padding: 10px;
+  padding: 6px 8px;
 }
 .tcg-logo :deep(svg) { width: 100%; height: 100%; }
 
@@ -88,5 +89,8 @@ const tcgs = TCGS
 @media (prefers-reduced-motion: reduce) {
   .tcg-tile { transition: none; }
   .tcg-tile:hover { transform: none; }
+}
+@media (max-width: 480px) {
+  .tcg-logo { width: 118px; min-width: 118px; height: 54px; }
 }
 </style>

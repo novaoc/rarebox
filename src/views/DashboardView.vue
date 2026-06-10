@@ -2,240 +2,131 @@
   <div class="dashboard">
     <!-- Landing page for new users -->
     <div v-if="isNewUser" class="landing">
-      <!-- Hero -->
-      <section class="hero">
-        <div class="hero-content">
-          <div class="hero-icon">⬡</div>
-          <h1 class="hero-title">Rarebox</h1>
-          <p class="hero-sub">Track your TCG collection — Pokémon, Magic, Yu-Gi-Oh!, Lorcana, One Piece, and Riftbound — with live prices, portfolio charts, and deck building tools. Free. Private. Runs in your browser.</p>
-          <div class="hero-actions">
-            <router-link to="/search" class="btn btn-primary btn-lg hero-cta">Get Started</router-link>
-            <button class="btn btn-secondary btn-lg" @click="scrollToFeatures">See Features</button>
-            <a href="https://docs.rarebox.io" target="_blank" rel="noopener" class="btn btn-secondary btn-lg">📖 Docs</a>
+      <!-- ── Hero ──────────────────────────────────────────────────── -->
+      <section class="ld-hero">
+        <div class="ld-hero-copy">
+          <div class="ld-sticker-row">
+            <span class="sticker">Free</span>
+            <span class="sticker sticker-blue">6 TCGs</span>
+            <span class="sticker sticker-pink">No account</span>
           </div>
-          <div class="hero-badges">
-            <span class="badge badge-accent">No Account</span>
-            <span class="badge badge-success">No Tracking</span>
-            <span class="badge badge-info">100% Free</span>
+          <h1 class="ld-title">Collect. Track.<br /><span class="marker">Trade.</span> Win.</h1>
+          <p class="ld-sub">
+            Rarebox is the home for your whole binder — Pokémon, Magic, Yu-Gi-Oh!, Lorcana,
+            One Piece and Riftbound. Live market prices, portfolio analytics, deck building
+            and a trade analyzer, all in your browser.
+          </p>
+          <div class="ld-ctas">
+            <router-link to="/search" class="btn btn-primary btn-lg">Get started — it's free</router-link>
+            <button class="btn btn-secondary btn-lg" @click="scrollToFeatures">See what's inside</button>
+          </div>
+        </div>
+        <div class="ld-hero-visual" aria-hidden="true">
+          <div class="ld-card ld-card-1">
+            <img src="https://images.pokemontcg.io/base1/4.png" alt="" loading="lazy" @error="$event.target.style.display='none'" />
+            <span class="ld-price-tag">$412.00</span>
+          </div>
+          <div class="ld-card ld-card-2">
+            <img src="https://images.pokemontcg.io/me2/13.png" alt="" loading="lazy" @error="$event.target.style.display='none'" />
+            <span class="ld-price-tag ld-tag-green">$96.40</span>
+          </div>
+          <div class="ld-card ld-card-3">
+            <img src="https://images.pokemontcg.io/sv3pt5/151.png" alt="" loading="lazy" @error="$event.target.style.display='none'" />
+            <span class="ld-price-tag ld-tag-pink">$38.25</span>
           </div>
         </div>
       </section>
 
-      <!-- Feature sections -->
-      <section class="features" ref="featuresRef">
-        <!-- Collection Management -->
-        <div class="feature-section">
-          <div class="feature-header">
-            <span class="feature-icon">🃏</span>
-            <div>
-              <h2>Collection Management</h2>
-              <p class="feature-sub">Add cards, sealed products, and graded slabs to organized portfolios. Supports Pokémon, Magic, Yu-Gi-Oh!, Lorcana, One Piece, and Riftbound.</p>
+      <!-- ── Marquee ───────────────────────────────────────────────── -->
+      <div class="ld-marquee" aria-hidden="true">
+        <div class="ld-marquee-track">
+          <span v-for="i in 2" :key="i" class="ld-marquee-seg">
+            POKÉMON&nbsp;&nbsp;★&nbsp;&nbsp;MAGIC&nbsp;&nbsp;★&nbsp;&nbsp;YU-GI-OH!&nbsp;&nbsp;★&nbsp;&nbsp;LORCANA&nbsp;&nbsp;★&nbsp;&nbsp;ONE&nbsp;PIECE&nbsp;&nbsp;★&nbsp;&nbsp;RIFTBOUND&nbsp;&nbsp;★&nbsp;&nbsp;
+          </span>
+        </div>
+      </div>
+
+      <!-- ── Features ──────────────────────────────────────────────── -->
+      <section class="ld-features" ref="featuresRef">
+        <h2 class="ld-h2">Built for the <span class="marker">pull</span></h2>
+        <div class="ld-feature-grid">
+          <div class="ld-feature ld-tint-yellow">
+            <div class="ld-feature-icon">
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>
             </div>
+            <h3>Live prices, six games</h3>
+            <p>Market prices for over 137,000 cards — singles, graded slabs and sealed product — refreshed continually. Search works offline once your games are loaded.</p>
           </div>
-          <div class="feature-grid">
-            <div class="feature-card">
-              <div class="feature-card-icon">🔍</div>
-              <h3>Search Any Card</h3>
-              <p>Search across every set for Pokémon, Magic, Yu-Gi-Oh!, Lorcana, One Piece, and Riftbound. Live results with card images and market prices.</p>
+          <div class="ld-feature ld-tint-green">
+            <div class="ld-feature-icon">
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/></svg>
             </div>
-            <div class="feature-card">
-              <div class="feature-card-icon">📦</div>
-              <h3>Sealed Products</h3>
-              <p>Track booster boxes, ETBs, tins, and collection boxes. Prices fetched live from PriceCharting — no account needed.</p>
+            <h3>Know your gains</h3>
+            <p>Portfolios with cost basis, profit and loss per card, value history charts and price alerts. Your shelf, as a number that updates itself.</p>
+          </div>
+          <div class="ld-feature ld-tint-pink">
+            <div class="ld-feature-icon">
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3 4 7l4 4"/><path d="M4 7h16"/><path d="m16 21 4-4-4-4"/><path d="M20 17H4"/></svg>
             </div>
-            <div class="feature-card">
-              <div class="feature-card-icon">🏆</div>
-              <h3>Graded Slabs</h3>
-              <p>PSA, BGS, CGC, and ACE graded cards with grade-specific pricing. Update values manually or fetch from PriceCharting.</p>
+            <h3>Trade with receipts</h3>
+            <p>Put both sides of a trade on the table and see who wins before you shake on it. Point your camera at a card and the scanner identifies it.</p>
+          </div>
+          <div class="ld-feature ld-tint-blue">
+            <div class="ld-feature-icon">
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 2h10"/><path d="M5 6h14"/><rect width="18" height="12" x="3" y="10" rx="2"/></svg>
             </div>
-            <div class="feature-card">
-              <div class="feature-card-icon">📁</div>
-              <h3>Multiple Portfolios</h3>
-              <p>Organize your collection into named portfolios with custom colors. Separate investments from personal collection.</p>
-            </div>
+            <h3>Decks that price themselves</h3>
+            <p>Build decks, import the current meta with one click, and see exactly what the missing cards cost against what you already own.</p>
           </div>
         </div>
+      </section>
 
-        <!-- Browse & Pricing -->
-        <div class="feature-section">
-          <div class="feature-header">
-            <span class="feature-icon">📊</span>
+      <!-- ── Shelf preview ─────────────────────────────────────────── -->
+      <section class="ld-shelf">
+        <div class="ld-shelf-panel">
+          <div class="ld-shelf-head">
             <div>
-              <h2>Browse & Pricing</h2>
-              <p class="feature-sub">Every TCG set. Live market prices. Historical charts back to 2022.</p>
+              <div class="ld-shelf-label">Your shelf, as a number</div>
+              <span class="sticker sticker-green ld-shelf-value">$12,847.32</span>
             </div>
+            <svg class="ld-spark" viewBox="0 0 220 56" fill="none" aria-hidden="true">
+              <polyline points="0,46 22,42 44,44 66,36 88,38 110,28 132,30 154,20 176,24 198,12 220,8" stroke="#141414" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
           </div>
-          <div class="feature-grid">
-            <div class="feature-card">
-              <div class="feature-card-icon">📚</div>
-              <h3>Browse All Sets</h3>
-              <p>Browse every set across 5 TCGs with logos, card counts, and release dates. Click into any set to see the full card list and add cards with one tap.</p>
-            </div>
-            <div class="feature-card">
-              <div class="feature-card-icon">📈</div>
-              <h3>Price History Charts</h3>
-              <p>Interactive charts with 7D / 1M / 6M / 1Y / 3Y ranges. Card history goes back to November 2022 via TCGDex data.</p>
-            </div>
-            <div class="feature-card">
-              <div class="feature-card-icon">💰</div>
-              <h3>Portfolio Value Tracking</h3>
-              <p>See your total collection value, cost basis, and gain/loss across all portfolios. Charts update as prices change.</p>
-            </div>
-            <div class="feature-card">
-              <div class="feature-card-icon">🔔</div>
-              <h3>Price Alerts</h3>
-              <p>Set above or below thresholds on any card. Get browser notifications when prices cross your targets.</p>
-            </div>
-          </div>
-        </div>
-
-        <!-- Deck Building -->
-        <div class="feature-section">
-          <div class="feature-header">
-            <span class="feature-icon">⚔️</span>
-            <div>
-              <h2>Deck Building</h2>
-              <p class="feature-sub">Build competitive decks, see what you own, and track the cost to finish each one.</p>
-            </div>
-          </div>
-          <div class="feature-grid">
-            <div class="feature-card">
-              <div class="feature-card-icon">🆕</div>
-              <h3>Build Custom Decks</h3>
-              <p>Search any card and add it to a deck. Create as many decks as you want. Rename, reorder, and manage them like a collection of builds.</p>
-            </div>
-            <div class="feature-card">
-              <div class="feature-card-icon">🃏</div>
-              <h3>Meta Decks</h3>
-              <p>Import popular Standard Pokémon decks with one click — Charizard ex, Gardevoir, Lost Zone, Chien-Pao, and more. Each card's market price is fetched automatically on import.</p>
-            </div>
-            <div class="feature-card">
-              <div class="feature-card-icon">✅</div>
-              <h3>Collection Sync</h3>
-              <p>Every deck checks against your portfolios automatically. Green badges = you own it, red = you need it. See exactly which cards to buy at a glance.</p>
-            </div>
-            <div class="feature-card">
-              <div class="feature-card-icon">💰</div>
-              <h3>Cost Tracking</h3>
-              <p>Each deck shows the total cost to finish it based on current market prices — only counting the cards you're missing. Know the real price before you buy.</p>
-            </div>
-          </div>
-        </div>
-
-        <!-- Bulk Import -->
-        <div class="feature-section">
-          <div class="feature-header">
-            <span class="feature-icon">⚡</span>
-            <div>
-              <h2>Bulk Import</h2>
-              <p class="feature-sub">Import entire decks, sets, or collections in seconds.</p>
-            </div>
-          </div>
-          <div class="feature-single">
-            <div class="feature-card feature-card-wide">
-              <div class="bulk-demo">
-                <div class="bulk-code">
-                  <div class="bulk-line">4 Charizard ex OBF 125</div>
-                  <div class="bulk-line">3 Pidgeot ex OBF 164</div>
-                  <div class="bulk-line">4 Arven SVI 166</div>
-                  <div class="bulk-line text-muted">...</div>
-                </div>
-                <div class="bulk-arrow">→</div>
-                <div class="bulk-result">
-                  <span class="text-accent font-bold">11 cards</span>
-                  <span class="text-muted">added instantly</span>
-                </div>
-              </div>
-              <p class="mt-3">Paste a PTCGL or PTCGO deck list, or add entire sets with one click. Each card is looked up automatically with current market prices. Preview before importing.</p>
-            </div>
-          </div>
-        </div>
-
-        <!-- Backup & Transfer -->
-        <div class="feature-section">
-          <div class="feature-header">
-            <span class="feature-icon">📱</span>
-            <div>
-              <h2>Backup & Transfer</h2>
-              <p class="feature-sub">Import from Collectr. Export to Excel. Move between devices. Your data, your control.</p>
-            </div>
-          </div>
-          <div class="feature-grid">
-            <div class="feature-card">
-              <div class="feature-card-icon">💾</div>
-              <h3>JSON Backup</h3>
-              <p>Download your entire collection as a single JSON file. Portfolios, items, snapshots, price cache — everything included.</p>
-            </div>
-            <div class="feature-card">
-              <div class="feature-card-icon">📲</div>
-              <h3>QR Code Transfer</h3>
-              <p>Transfer your collection to another device via QR code. Data is gzip-compressed to fit even large collections in a single code.</p>
-            </div>
-            <div class="feature-card">
-              <div class="feature-card-icon">📋</div>
-              <h3>Clipboard Transfer</h3>
-              <p>Copy your collection to clipboard and paste it on any device. Compressed base64 — works across browsers and operating systems.</p>
-            </div>
-            <div class="feature-card">
-              <div class="feature-card-icon">📊</div>
-              <h3>Excel Export</h3>
-              <p>Export individual portfolios or all portfolios to Excel. Summary sheet plus full item details with prices and gain/loss.</p>
-            </div>
-            <div class="feature-card">
-              <div class="feature-card-icon">📥</div>
-              <h3>Import from Collectr</h3>
-              <p>Switching from Collectr? Import your CSV or Excel export and all your portfolios, cards, sealed products, and graded slabs are converted automatically.</p>
-            </div>
-          </div>
-        </div>
-
-        <!-- Privacy -->
-        <div class="feature-section">
-          <div class="feature-header">
-            <span class="feature-icon">🔒</span>
-            <div>
-              <h2>Private by Design</h2>
-              <p class="feature-sub">No accounts. No tracking. No servers. Everything runs in your browser.</p>
-            </div>
-          </div>
-          <div class="privacy-grid">
-            <div class="privacy-item">
-              <span class="privacy-check">✓</span>
-              <div>
-                <strong>Local Storage Only</strong>
-                <p>All data stays in your browser's IndexedDB (via Dexie.js). Crash-safe writes, auto-backup on every change. Nothing is sent to any server.</p>
-              </div>
-            </div>
-            <div class="privacy-item">
-              <span class="privacy-check">✓</span>
-              <div>
-                <strong>Direct API Fetches</strong>
-                <p>Price data comes directly from public APIs (pokemontcg.io, TCGDex, PriceCharting) — your browser is the client.</p>
-              </div>
-            </div>
-            <div class="privacy-item">
-              <span class="privacy-check">✓</span>
-              <div>
-                <strong>No Login Required</strong>
-                <p>Open the app and start tracking. No email, no password, no account creation.</p>
-              </div>
-            </div>
-            <div class="privacy-item">
-              <span class="privacy-check">✓</span>
-              <div>
-                <strong>Open Source</strong>
-                <p>MIT licensed. Inspect the code, fork it, run it yourself.<br><a href="https://github.com/novaoc/rarebox" target="_blank" rel="noopener">GitHub</a> · <a href="https://docs.rarebox.io" target="_blank" rel="noopener">Documentation</a></p>
-              </div>
+          <div class="ld-shelf-grid">
+            <div class="ld-shelf-card" v-for="c in shelfCards" :key="c.name">
+              <div class="ld-shelf-img"><img :src="c.img" :alt="c.name" loading="lazy" @error="$event.target.style.display='none'" /></div>
+              <div class="ld-shelf-name">{{ c.name }}</div>
+              <span class="ld-shelf-price">{{ c.price }}</span>
             </div>
           </div>
         </div>
       </section>
 
-      <!-- Final CTA -->
-      <section class="final-cta">
-        <h2>Ready to track your collection?</h2>
-        <p>No signup. No download. Start adding cards right now.</p>
-        <router-link to="/search" class="btn btn-primary btn-lg hero-cta">Get Started — It's Free</router-link>
+      <!-- ── Import ────────────────────────────────────────────────── -->
+      <section class="ld-import">
+        <h2 class="ld-h2">Already collecting somewhere else?</h2>
+        <p class="ld-import-sub">Bring everything with you in minutes — no retyping your binder.</p>
+        <div class="ld-import-chips">
+          <div class="ld-import-chip"><strong>Collectr import</strong><span>drop your CSV or Excel export, done</span></div>
+          <div class="ld-import-chip"><strong>Bulk paste</strong><span>"4 Charizard ex SVP 125" — one card per line</span></div>
+          <div class="ld-import-chip"><strong>Device transfer</strong><span>move to a new phone with a QR code</span></div>
+        </div>
+      </section>
+
+      <!-- ── Privacy ───────────────────────────────────────────────── -->
+      <section class="ld-privacy">
+        <div class="ld-privacy-item"><span class="ld-check">✓</span><div><strong>Local-first</strong><p>Your collection lives on your device, not on someone's server.</p></div></div>
+        <div class="ld-privacy-item"><span class="ld-check">✓</span><div><strong>No login, no tracking</strong><p>No email, no password, no analytics following you around.</p></div></div>
+        <div class="ld-privacy-item"><span class="ld-check">✓</span><div><strong>Open source</strong><p>The whole app is on GitHub. Inspect it, fork it, keep it.</p></div></div>
+      </section>
+
+      <!-- ── Final CTA ─────────────────────────────────────────────── -->
+      <section class="ld-cta">
+        <span class="sticker ld-cta-sticker">100% free</span>
+        <h2>Your binder deserves better.</h2>
+        <p>Start with one card or import a thousand — it's your shelf either way.</p>
+        <router-link to="/search" class="btn btn-primary btn-lg">Get started — it's free</router-link>
       </section>
     </div>
 
@@ -350,6 +241,13 @@ const featuresRef = ref(null)
 const isNewUser = computed(() => {
   return store.portfolios.every(p => p.items.length === 0)
 })
+
+const shelfCards = [
+  { name: 'Charizard', img: 'https://images.pokemontcg.io/base1/4.png', price: '$412.00' },
+  { name: 'Pikachu', img: 'https://images.pokemontcg.io/base1/58.png', price: '$8.40' },
+  { name: 'Mega Charizard X ex', img: 'https://images.pokemontcg.io/me2/13.png', price: '$96.40' },
+  { name: 'Mew ex', img: 'https://images.pokemontcg.io/sv3pt5/151.png', price: '$38.25' },
+]
 
 function scrollToFeatures() {
   featuresRef.value?.scrollIntoView({ behavior: 'smooth' })
@@ -761,4 +659,95 @@ onMounted(async () => {
   .portfolio-card-stats { gap: 12px; }
   .portfolio-card-body { padding: 12px; }
 }
+
+/* ── Tactile landing ─────────────────────────────────────────────── */
+.ld-hero {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 28px;
+  align-items: center;
+  padding: clamp(18px, 4vw, 48px) 0 clamp(20px, 4vw, 44px);
+}
+.ld-sticker-row { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 18px; }
+.ld-title { font-size: clamp(2.3rem, 7.5vw, 4.4rem); font-weight: 900; letter-spacing: -0.03em; line-height: 1.04; }
+.ld-sub { margin-top: 16px; font-size: clamp(14px, 2vw, 16.5px); line-height: 1.65; color: var(--text-secondary); max-width: 540px; }
+.ld-ctas { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 24px; }
+
+.ld-hero-visual { position: relative; height: clamp(240px, 38vw, 340px); overflow: visible; }
+.ld-card {
+  position: absolute; top: 12%;
+  width: clamp(120px, 16vw, 170px); aspect-ratio: 63/88;
+  background: #fff; border: var(--bw) solid var(--ink); border-radius: 12px;
+  box-shadow: var(--shadow); padding: 6px;
+}
+.ld-card img { width: 100%; height: 100%; object-fit: contain; }
+.ld-card-1 { left: 4%; transform: rotate(-7deg); z-index: 1; }
+.ld-card-2 { left: 32%; top: 4%; transform: rotate(2deg); z-index: 3; }
+.ld-card-3 { left: 60%; transform: rotate(8deg); z-index: 2; }
+.ld-price-tag {
+  position: absolute; bottom: -12px; left: 50%; transform: translateX(-50%) rotate(-3deg);
+  background: var(--accent); border: var(--bw) solid var(--ink); border-radius: 8px;
+  padding: 2px 10px; font-weight: 800; font-size: 12.5px; white-space: nowrap; box-shadow: var(--shadow-pressed);
+}
+.ld-tag-green { background: var(--success); }
+.ld-tag-pink { background: var(--pink); }
+
+.ld-marquee { border-top: var(--bw) solid var(--ink); border-bottom: var(--bw) solid var(--ink); background: var(--accent); overflow: hidden; margin: 0 calc(-1 * clamp(14px, 2.5vw, 28px)); }
+.ld-marquee-track { display: flex; white-space: nowrap; animation: ld-scroll 28s linear infinite; padding: 10px 0; }
+.ld-marquee-seg { font-weight: 900; font-size: 13.5px; letter-spacing: 0.06em; }
+@keyframes ld-scroll { to { transform: translateX(-50%); } }
+
+.ld-h2 { font-size: clamp(1.6rem, 4.5vw, 2.4rem); font-weight: 900; letter-spacing: -0.02em; text-align: center; }
+.ld-features { padding: clamp(30px, 6vw, 64px) 0 0; }
+.ld-feature-grid { display: grid; grid-template-columns: 1fr; gap: 16px; margin-top: 28px; }
+.ld-feature { border: var(--bw) solid var(--ink); border-radius: var(--radius-lg); padding: 22px; box-shadow: var(--shadow-sm); }
+.ld-tint-yellow { background: var(--accent-dim); }
+.ld-tint-green { background: var(--success-dim); }
+.ld-tint-pink { background: var(--pink-dim); }
+.ld-tint-blue { background: var(--info-dim); }
+.ld-feature-icon { display: inline-flex; padding: 9px; background: #fff; border: var(--bw) solid var(--ink); border-radius: 10px; box-shadow: var(--shadow-pressed); margin-bottom: 14px; }
+.ld-feature h3 { font-size: 17px; font-weight: 800; margin-bottom: 6px; }
+.ld-feature p { font-size: 13.5px; line-height: 1.6; color: var(--text-secondary); }
+
+.ld-shelf { padding: clamp(30px, 6vw, 60px) 0 0; }
+.ld-shelf-panel { background: #fff; border: var(--bw) solid var(--ink); border-radius: var(--radius-lg); box-shadow: var(--shadow); padding: clamp(16px, 3vw, 28px); }
+.ld-shelf-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.ld-shelf-label { font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-secondary); margin-bottom: 10px; }
+.ld-shelf-value { font-size: clamp(1.4rem, 4vw, 2rem); padding: 6px 16px; }
+.ld-spark { width: min(220px, 40vw); height: 56px; flex-shrink: 0; }
+.ld-shelf-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; margin-top: 22px; }
+.ld-shelf-img { background: var(--bg-secondary); border: var(--bw) solid var(--ink); border-radius: 10px; aspect-ratio: 63/88; padding: 5px; }
+.ld-shelf-img img { width: 100%; height: 100%; object-fit: contain; }
+.ld-shelf-name { font-size: 12.5px; font-weight: 800; margin-top: 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ld-shelf-price { display: inline-block; margin-top: 4px; background: var(--accent); border: 1.5px solid var(--ink); border-radius: 7px; padding: 1px 8px; font-size: 11.5px; font-weight: 800; }
+
+.ld-import { padding: clamp(34px, 6vw, 64px) 0 0; text-align: center; }
+.ld-import-sub { color: var(--text-secondary); margin-top: 8px; }
+.ld-import-chips { display: grid; grid-template-columns: 1fr; gap: 12px; margin-top: 22px; }
+.ld-import-chip { background: #fff; border: var(--bw) solid var(--ink); border-radius: var(--radius); box-shadow: var(--shadow-pressed); padding: 14px 16px; display: flex; flex-direction: column; gap: 3px; text-align: left; }
+.ld-import-chip strong { font-size: 14px; font-weight: 800; }
+.ld-import-chip span { font-size: 12.5px; color: var(--text-secondary); }
+
+.ld-privacy { display: grid; grid-template-columns: 1fr; gap: 14px; padding: clamp(30px, 5vw, 54px) 0 0; }
+.ld-privacy-item { display: flex; gap: 12px; align-items: flex-start; }
+.ld-check { width: 26px; height: 26px; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; background: var(--success); border: var(--bw) solid var(--ink); border-radius: 8px; font-weight: 900; font-size: 13px; }
+.ld-privacy-item strong { font-size: 14.5px; font-weight: 800; }
+.ld-privacy-item p { font-size: 13px; color: var(--text-secondary); margin-top: 2px; }
+
+.ld-cta { margin-top: clamp(36px, 6vw, 64px); background: var(--pink-dim); border: var(--bw) solid var(--ink); border-radius: var(--radius-lg); box-shadow: var(--shadow); padding: clamp(28px, 5vw, 52px) 20px; text-align: center; position: relative; }
+.ld-cta-sticker { position: absolute; top: -14px; right: 18px; transform: rotate(3deg); }
+.ld-cta h2 { font-size: clamp(1.5rem, 4.5vw, 2.3rem); font-weight: 900; letter-spacing: -0.02em; }
+.ld-cta p { color: var(--text-secondary); margin: 10px 0 20px; }
+
+@media (min-width: 720px) {
+  .ld-hero { grid-template-columns: 1.1fr 1fr; }
+  .ld-feature-grid { grid-template-columns: 1fr 1fr; }
+  .ld-shelf-grid { grid-template-columns: repeat(4, 1fr); }
+  .ld-import-chips { grid-template-columns: repeat(3, 1fr); }
+  .ld-privacy { grid-template-columns: repeat(3, 1fr); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ld-marquee-track { animation: none; }
+}
+
 </style>

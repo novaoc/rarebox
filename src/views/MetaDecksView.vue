@@ -1,7 +1,7 @@
 <template>
   <div class="meta-decks-view">
     <div class="meta-header">
-      <router-link to="/decks" class="btn btn-ghost btn-sm" style="margin-bottom:8px">← All Decks</router-link>
+      <router-link to="/decks" class="btn btn-secondary btn-sm" style="margin-bottom:8px">← All Decks</router-link>
       <h2>Meta Decks</h2>
       <p class="text-muted" style="font-size:13px;margin-top:2px">
         {{ source === 'live' ? liveSourceLabel(activeGame) : 'Top competitive decks based on recent tournament results.' }}
@@ -16,7 +16,7 @@
         v-for="g in tcgOptions"
         :key="g.key"
         class="btn btn-sm"
-        :class="g.key === activeGame ? 'btn-primary' : 'btn-ghost'"
+        :class="g.key === activeGame ? 'btn-primary' : 'btn-secondary'"
         @click="switchGame(g.key)"
       >{{ g.label }}</button>
     </div>

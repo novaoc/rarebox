@@ -8,7 +8,7 @@
  * Retry logic: Each failed TCG gets 2 retries with exponential backoff.
  */
 
-import { saveGameCards, isCacheFresh } from './cardCache.js'
+import { saveGameCards, isCacheFresh, getGameCards } from './cardCache.js'
 import { getProvider } from './providers.js'
 
 const BULK_TIMEOUT = 300_000   // 5 min for large downloads
@@ -120,6 +120,15 @@ async function fetchPokemonPrices(allCards, onProgress) {
   const priceById = new Map()
   for (const c of (first.data || [])) priceById.set(c.id, pickPokemonPrice(c.tcgplayer))
 
+  function applyPrices() {
+    let priced = 0
+    for (const card of allCards) {
+      const p = priceById.get(card.id)
+      if (p != null) { card.price = p; priced++ }
+    }
+    return priced
+  }
+
   let fetched = 1
   const pages = Array.from({ length: totalPages - 1 }, (_, i) => i + 2)
   await parallelPool(pages, 6, async (page) => {
@@ -127,14 +136,33 @@ async function fetchPokemonPrices(allCards, onProgress) {
     for (const c of (d.data || [])) priceById.set(c.id, pickPokemonPrice(c.tcgplayer))
     fetched++
     onProgress({ game: 'pokemon', phase: `Prices ${fetched}/${totalPages}`, loaded: fetched, total: totalPages })
+    // Persist progress every ~15 pages — the pass takes minutes and the user
+    // may close the tab; partial prices beat a priceless 24h cache.
+    if (fetched % 15 === 0) {
+      if (applyPrices() > 0) await saveGameCards('pokemon', allCards)
+    }
   })
 
-  let priced = 0
-  for (const card of allCards) {
-    const p = priceById.get(card.id)
-    if (p != null) { card.price = p; priced++ }
+  return applyPrices()
+}
+
+// If the cached Pokémon DB is fresh but mostly priceless (the user closed the
+// tab before the price pass finished), resume the pass in the background.
+let _priceResumeStarted = false
+async function resumePokemonPricesIfNeeded() {
+  if (_priceResumeStarted) return
+  _priceResumeStarted = true
+  try {
+    const rows = await getGameCards('pokemon')
+    if (rows.length === 0) return
+    const priced = rows.filter(c => c.price != null).length
+    if (priced / rows.length >= 0.3) return
+    const cards = rows.map(({ game, cachedAt, cid, ...c }) => c)
+    const n = await fetchPokemonPrices(cards, () => {})
+    if (n > 0) await saveGameCards('pokemon', cards)
+  } catch (e) {
+    console.warn('Pokemon price resume failed:', e.message)
   }
-  return priced
 }
 
 async function fetchPokemon(onProgress) {
@@ -446,6 +474,7 @@ export async function preloadGames(games, onProgress = () => {}, { force = false
     // Skip if already cached and fresh (< 24h old) — unless forced
     if (!force && await isCacheFresh(game)) {
       onProgress({ game, phase: 'Already cached', loaded: 0, total: 0 })
+      if (game === 'pokemon') resumePokemonPricesIfNeeded()
       return
     }
 
