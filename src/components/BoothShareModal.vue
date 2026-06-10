@@ -30,6 +30,16 @@
             <button class="btn btn-primary btn-sm" @click="copyLink">{{ copied ? '✓' : 'Copy link' }}</button>
           </div>
 
+          <div v-if="shortUrl" class="share-link-row">
+            <input class="input share-link-input share-link-short" :value="shortUrl" readonly @click="$event.target.select()" />
+            <button class="btn btn-primary btn-sm" @click="copyShort">{{ copiedShort ? '✓' : 'Copy short' }}</button>
+          </div>
+          <button v-else class="btn btn-secondary btn-sm share-shorten-btn" :disabled="shortening" @click="shorten">
+            {{ shortening ? 'Shortening…' : '✂️ Shorten for socials' }}
+          </button>
+          <p v-if="shortUrl" class="share-short-note">Short link is stored by TinyURL and needs internet to open — the QR and full link stay self-contained.</p>
+          <p v-if="shortenError" class="share-short-note share-short-error">{{ shortenError }}</p>
+
           <div class="share-info">
             <span class="text-muted" style="font-size: 12px">
               {{ booth.items?.length || 0 }} listing{{ (booth.items?.length || 0) !== 1 ? 's' : '' }} ·
@@ -60,6 +70,10 @@ const building = ref(true)
 const shareUrl = ref('')
 const urlSize = ref('')
 const copied = ref(false)
+const shortUrl = ref('')
+const shortening = ref(false)
+const shortenError = ref('')
+const copiedShort = ref(false)
 const frameCount = ref(0)
 const currentFrame = ref(0)
 const total = boothTotal(props.booth)
@@ -109,6 +123,35 @@ async function drawFrame(i) {
   })
 }
 
+// TinyURL allows browser calls from rarebox.io (CORS) — the request goes
+// straight from the seller's device to TinyURL, never through us. The
+// trade-off is explicit in the UI: the short link lives in their database
+// and needs internet to resolve; the QR/full link stay self-contained.
+async function shorten() {
+  shortening.value = true
+  shortenError.value = ''
+  try {
+    const resp = await fetch('https://tinyurl.com/api-create.php?url=' + encodeURIComponent(shareUrl.value))
+    const text = (await resp.text()).trim()
+    if (!resp.ok || !text.startsWith('https://tinyurl.com/')) throw new Error('bad response')
+    shortUrl.value = text
+  } catch {
+    shortenError.value = navigator.onLine
+      ? "Couldn't shorten right now — the full link works everywhere."
+      : 'Shortening needs a connection — the full link works everywhere.'
+  } finally {
+    shortening.value = false
+  }
+}
+
+async function copyShort() {
+  try {
+    await navigator.clipboard.writeText(shortUrl.value)
+    copiedShort.value = true
+    setTimeout(() => { copiedShort.value = false }, 2000)
+  } catch { /* manual select */ }
+}
+
 async function copyLink() {
   try {
     await navigator.clipboard.writeText(shareUrl.value)
@@ -134,6 +177,10 @@ onBeforeUnmount(() => { if (frameTimer) clearInterval(frameTimer) })
 .share-frame-info { display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 12px; }
 .share-hint { text-align: center; font-size: 12px; color: var(--text-muted); margin-bottom: 12px; }
 .share-link-row { display: flex; gap: 8px; margin-bottom: 10px; }
+.share-link-short { font-size: 13px; font-weight: 700; }
+.share-shorten-btn { width: 100%; margin-bottom: 10px; }
+.share-short-note { font-size: 11.5px; color: var(--text-muted); text-align: center; margin-bottom: 10px; line-height: 1.4; }
+.share-short-error { color: var(--danger); font-weight: 600; }
 .share-link-input { flex: 1; font-family: monospace; font-size: 11px; }
 .share-info { text-align: center; }
 </style>
