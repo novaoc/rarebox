@@ -235,10 +235,11 @@
         <h2>2. Data We Collect</h2>
         <p>
           <strong>We do not collect any personal data.</strong> Rarebox has no user
-          accounts and no login systems, sets no cookies, and runs no analytics or
-          tracking of any kind (see Section 6). The only servers involved are static
-          hosting and a few stateless serverless functions that proxy public price
-          data — they store nothing about you.
+          accounts and no login systems and sets no cookies. The only usage data is
+          anonymous, cookieless page-view counting via Vercel Web Analytics (see
+          Section 6). The only servers involved are static hosting and a few
+          stateless serverless functions that proxy public price data — they store
+          nothing about you.
         </p>
       </section>
 
@@ -306,10 +307,13 @@
       <section>
         <h2>6. Analytics</h2>
         <p>
-          Rarebox does not collect any analytics. No page views, no tracking,
-          no cookies, no fingerprinting, no advertising networks. We do not
-          track your searches, card views, portfolio contents, or any
-          interaction within the app.
+          Rarebox uses Vercel Web Analytics to count anonymous page views and
+          visits. It is cookieless, does not identify you, does not track you
+          across sites, and collects no personal data — visitors are counted
+          via a short-lived anonymized hash that cannot be tied back to you.
+          We never see your searches, card views, portfolio contents, or any
+          data you store in the app. No advertising networks, no
+          fingerprinting, no third-party trackers.
         </p>
       </section>
 

@@ -9,6 +9,10 @@ import VueApexCharts from 'vue3-apexcharts'
 import router from './router'
 import App from './App.vue'
 import './assets/main.css'
+import { inject as injectAnalytics } from '@vercel/analytics'
+
+// Anonymous, cookieless page-view analytics (Vercel Web Analytics)
+injectAnalytics()
 
 // Global error handler — catches Vue render errors
 const app = createApp(App)

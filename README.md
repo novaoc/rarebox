@@ -134,7 +134,7 @@ Built by [Nova](https://github.com/novaoc).
 - Price data fetched directly from public APIs in the browser
 - Per-type price staleness tracking — cards (24h), sealed/graded (12h)
 - Terms & Conditions page with full Privacy Policy at [/terms](https://rarebox.io/terms)
-- No analytics, no cookies, no fingerprinting — nothing phones home
+- Anonymous, cookieless page-view analytics via Vercel Web Analytics — no personal data, no cross-site tracking; portfolio contents never leave the device
 
 ### Feature Tour Videos
 - In-app tutorial videos for Browse Sets and Decks pages
