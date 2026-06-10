@@ -487,6 +487,8 @@ async function doReset() {
     await saveTradeState({ sideA: { items: [], totalValue: 0 }, sideB: { items: [], totalValue: 0 } })
   } catch {}
   try { localStorage.removeItem('rarebox_decks') } catch {}
+  try { localStorage.removeItem('rarebox_booths') } catch {}
+  try { localStorage.removeItem('rarebox_saved_shops') } catch {}
   confirmReset.value = false
   resetConfirmText.value = ''
   // Full reload so every in-memory store re-initializes from wiped storage

@@ -97,6 +97,10 @@
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 2h10"/><path d="M5 6h14"/><rect width="18" height="12" x="3" y="10" rx="2"/></svg>
             Decks
           </router-link>
+          <router-link to="/booth" class="more-item" role="menuitem" @click="moreOpen = false">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9l1.5-5h15L21 9"/><path d="M3 9a3 3 0 0 0 6 0 3 3 0 0 0 6 0 3 3 0 0 0 6 0"/><path d="M5 11.5V21h14v-9.5"/><path d="M9 21v-6h6v6"/></svg>
+            Card Booth
+          </router-link>
           <button class="more-item" role="menuitem" @click="toggleTheme">
             <svg v-if="theme === 'dark'" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32 1.41 1.41M2 12h2m16 0h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
             <svg v-else xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
@@ -267,6 +271,8 @@ const currentPageTitle = computed(() => {
   if (route.name === 'Browse') return 'Browse Sets'
   if (route.name === 'Sets') return 'Pokémon Sets'
   if (route.name === 'TcgSets') return 'Browse Sets'
+  if (route.name === 'Booth') return 'Card Booth'
+  if (route.name === 'BoothEdit') return 'Edit Booth'
   if (route.name === 'Settings') return 'Settings'
   if (route.name === 'Terms') return 'Terms & Conditions'
   if (route.name === 'TradeAnalyzer' || route.name === 'TradeLanding') return 'Trade Analyzer'
