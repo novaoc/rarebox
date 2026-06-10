@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://holode.xyz/sitemap.xml
+Sitemap: https://rarebox.io/sitemap.xml

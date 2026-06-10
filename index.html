@@ -2,7 +2,8 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⬡</text></svg>" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="canonical" href="https://rarebox.io/" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover" />
     <title>Rarebox — TCG Portfolio Tracker</title>
 
@@ -15,7 +16,6 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Rarebox" />
-    <link rel="apple-touch-icon" href="/icon-192.svg" />
 
     <!-- DNS prefetch for external APIs and CDNs -->
     <link rel="dns-prefetch" href="//api.pokemontcg.io" />
@@ -31,6 +31,8 @@
     <meta property="og:description" content="Your whole binder, one shelf. Live prices and alerts on grails like Manga Luffy ($3,975) and Traveling Chocobo ($5,950) across Pokémon, Magic, Yu-Gi-Oh!, Lorcana, One Piece and Riftbound. Free. Private. No account." />
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://rarebox.io" />
+    <meta property="og:site_name" content="Rarebox" />
+    <meta property="og:locale" content="en_US" />
     <meta property="og:image" content="https://rarebox.io/api/og" />
     <meta property="og:image:type" content="image/png" />
     <meta property="og:image:width" content="1200" />
@@ -40,9 +42,28 @@
     <meta name="twitter:title" content="Rarebox — Collect. Track. Trade. Win." />
     <meta name="twitter:description" content="Your whole binder, one shelf. Live prices and alerts on grails like Manga Luffy ($3,975) across six TCGs. Free, private, no account." />
     <meta name="twitter:image" content="https://rarebox.io/api/og" />
+      <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      "name": "Rarebox",
+      "url": "https://rarebox.io",
+      "description": "Free, private TCG collection tracker for Pokémon, Magic: The Gathering, Yu-Gi-Oh!, Disney Lorcana, One Piece and Riftbound — live prices, price alerts, portfolio analytics, deck building and a trade analyzer.",
+      "applicationCategory": "FinanceApplication",
+      "operatingSystem": "Any (web browser)",
+      "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+      "author": { "@type": "Person", "name": "Nova", "url": "https://github.com/novaoc" }
+    }
+    </script>
   </head>
   <body>
-    <div id="app"></div>
+    <div id="app">
+      <noscript>
+        <h1>Rarebox — TCG Collection Tracker</h1>
+        <p>Track your whole binder across Pokémon, Magic: The Gathering, Yu-Gi-Oh!, Disney Lorcana, One Piece and Riftbound — live prices, price alerts, portfolio value, deck building and a trade analyzer. Free, private, no account. Rarebox needs JavaScript to run; please enable it.</p>
+        <p><a href="https://docs.rarebox.io">Documentation</a> · <a href="https://github.com/novaoc/rarebox">Source on GitHub</a></p>
+      </noscript>
+    </div>
     <script type="module" src="/src/main.js"></script>
   </body>
 </html>

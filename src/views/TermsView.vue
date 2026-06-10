@@ -4,7 +4,7 @@
 
     <div class="terms-card">
       <h1>Terms &amp; Conditions</h1>
-      <p class="terms-updated">Last updated: April 2026</p>
+      <p class="terms-updated">Last updated: June 2026</p>
 
       <section>
         <h2>1. Acceptance of Terms</h2>
@@ -17,11 +17,14 @@
       <section>
         <h2>2. Description of Service</h2>
         <p>
-          Rarebox is a free, client-side Pokémon TCG portfolio tracker. It allows you to
-          track your card collection, monitor market values, build decks, browse sets,
-          and view price history charts. The Service processes all data locally in your
-          browser — there are no user accounts, no server-side storage, and no backend
-          database.
+          Rarebox is a free, client-side trading card game portfolio tracker supporting
+          Pokémon, Magic: The Gathering, Yu-Gi-Oh!, Disney Lorcana, One Piece Card Game,
+          and Riftbound. It allows you to track cards, sealed products, and graded slabs,
+          monitor market values, set price alerts, build decks, browse sets, analyze
+          trades, scan physical cards with your camera, import collections from other
+          apps, and view price history charts. The Service processes all data locally in
+          your browser — there are no user accounts, no server-side database of user
+          data, and no login.
         </p>
       </section>
 
@@ -33,10 +36,25 @@
             daily price snapshots are stored in your browser's IndexedDB and never
             leave your device unless you export or sync them.</li>
           <li><strong>Card data</strong> — card names, images, and set information are
-            fetched from the pokemontcg.io API. Japanese sets use the tcgdex API.</li>
-          <li><strong>Price data</strong> — current prices for graded and sealed products
-            are fetched from PriceCharting. Card price history is fetched from tcgdex
-            and PriceCharting's public JSON API.</li>
+            fetched from public APIs per game: pokemontcg.io and the official
+            pokemon-tcg-data dataset (via the jsDelivr CDN) for Pokémon, tcgdex for
+            Japanese Pokémon, Scryfall for Magic, YGOPRODeck for Yu-Gi-Oh!, Lorcast
+            for Lorcana, optcgapi for One Piece, and riftcodex (with card images from
+            Riot Games' CDN) for Riftbound.</li>
+          <li><strong>Price data</strong> — current prices come from the same per-game
+            APIs plus PriceCharting for graded slabs, sealed products, and Riftbound
+            singles. Card price history is fetched from tcgdex and PriceCharting's
+            public JSON API. A small set of requests (sealed product search, the
+            link-preview banner) is served through Rarebox's own serverless functions,
+            which hold no user data.</li>
+          <li><strong>Card scanning</strong> — the camera scanner and OCR run entirely
+            on your device (Tesseract.js compiled to WebAssembly). Photos you capture
+            are processed in your browser's memory and are never uploaded anywhere.
+            Recognition language files are downloaded once from a public CDN.</li>
+          <li><strong>Price alerts</strong> — alerts are checked locally and use your
+            browser's Notification permission, which you can revoke at any time.</li>
+          <li><strong>Collection import</strong> — files you import (e.g. Collectr CSV
+            or Excel exports) are parsed locally in your browser and never uploaded.</li>
           <li><strong>Cross-device sync</strong> — optional sync to jsonbin.io uses an
             API key you provide. Data is transmitted directly from your browser to
             jsonbin.io. We do not intermediate or store your data.</li>
@@ -79,11 +97,19 @@
         <h2>7. Third-Party Services</h2>
         <p>The Service relies on the following third-party APIs and services:</p>
         <ul>
-          <li><strong>pokemontcg.io</strong> — card data and English set information</li>
-          <li><strong>tcgdex.net</strong> — Japanese card data, set information, and
-            card images</li>
-          <li><strong>PriceCharting</strong> — graded and sealed product pricing</li>
-          <li><strong>Vercel</strong> — hosting and CDN</li>
+          <li><strong>pokemontcg.io</strong> — Pokémon card data and prices</li>
+          <li><strong>tcgdex.net</strong> — Japanese Pokémon card data, prices, and images</li>
+          <li><strong>Scryfall</strong> — Magic: The Gathering card data, prices, and images</li>
+          <li><strong>YGOPRODeck</strong> — Yu-Gi-Oh! card data, prices, and images</li>
+          <li><strong>Lorcast</strong> — Disney Lorcana card data, prices, and images</li>
+          <li><strong>optcgapi.com</strong> — One Piece Card Game data, prices, and images</li>
+          <li><strong>riftcodex.com</strong> — Riftbound card data; card images served
+            from Riot Games' content CDN</li>
+          <li><strong>PriceCharting</strong> — graded, sealed, and Riftbound pricing</li>
+          <li><strong>jsDelivr</strong> — CDN for the bulk Pokémon card dataset and OCR
+            language files</li>
+          <li><strong>Pokellector</strong> — Japanese set logos</li>
+          <li><strong>Vercel</strong> — hosting, CDN, and Rarebox's serverless functions</li>
           <li><strong>jsonbin.io</strong> — optional cross-device sync (only if you
             configure it)</li>
           <li><strong>GitHub</strong> — source code hosting and meta deck data</li>
@@ -194,7 +220,7 @@
 
     <div class="terms-card" style="margin-top: 20px">
       <h1>Privacy Policy</h1>
-      <p class="terms-updated">Last updated: April 2026</p>
+      <p class="terms-updated">Last updated: June 2026</p>
 
       <section>
         <h2>1. Overview</h2>
@@ -208,10 +234,11 @@
       <section>
         <h2>2. Data We Collect</h2>
         <p>
-          <strong>We do not collect any personal data.</strong> Rarebox has no server,
-          no user accounts, and no login systems. There are no cookies set by the
-          application itself. However, we do use Vercel Analytics and Speed Insights for
-          anonymized usage metrics — see Section 6 for details.
+          <strong>We do not collect any personal data.</strong> Rarebox has no user
+          accounts and no login systems, sets no cookies, and runs no analytics or
+          tracking of any kind (see Section 6). The only servers involved are static
+          hosting and a few stateless serverless functions that proxy public price
+          data — they store nothing about you.
         </p>
       </section>
 
@@ -249,14 +276,31 @@
         <h2>5. Third-Party Services</h2>
         <p>Your browser makes direct requests to:</p>
         <ul>
-          <li><strong>Vercel</strong> — hosting provider. May log standard
-            request data (IP, user agent) per their privacy policy.</li>
-          <li><strong>pokemontcg.io</strong> — card data API</li>
-          <li><strong>tcgdex.net</strong> — Japanese card data and images</li>
-          <li><strong>PriceCharting</strong> — pricing data</li>
+          <li><strong>Vercel</strong> — hosting provider and serverless functions. May
+            log standard request data (IP, user agent) per their privacy policy.</li>
+          <li><strong>pokemontcg.io, tcgdex.net, Scryfall, YGOPRODeck, Lorcast,
+            optcgapi.com, riftcodex.com (Riot CDN), PriceCharting, jsDelivr,
+            Pokellector</strong> — card data, images, and pricing APIs/CDNs</li>
           <li><strong>jsonbin.io</strong> — only if you configure sync</li>
           <li><strong>GitHub</strong> — source code and meta deck data</li>
         </ul>
+        <p>
+          These requests are made directly from your browser and never include your
+          portfolio contents — only the card or product being looked up.
+        </p>
+
+      </section>
+
+      <section>
+        <h2>5a. Camera, Files &amp; Notifications</h2>
+        <p>
+          The card scanner uses your camera only while you have the scanner open, and
+          all image processing (OCR) happens on your device — photos are never
+          uploaded or stored. Files you import (CSV, Excel, JSON backups) are parsed
+          locally in your browser. Price alerts use the browser Notification
+          permission; both permissions can be revoked at any time in your browser
+          settings.
+        </p>
       </section>
 
       <section>
