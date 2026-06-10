@@ -195,8 +195,8 @@ function addPicked() {
 
 .be-items { display: flex; flex-direction: column; gap: 10px; }
 .be-item { display: flex; gap: 12px; align-items: center; padding: 10px 12px; flex-wrap: wrap; }
-.be-item-img { width: 44px; flex-shrink: 0; background: #fff; border: 1.5px solid var(--ink); border-radius: 7px; padding: 2px; }
-.be-item-img img { width: 100%; display: block; border-radius: 4px; }
+.be-item-img { width: 44px; height: 58px; flex-shrink: 0; background: #fff; border: 1.5px solid var(--ink); border-radius: 7px; padding: 2px; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.be-item-img img { width: 100%; height: 100%; object-fit: contain; border-radius: 4px; }
 .be-item-main { flex: 1; min-width: 140px; }
 .be-item-name { font-weight: 800; font-size: 14px; }
 .be-item-sub { font-size: 12px; color: var(--text-secondary); }

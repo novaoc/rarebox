@@ -9,7 +9,7 @@
   <div v-else class="app-layout">
     <!-- TCG selection modal (first visit only, app renders behind it) -->
     <transition name="fade">
-      <CardDatabaseLoader v-if="showLoader" @ready="onLoaderReady" />
+      <CardDatabaseLoader v-if="showLoader && !isBoothRoute" @ready="onLoaderReady" />
     </transition>
 
     <!-- ── Top bar ──────────────────────────────────────────────────── -->
@@ -171,7 +171,7 @@
     <TourModal v-if="showTradeTour" :key="tourKey + theme" :src="`/videos/trade-tour-${theme}.mp4`" storage-key="rarebox_trade_tour_seen" />
 
     <!-- Background card loading indicator -->
-    <CardLoadIndicator ref="cardLoadIndicator" />
+    <CardLoadIndicator v-show="!isBoothRoute" ref="cardLoadIndicator" />
   </div>
 </template>
 
@@ -209,6 +209,9 @@ window.addEventListener('online', () => { online.value = true })
 window.addEventListener('offline', () => { online.value = false })
 const cardLoadIndicator = ref(null)
 const showLoader = ref(!isCardDatabaseReady() && !getTcgPrefs())
+// Booth pages stay popup-free: someone opening a shared booth (or hopping
+// between scanned booths) shouldn't be asked to download card databases
+const isBoothRoute = computed(() => route.path.startsWith('/booth'))
 const showNewPortfolioModal = ref(false)
 const newPortfolioName = ref('')
 const newPortfolioColor = ref('#ffd23f')

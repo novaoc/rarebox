@@ -2,6 +2,13 @@
   <div class="booth-page container">
     <!-- ── Incoming / opened shop (read-only) ───────────────────────── -->
     <template v-if="viewing">
+      <div v-if="showInvite" class="booth-invite">
+        <span class="booth-invite-mark" aria-hidden="true">RB</span>
+        <span class="booth-invite-text">This booth was made with <strong>Rarebox</strong> — track your own collection free. No account, works offline.</span>
+        <router-link to="/" class="btn btn-primary btn-sm" @click="dismissInvite">Try it</router-link>
+        <button class="btn btn-ghost btn-icon" aria-label="Dismiss" @click="dismissInvite">✕</button>
+      </div>
+
       <div class="shop-head card">
         <div class="shop-head-main">
           <span class="sticker">{{ viewing.booth.name }}</span>
@@ -25,7 +32,10 @@
 
       <div class="shop-grid">
         <div v-for="(it, i) in viewing.booth.items" :key="i" class="shop-item card-sm card">
-          <div class="shop-item-img" v-if="it.img"><img :src="it.img" :alt="it.name" loading="lazy" @error="$event.target.style.display='none'" /></div>
+          <div class="shop-item-img">
+            <img v-if="it.img" :src="it.img" :alt="it.name" loading="lazy" @error="$event.target.style.display='none'" />
+            <span v-else class="shop-item-noimg" aria-hidden="true">🃏</span>
+          </div>
           <div class="shop-item-body">
             <div class="shop-item-name">{{ it.name }}</div>
             <div class="shop-item-sub">{{ [it.setName, it.number ? '#' + it.number : ''].filter(Boolean).join(' · ') }}</div>
@@ -135,6 +145,17 @@ const booths = ref(loadBooths())
 const savedShops = ref(loadSavedShops())
 const shareBooth = ref(null)
 const viewing = ref(null) // { booth, saved }
+
+// Invite newcomers (no TCG prefs = never onboarded), dismissibly
+const INVITE_KEY = 'rarebox_booth_invite_dismissed'
+const showInvite = ref(false)
+try {
+  showInvite.value = !localStorage.getItem('rarebox_tcg_prefs') && !localStorage.getItem(INVITE_KEY)
+} catch { /* private mode */ }
+function dismissInvite() {
+  showInvite.value = false
+  try { localStorage.setItem(INVITE_KEY, '1') } catch { /* private mode */ }
+}
 
 function fmtMoney(n) {
   return '$' + (n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -290,8 +311,47 @@ onBeforeUnmount(stopScan)
 .shop-actions { display: flex; gap: 10px; align-items: center; margin: 14px 0; }
 .shop-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 160px), 1fr)); gap: 12px; }
 .shop-item { padding: 10px; display: flex; flex-direction: column; gap: 8px; }
-.shop-item-img { background: #fff; border: var(--bw) solid var(--ink); border-radius: 10px; padding: 4px; }
-.shop-item-img img { width: 100%; display: block; border-radius: 6px; }
+/* Uniform mats: every listing gets the same white frame regardless of the
+   product's image shape (tall booster boxes, wide tins, card scans) —
+   images letterbox inside via object-fit: contain */
+.shop-item-img {
+  background: #fff;
+  border: var(--bw) solid var(--ink);
+  border-radius: 10px;
+  padding: 4px;
+  aspect-ratio: 3 / 4;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+.shop-item-img img { width: 100%; height: 100%; object-fit: contain; border-radius: 6px; }
+.shop-item-noimg { font-size: 34px; opacity: 0.35; }
+.shop-item-body { display: flex; flex-direction: column; flex: 1; }
+.shop-item-body .shop-item-row { margin-top: auto; padding-top: 6px; }
+
+.booth-invite {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  margin-top: 16px;
+  background: var(--accent-dim);
+  border: var(--bw) solid var(--ink);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-xs);
+}
+.booth-invite-mark {
+  flex-shrink: 0;
+  width: 30px; height: 30px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--accent);
+  border: 2px solid var(--on-accent);
+  border-radius: 8px;
+  font-size: 12px; font-weight: 900; color: var(--on-accent);
+  transform: rotate(-6deg);
+}
+.booth-invite-text { flex: 1; font-size: 12.5px; line-height: 1.45; }
 .shop-item-name { font-weight: 800; font-size: 13.5px; line-height: 1.3; }
 .shop-item-sub { font-size: 11.5px; color: var(--text-secondary); margin-top: 2px; }
 .shop-item-row { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
