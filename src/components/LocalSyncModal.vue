@@ -1,9 +1,9 @@
 <template>
-  <div class="modal-overlay" @click.self="$emit('close')">
+  <div class="modal-overlay" @click.self="close">
     <div class="modal slide-up-enter-active" style="max-width: 480px">
       <div class="modal-header">
         <h3>{{ mode === 'send' ? '📤 Send to Device' : '📥 Receive from Device' }}</h3>
-        <button class="btn btn-ghost btn-icon" @click="$emit('close')">✕</button>
+        <button class="btn btn-ghost btn-icon" @click="close">✕</button>
       </div>
 
       <div class="modal-body">
@@ -15,49 +15,75 @@
 
         <!-- SEND mode -->
         <template v-if="mode === 'send'">
-          <p class="sync-desc">The other device can scan this QR code or paste the text below.</p>
+          <p class="sync-desc">
+            On the other device, open <strong>Settings → Device Transfer → Receive</strong> and point its camera here.
+            {{ frameCount > 1 ? 'The code animates — hold steady until the other side completes.' : '' }}
+          </p>
 
-          <!-- QR Code -->
-          <div v-if="!qrTooLarge" class="qr-container">
-            <canvas ref="qrCanvas" class="qr-canvas"></canvas>
-          </div>
-          <div v-else class="qr-fallback">
-            <p class="text-muted" style="font-size: 13px; text-align: center;">
-              Collection too large for QR code — use the text below instead.
-            </p>
+          <div v-if="building" class="sync-building">
+            <div class="spinner"></div>
+            <p class="text-muted" style="font-size: 13px">Packing your shelves…</p>
           </div>
 
-          <!-- Copyable text -->
-          <div class="sync-text-area">
-            <textarea
-              ref="sendTextarea"
-              :value="compressedBase64 || encodedData"
-              readonly
-              class="input sync-textarea"
-              rows="4"
-              @click="selectText"
-            ></textarea>
-            <button class="btn btn-secondary btn-sm sync-copy-btn" @click="copyData">
-              {{ copied ? '✓ Copied' : 'Copy' }}
-            </button>
-          </div>
+          <template v-else>
+            <div class="qr-container">
+              <canvas ref="qrCanvas" class="qr-canvas"></canvas>
+            </div>
+            <div v-if="frameCount > 1" class="sync-frame-info">
+              <span class="badge badge-accent">{{ currentFrame + 1 }} / {{ frameCount }}</span>
+              <span class="text-muted" style="font-size: 12px">full cycle ≈ {{ cycleSeconds }}s</span>
+            </div>
 
-          <div class="sync-info">
-            <span class="text-muted" style="font-size: 12px">
-              {{ itemCount }} item{{ itemCount !== 1 ? 's' : '' }} · {{ dataSize }}
-            </span>
-          </div>
+            <!-- Copyable text fallback -->
+            <div class="sync-text-area">
+              <textarea
+                ref="sendTextarea"
+                :value="compressedBase64"
+                readonly
+                class="input sync-textarea"
+                rows="3"
+                @click="selectText"
+              ></textarea>
+              <button class="btn btn-secondary btn-sm sync-copy-btn" @click="copyData">
+                {{ copied ? '✓ Copied' : 'Copy' }}
+              </button>
+            </div>
+
+            <div class="sync-info">
+              <span class="text-muted" style="font-size: 12px">
+                {{ itemCount }} item{{ itemCount !== 1 ? 's' : '' }}{{ deckCount ? ` · ${deckCount} deck${deckCount !== 1 ? 's' : ''}` : '' }} · {{ dataSize }}
+              </span>
+            </div>
+          </template>
         </template>
 
         <!-- RECEIVE mode -->
         <template v-if="mode === 'receive'">
-          <p class="sync-desc">Paste the data from the sending device below.</p>
+          <template v-if="!scanning">
+            <button class="btn btn-primary sync-scan-btn" @click="startScan">📷 Scan QR from other device</button>
+            <p class="sync-desc" style="text-align:center; margin: 12px 0 8px">— or paste the copied text —</p>
+          </template>
+
+          <div v-show="scanning" class="sync-camera">
+            <video ref="videoEl" class="sync-video" playsinline muted></video>
+            <div class="sync-scan-progress">
+              <template v-if="collectorTotal">
+                <div class="sync-progress-bar">
+                  <div class="sync-progress-fill" :style="{ width: (collectorGot / collectorTotal * 100) + '%' }"></div>
+                </div>
+                <span>{{ collectorGot }} / {{ collectorTotal }} parts — keep pointing at the code</span>
+              </template>
+              <span v-else>Looking for a Rarebox code…</span>
+            </div>
+            <button class="btn btn-secondary btn-sm" style="margin-top:8px" @click="stopScan">Cancel scan</button>
+          </div>
 
           <textarea
+            v-if="!scanning"
             v-model="receiveInput"
             class="input sync-textarea"
             placeholder="Paste sync data here..."
-            rows="6"
+            rows="5"
           ></textarea>
 
           <div v-if="parseError" class="sync-error">{{ parseError }}</div>
@@ -65,7 +91,7 @@
           <div v-if="parsedBackup" class="sync-preview">
             <div class="sync-preview-title">Ready to import:</div>
             <div class="sync-preview-detail">
-              {{ (parsedBackup.data?.portfolios?.portfolios?.length || 0) === 1 ? '1 shelf' : `${parsedBackup.data?.portfolios?.portfolios?.length || 0} shelves` }}
+              {{ shelfCount === 1 ? '1 shelf' : `${shelfCount} shelves` }}<span v-if="parsedDeckCount"> · {{ parsedDeckCount }} deck{{ parsedDeckCount !== 1 ? 's' : '' }}</span><span v-if="parsedBackup.data?.trade"> · trade in progress</span>
             </div>
             <div class="sync-preview-detail" v-if="parsedBackup.exportedAt">
               Exported: {{ formatDate(parsedBackup.exportedAt) }}
@@ -75,7 +101,7 @@
       </div>
 
       <div class="modal-footer">
-        <button class="btn btn-secondary" @click="$emit('close')">Cancel</button>
+        <button class="btn btn-secondary" @click="close">Cancel</button>
         <button
           v-if="mode === 'receive'"
           class="btn btn-primary"
@@ -90,9 +116,11 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted, nextTick } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import QRCode from 'qrcode'
-import { importBackup, validateBackup } from '../utils/backup'
+import jsQR from 'jsqr'
+import { buildBackupPayload, importBackup, validateBackup } from '../utils/backup'
+import { buildFrames, FrameCollector, isFrame, gzip, gunzip, bytesToBase64, base64ToBytes } from '../utils/qrTransfer'
 
 const emit = defineEmits(['close'])
 
@@ -102,138 +130,103 @@ const copied = ref(false)
 // ── Send ──
 const qrCanvas = ref(null)
 const sendTextarea = ref(null)
-const qrTooLarge = ref(false)
+const building = ref(true)
 const compressedBase64 = ref('')
+const itemCount = ref(0)
+const deckCount = ref(0)
+const dataSize = ref('')
+const frameCount = ref(0)
+const currentFrame = ref(0)
 
-// Compress string with gzip → base64
-async function compressToBase64(str) {
-  const bytes = new TextEncoder().encode(str)
-  const cs = new CompressionStream('gzip')
-  const writer = cs.writable.getWriter()
-  writer.write(bytes)
-  writer.close()
-  const compressed = await new Response(cs.readable).arrayBuffer()
-  // Convert to base64
-  const arr = new Uint8Array(compressed)
-  let binary = ''
-  for (let i = 0; i < arr.length; i++) binary += String.fromCharCode(arr[i])
-  return btoa(binary)
-}
+const FRAME_MS = 400
+const cycleSeconds = computed(() => Math.ceil((frameCount.value * FRAME_MS) / 1000))
 
-// Decompress base64 → original string
-async function decompressFromBase64(b64) {
-  const binary = atob(b64)
-  const bytes = new Uint8Array(binary.length)
-  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
-  const ds = new DecompressionStream('gzip')
-  const writer = ds.writable.getWriter()
-  writer.write(bytes)
-  writer.close()
-  const decompressed = await new Response(ds.readable).arrayBuffer()
-  return new TextDecoder().decode(decompressed)
-}
+let frames = []
+let frameTimer = null
 
-// Build backup data WITHOUT triggering download (exportBackup creates a file download)
-function buildBackupData() {
-  const payload = { version: 1, exportedAt: new Date().toISOString(), app: 'rarebox', data: {} }
-  const keys = { portfolios: 'rarebox_portfolios', settings: 'rarebox_settings', snapshots: 'rarebox_snapshots' }
-  for (const [label, key] of Object.entries(keys)) {
-    const raw = localStorage.getItem(key)
-    if (raw) try { payload.data[label] = JSON.parse(raw) } catch { payload.data[label] = raw }
-  }
-  const cacheKeys = Object.keys(localStorage).filter(k => k.startsWith('ph_cache_'))
-  if (cacheKeys.length > 0) {
-    payload.data.priceCache = {}
-    for (const k of cacheKeys) {
-      const raw = localStorage.getItem(k)
-      if (raw) try { payload.data.priceCache[k] = JSON.parse(raw) } catch { payload.data.priceCache[k] = raw }
+// Strip bulky fields from card data for compact transfer.
+// Keeps: name, set, number, prices, quantity — everything needed to restore.
+// Drops: images, price history arrays, raw API blobs, price cache.
+function slimItems(items) {
+  if (!Array.isArray(items)) return
+  for (const item of items) {
+    if (!item.cardData) continue
+    const cd = item.cardData
+    item.cardData = {
+      id: cd.id,
+      name: cd.name,
+      number: cd.number,
+      set: cd.set ? { id: cd.set.id, name: cd.set.name, series: cd.set.series } : undefined,
+      tcgplayer: cd.tcgplayer ? { prices: cd.tcgplayer.prices } : undefined,
     }
+    Object.keys(item.cardData).forEach(k => item.cardData[k] === undefined && delete item.cardData[k])
   }
-  return payload
 }
 
-// Strip bulky fields from card data for compact QR transfer.
-// Keeps: name, set, number, prices, type, quantity — everything needed to restore.
-// Drops: images, price history arrays, tcgdex raw data, price cache.
 function compactForTransfer(payload) {
   const compact = JSON.parse(JSON.stringify(payload))
-  // Drop price cache entirely — re-fetches on load
-  delete compact.data.priceCache
-  // Drop snapshots — not critical for transfer
-  delete compact.data.snapshots
-  // Slim down items inside portfolios
-  const portfolios = compact.data.portfolios?.portfolios
-  if (Array.isArray(portfolios)) {
-    for (const p of portfolios) {
-      if (!Array.isArray(p.items)) continue
-      for (const item of p.items) {
-        // Strip bulky card data fields
-        if (item.cardData) {
-          const cd = item.cardData
-          // Keep essentials only
-          item.cardData = {
-            id: cd.id,
-            name: cd.name,
-            number: cd.number,
-            set: cd.set ? { id: cd.set.id, name: cd.set.name, series: cd.set.series } : undefined,
-            tcgplayer: cd.tcgplayer ? { prices: cd.tcgplayer.prices } : undefined,
-          }
-          // Remove undefined keys
-          Object.keys(item.cardData).forEach(k => item.cardData[k] === undefined && delete item.cardData[k])
-        }
-      }
-    }
+  delete compact.data.priceCache // re-fetches on the other device
+  delete compact.data.snapshots // history charts rebuild over time
+  for (const p of compact.data.portfolios?.portfolios || []) slimItems(p.items)
+  if (compact.data.trade) {
+    slimItems(compact.data.trade.sideA)
+    slimItems(compact.data.trade.sideB)
   }
   return compact
 }
 
-const backupData = computed(() => buildBackupData())
-const compactData = computed(() => compactForTransfer(backupData.value))
-const encodedData = computed(() => JSON.stringify(compactData.value))
-const itemCount = computed(() => {
-  const portfolios = backupData.value.data?.portfolios?.portfolios || []
-  return portfolios.reduce((s, p) => s + (p.items?.length || 0), 0)
-})
-const dataSize = computed(() => {
-  const bytes = new Blob([encodedData.value]).size
-  if (bytes < 1024) return `${bytes} B`
-  return `${(bytes / 1024).toFixed(1)} KB`
-})
-
-async function generateQR() {
-  if (!qrCanvas.value) return
+async function prepareSend() {
+  building.value = true
   try {
-    // Compress the JSON before encoding into QR
-    const jsonStr = encodedData.value
-    const bytes = new TextEncoder().encode(jsonStr)
-    const cs = new CompressionStream('gzip')
-    const writer = cs.writable.getWriter()
-    writer.write(bytes)
-    writer.close()
-    const compressed = await new Response(cs.readable).arrayBuffer()
-    const compressedArr = new Uint8Array(compressed)
+    const payload = await buildBackupPayload({ includePriceCache: false })
+    const portfolios = payload.data?.portfolios?.portfolios || []
+    itemCount.value = portfolios.reduce((s, p) => s + (p.items?.length || 0), 0)
+    deckCount.value = Array.isArray(payload.data?.decks) ? payload.data.decks.length : 0
 
-    // Also store base64 version for clipboard
-    let binary = ''
-    for (let i = 0; i < compressedArr.length; i++) binary += String.fromCharCode(compressedArr[i])
-    compressedBase64.value = btoa(binary)
+    const json = JSON.stringify(compactForTransfer(payload))
+    const bytes = await gzip(json)
+    compressedBase64.value = bytesToBase64(bytes)
+    const kb = bytes.length / 1024
+    dataSize.value = kb < 1 ? `${bytes.length} B` : `${kb.toFixed(1)} KB compressed`
 
-    // QR with binary (byte mode) — version 40 + L correction = ~2953 bytes capacity
-    if (compressedArr.length > 2900) {
-      qrTooLarge.value = true
-      return
-    }
-    qrTooLarge.value = false
-    await QRCode.toCanvas(qrCanvas.value, compressedArr, {
-      width: 280,
+    frames = buildFrames(bytes)
+    frameCount.value = frames.length
+    currentFrame.value = 0
+    building.value = false
+    await nextTick()
+    startFrameLoop()
+  } catch (e) {
+    console.error('Sync prepare failed:', e)
+    building.value = false
+  }
+}
+
+async function drawFrame(i) {
+  if (!qrCanvas.value || !frames[i]) return
+  try {
+    await QRCode.toCanvas(qrCanvas.value, [{ data: frames[i], mode: 'byte' }], {
+      width: 300,
       margin: 2,
       color: { dark: '#141414', light: '#ffffff' },
-      errorCorrectionLevel: 'L',
+      errorCorrectionLevel: 'M',
     })
   } catch (e) {
-    console.error('QR generation failed:', e)
-    qrTooLarge.value = true
+    console.error('QR draw failed:', e)
   }
+}
+
+function startFrameLoop() {
+  stopFrameLoop()
+  drawFrame(0)
+  if (frames.length <= 1) return
+  frameTimer = setInterval(() => {
+    currentFrame.value = (currentFrame.value + 1) % frames.length
+    drawFrame(currentFrame.value)
+  }, FRAME_MS)
+}
+
+function stopFrameLoop() {
+  if (frameTimer) { clearInterval(frameTimer); frameTimer = null }
 }
 
 function selectText() {
@@ -242,8 +235,7 @@ function selectText() {
 
 async function copyData() {
   try {
-    const text = compressedBase64.value || encodedData.value
-    await navigator.clipboard.writeText(text)
+    await navigator.clipboard.writeText(compressedBase64.value)
     copied.value = true
     setTimeout(() => { copied.value = false }, 2000)
   } catch {
@@ -255,6 +247,88 @@ async function copyData() {
 const receiveInput = ref('')
 const parseError = ref('')
 const parsedBackup = ref(null)
+const scanning = ref(false)
+const videoEl = ref(null)
+const collectorGot = ref(0)
+const collectorTotal = ref(0)
+
+const shelfCount = computed(() => parsedBackup.value?.data?.portfolios?.portfolios?.length || 0)
+const parsedDeckCount = computed(() => Array.isArray(parsedBackup.value?.data?.decks) ? parsedBackup.value.data.decks.length : 0)
+
+let mediaStream = null
+let scanTimer = null
+let collector = null
+let scanCanvas = null
+
+async function acceptPayload(bytes) {
+  const json = await gunzip(bytes)
+  const data = JSON.parse(json)
+  const err = validateBackup(data)
+  if (err) { parseError.value = err; return }
+  parseError.value = ''
+  parsedBackup.value = data
+}
+
+async function startScan() {
+  parseError.value = ''
+  parsedBackup.value = null
+  collector = new FrameCollector()
+  collectorGot.value = 0
+  collectorTotal.value = 0
+  try {
+    mediaStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'environment', width: { ideal: 1280 } },
+      audio: false,
+    })
+  } catch {
+    parseError.value = 'Camera unavailable — paste the copied text instead.'
+    return
+  }
+  scanning.value = true
+  await nextTick()
+  videoEl.value.srcObject = mediaStream
+  await videoEl.value.play()
+  scanCanvas = scanCanvas || document.createElement('canvas')
+  scanTimer = setInterval(scanTick, 120)
+}
+
+async function scanTick() {
+  const video = videoEl.value
+  if (!video || video.readyState < 2) return
+  const w = video.videoWidth, h = video.videoHeight
+  if (!w) return
+  scanCanvas.width = w
+  scanCanvas.height = h
+  const ctx = scanCanvas.getContext('2d', { willReadFrequently: true })
+  ctx.drawImage(video, 0, 0, w, h)
+  const img = ctx.getImageData(0, 0, w, h)
+  const code = jsQR(img.data, w, h, { inversionAttempts: 'dontInvert' })
+  if (!code || !code.binaryData?.length) return
+  const bytes = Uint8Array.from(code.binaryData)
+
+  if (isFrame(bytes)) {
+    if (collector.feed(bytes)) {
+      collectorGot.value = collector.received
+      collectorTotal.value = collector.total
+    }
+    if (collector.done) {
+      stopScan()
+      try { await acceptPayload(collector.assemble()) }
+      catch { parseError.value = 'Transfer corrupted — try scanning again.' }
+    }
+  } else {
+    // Legacy single-QR transfer: the whole gzip blob in one code
+    stopScan()
+    try { await acceptPayload(bytes) }
+    catch { parseError.value = 'Not a Rarebox transfer code.' }
+  }
+}
+
+function stopScan() {
+  if (scanTimer) { clearInterval(scanTimer); scanTimer = null }
+  if (mediaStream) { mediaStream.getTracks().forEach(t => t.stop()); mediaStream = null }
+  scanning.value = false
+}
 
 watch(receiveInput, async (val) => {
   parseError.value = ''
@@ -263,22 +337,18 @@ watch(receiveInput, async (val) => {
 
   const input = val.trim()
 
-  // Try parsing as raw JSON first (backwards compat)
+  // Raw JSON (backwards compat)
   try {
     const data = JSON.parse(input)
     const err = validateBackup(data)
     if (err) { parseError.value = err; return }
     parsedBackup.value = data
     return
-  } catch {}
+  } catch { /* not raw JSON */ }
 
-  // Try decompressing from base64 (gzip compressed)
+  // gzip + base64
   try {
-    const jsonStr = await decompressFromBase64(input)
-    const data = JSON.parse(jsonStr)
-    const err = validateBackup(data)
-    if (err) { parseError.value = err; return }
-    parsedBackup.value = data
+    await acceptPayload(base64ToBytes(input))
   } catch {
     parseError.value = 'Invalid data — make sure you copied the full text'
   }
@@ -297,9 +367,19 @@ function formatDate(iso) {
   try { return new Date(iso).toLocaleString() } catch { return iso }
 }
 
-// Generate QR on mount and when switching to send mode
-watch(mode, (m) => { if (m === 'send') nextTick(generateQR) })
-onMounted(() => { nextTick(generateQR) })
+function close() {
+  stopScan()
+  stopFrameLoop()
+  emit('close')
+}
+
+watch(mode, (m) => {
+  if (m === 'send') nextTick(() => { frames.length ? startFrameLoop() : prepareSend() })
+  else stopFrameLoop()
+  if (m !== 'receive') stopScan()
+})
+onMounted(() => { prepareSend() })
+onBeforeUnmount(() => { stopScan(); stopFrameLoop() })
 </script>
 
 <style scoped>
@@ -337,10 +417,18 @@ onMounted(() => { nextTick(generateQR) })
   margin-bottom: 16px;
 }
 
+.sync-building {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 40px 0;
+}
+
 .qr-container {
   display: flex;
   justify-content: center;
-  margin-bottom: 16px;
+  margin-bottom: 10px;
 }
 .qr-canvas {
   border: var(--bw) solid var(--ink);
@@ -349,13 +437,12 @@ onMounted(() => { nextTick(generateQR) })
   background: #fff;
 }
 
-.qr-fallback {
-  padding: 20px;
-  text-align: center;
-  background: var(--bg-hover);
-  border: var(--bw) solid var(--border-subtle);
-  border-radius: var(--radius);
-  margin-bottom: 16px;
+.sync-frame-info {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 14px;
 }
 
 .sync-text-area {
@@ -375,6 +462,45 @@ onMounted(() => { nextTick(generateQR) })
 }
 
 .sync-info { text-align: center; }
+
+.sync-scan-btn { width: 100%; }
+
+.sync-camera {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 12px;
+}
+.sync-video {
+  width: 100%;
+  max-height: 280px;
+  object-fit: cover;
+  border: var(--bw) solid var(--ink);
+  border-radius: var(--radius);
+  background: #000;
+}
+.sync-scan-progress {
+  width: 100%;
+  margin-top: 10px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  text-align: center;
+}
+.sync-progress-bar {
+  width: 100%;
+  height: 10px;
+  background: var(--bg-secondary);
+  border: 1.5px solid var(--ink);
+  border-radius: 999px;
+  overflow: hidden;
+  margin-bottom: 6px;
+}
+.sync-progress-fill {
+  height: 100%;
+  background: var(--success);
+  transition: width 0.2s;
+}
 
 .sync-error {
   font-size: 13px;

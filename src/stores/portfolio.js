@@ -50,8 +50,10 @@ export const usePortfolioStore = defineStore('portfolio', () => {
 
   // Debounced save to IDB
   function persist() {
+    if (typeof window !== 'undefined' && window.__rareboxImporting) return
     if (debounceTimer) clearTimeout(debounceTimer)
     debounceTimer = setTimeout(async () => {
+      if (typeof window !== 'undefined' && window.__rareboxImporting) return
       try {
         await saveState(getState())
       } catch (e) {
@@ -62,6 +64,7 @@ export const usePortfolioStore = defineStore('portfolio', () => {
 
   // Immediate save (for beforeunload, reset, critical paths)
   async function persistNow() {
+    if (typeof window !== 'undefined' && window.__rareboxImporting) return
     if (debounceTimer) {
       clearTimeout(debounceTimer)
       debounceTimer = null

@@ -31,8 +31,10 @@ export const useTradeStore = defineStore('trade', () => {
   }
 
   function persist() {
+    if (typeof window !== 'undefined' && window.__rareboxImporting) return
     if (debounceTimer) clearTimeout(debounceTimer)
     debounceTimer = setTimeout(async () => {
+      if (typeof window !== 'undefined' && window.__rareboxImporting) return
       try {
         await saveTradeState(getState())
       } catch (e) {

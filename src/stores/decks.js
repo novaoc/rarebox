@@ -25,6 +25,7 @@ export const useDeckStore = defineStore('decks', () => {
   const decks = ref(loadFromStorage())
 
   function persist() {
+    if (typeof window !== 'undefined' && window.__rareboxImporting) return
     saveToStorage(decks.value)
   }
 
