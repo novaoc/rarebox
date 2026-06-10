@@ -1,6 +1,14 @@
-"""GET /api/meta-decks — live meta decks from all 6 TCG sources."""
+"""Build public/meta-decks/{game}.json — live meta decks from all 6 TCG sources.
 
-from http.server import BaseHTTPRequestHandler
+Formerly the /api/meta-decks serverless function; the app is local-only, so
+this now runs in CI (daily GitHub Action) and ships its output as static
+assets. The client merges them with its built-in fallback decks.
+
+    python3 scripts/build_meta_decks.py [game ...]
+"""
+
+import sys
+from pathlib import Path
 import json
 import re
 import time
@@ -736,41 +744,20 @@ def scrape_riftbound() -> list[dict]:
     return decks
 
 
-def _fetch_riftbound_prices(sets_data: list) -> dict:
-    """Fetch Riftbound prices from PriceCharting for each set.
-    Returns { collector_number: price } across all sets."""
-    prices = {}
-    for s in sets_data:
-        set_name = s.get("name", "")
-        if not set_name:
-            continue
-        try:
-            url = f"https://www.pricecharting.com/search-products?type=prices&q={urllib.parse.quote('riftbound ' + set_name)}"
-            data = fetch_json(url, delay=1.0)
-            products = data.get("products") or []
-            for p in products:
-                name = p.get("productName", "") or ""
-                num_match = re.search(r"#(\d+)", name)
-                if not num_match:
-                    continue
-                num = num_match.group(1)
-                price_raw = p.get("price1")
-                if not price_raw:
-                    continue
-                try:
-                    price_val = float(str(price_raw).replace("$", "").replace(",", ""))
-                except (ValueError, TypeError):
-                    continue
-                # Only use non-variant prices (no brackets in name)
-                if "[" not in name:
-                    prices[num] = price_val
-        except Exception:
-            continue
-    return prices
+def _load_riftbound_prices() -> dict:
+    """TCGplayer prices keyed by product id, from the static asset that
+    scripts/build_riftbound_prices.py maintains (riftcodex cards carry the
+    matching tcgplayer_id). Replaces the old PriceCharting search, which
+    missed promos entirely and truncated big sets at 100 results."""
+    path = Path(__file__).resolve().parent.parent / "public" / "riftbound-prices.json"
+    try:
+        return json.loads(path.read_text()).get("prices", {})
+    except (OSError, ValueError):
+        return {}
 
 
 def resolve_riftbound_cards(decks: list[dict]) -> list[dict]:
-    """Resolve Riftbound card names via riftcodex API + PriceCharting prices."""
+    """Resolve Riftbound card names via riftcodex API + TCGplayer prices."""
     try:
         sets = fetch_json("https://api.riftcodex.com/sets", delay=0.3)
     except Exception:
@@ -795,8 +782,7 @@ def resolve_riftbound_cards(decks: list[dict]) -> list[dict]:
         except Exception:
             continue
 
-    # Fetch prices from PriceCharting
-    price_map = _fetch_riftbound_prices(sets_items)
+    price_map = _load_riftbound_prices()
 
     for deck in decks:
         resolved = []
@@ -813,13 +799,14 @@ def resolve_riftbound_cards(decks: list[dict]) -> list[dict]:
                     info = all_cards.get(f"#{num}")
             if info:
                 cnum = str(info.get("collector_number", ""))
+                tp = price_map.get(str(info.get("tcgplayer_id", ""))) or {}
                 resolved.append({
                     "cardId": info.get("id", ""),
                     "name": info.get("name", card["name"]),
                     "setName": (info.get("set") or {}).get("label", ""),
                     "setCode": (info.get("set") or {}).get("set_id", ""),
                     "number": cnum,
-                    "price": price_map.get(cnum),
+                    "price": tp.get("normal") or tp.get("foil"),
                     "image": (info.get("media") or {}).get("image_url", ""),
                     "quantity": card["quantity"],
                 })
@@ -962,54 +949,33 @@ SCRAPERS = {
 }
 
 
-class handler(BaseHTTPRequestHandler):
-    def do_GET(self):
-        from urllib.parse import urlparse, parse_qs
-        parsed = urlparse(self.path)
-        params = parse_qs(parsed.query)
-        game = (params.get("game") or ["pokemon"])[0]
 
-        cached_key = f"meta-decks-{game}"
-        cached = cache_get(cached_key)
-        if cached:
-            self._json({"decks": cached, "cached": True})
-            return
-
-        scraper_info = SCRAPERS.get(game)
-        if not scraper_info:
-            self._json({"decks": [], "game": game, "note": f"Unknown game: {game}"})
-            return
-
-        scraper, resolver = scraper_info
-
+def main() -> int:
+    out_dir = Path(__file__).resolve().parent.parent / "public" / "meta-decks"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    games = sys.argv[1:] or list(SCRAPERS)
+    failures = 0
+    for game in games:
+        scraper, resolver = SCRAPERS[game]
         try:
             decks = scraper()
-
-            if not decks:
-                self._json({"decks": [], "game": game, "note": f"No decks found for {game}"})
-                return
-
-            if resolver:
+            if decks and resolver:
                 decks = resolver(decks)
-
-            if decks:
-                cache_set(cached_key, decks)
-
-            self._json({"decks": decks, "cached": False})
-
         except Exception as e:
-            self._json({"error": str(e), "decks": []}, 502)
+            print(f"{game}: scrape failed: {e}", file=sys.stderr)
+            decks = []
+        decks = [d for d in decks if d.get("cards")]
+        if decks:
+            (out_dir / f"{game}.json").write_text(
+                json.dumps({"decks": decks}, separators=(",", ":"))
+            )
+            print(f"{game}: wrote {len(decks)} decks")
+        else:
+            # Keep the previous day's file — the client also has fallbacks.
+            failures += 1
+            print(f"{game}: no decks scraped, keeping existing file", file=sys.stderr)
+    return 1 if failures == len(games) else 0
 
-    def do_OPTIONS(self):
-        self.send_response(200)
-        self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Methods", "GET, OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "*")
-        self.end_headers()
 
-    def _json(self, data: dict, status: int = 200):
-        self.send_response(status)
-        self.send_header("Content-Type", "application/json")
-        self.send_header("Access-Control-Allow-Origin", "*")
-        self.end_headers()
-        self.wfile.write(json.dumps(data).encode())
+if __name__ == "__main__":
+    sys.exit(main())

@@ -295,6 +295,26 @@ export async function getJapaneseSets() {
   return sets
 }
 
+// TCGplayer market prices for JP cards — static asset built daily in CI
+// (scripts/build_jp_prices.py). tcgdex only carries Cardmarket pricing for
+// the newest Mega-era sets; every SV-era and older JP set comes back
+// priceless without this. Keyed `${set id}-${number}`: lowercase, no
+// leading zeros.
+let _jpPrices = null
+async function getJpPriceMap() {
+  if (_jpPrices) return _jpPrices
+  try {
+    const res = await fetch('/jp-prices.json')
+    _jpPrices = res.ok ? (await res.json()).prices || {} : {}
+  } catch { _jpPrices = {} }
+  return _jpPrices
+}
+
+function jpPriceKey(setId, localId) {
+  const num = String(localId ?? '').split('/')[0].replace(/^0+/, '') || '0'
+  return `${String(setId || '').toLowerCase()}-${num.toLowerCase()}`
+}
+
 export async function getJapaneseCardsBySet(setId, page = 1, pageSize = 36) {
   // Fetch the set to get card list (names, numbers)
   const url = `https://api.tcgdex.net/v2/ja/sets/${setId}`
@@ -317,11 +337,13 @@ export async function getJapaneseCardsBySet(setId, page = 1, pageSize = 36) {
     }
   }
 
+  const jpPrices = await getJpPriceMap()
   const allCards = rawCards.map(c => {
     const localId = c.localId || c.id?.split('-').pop() || ''
     // tcgdex card briefs carry the canonical image base URL; absence means the CDN
     // has no scan for this card (e.g. Mega era) — show placeholder, not a 404
     const imageBase = c.image || null
+    const price = jpPrices[jpPriceKey(setId, localId)]
     return {
       id: c.id,
       name: c.name,
@@ -329,6 +351,7 @@ export async function getJapaneseCardsBySet(setId, page = 1, pageSize = 36) {
       set: { id: setId, name: enName },
       images: imageBase ? { small: imageBase + '/low.webp', large: imageBase + '/high.webp' } : { small: null, large: null },
       supertype: 'Pokémon',
+      tcgplayer: price ? { prices: { normal: { market: price, low: null, mid: price } } } : undefined,
       _lang: 'ja',
       _hasImage: !!imageBase
     }
@@ -342,16 +365,23 @@ export async function getJapaneseCardDetail(cardId) {
   const url = `https://api.tcgdex.net/v2/ja/cards/${cardId}`
   const data = await fetchWithCache(url)
   
-  // Build prices from cardmarket (EUR) and convert to USD
-  const EUR_TO_USD = 1.08
+  // Prefer the TCGplayer USD price from the static asset; fall back to
+  // tcgdex's cardmarket data (EUR, converted) where TCGplayer has nothing.
   let tcgPrices = null
-  const cm = data.pricing?.cardmarket
-  if (cm && (cm.avg || cm.trend)) {
-    tcgPrices = {
-      normal: {
-        market: cm.trend ? +(cm.trend * EUR_TO_USD).toFixed(2) : null,
-        low: cm.low ? +(cm.low * EUR_TO_USD).toFixed(2) : null,
-        mid: cm.avg ? +(cm.avg * EUR_TO_USD).toFixed(2) : null
+  const jpPrices = await getJpPriceMap()
+  const jpUsd = jpPrices[jpPriceKey(data.set?.id, data.localId)]
+  if (jpUsd) {
+    tcgPrices = { normal: { market: jpUsd, low: null, mid: jpUsd } }
+  } else {
+    const EUR_TO_USD = 1.08
+    const cm = data.pricing?.cardmarket
+    if (cm && (cm.avg || cm.trend)) {
+      tcgPrices = {
+        normal: {
+          market: cm.trend ? +(cm.trend * EUR_TO_USD).toFixed(2) : null,
+          low: cm.low ? +(cm.low * EUR_TO_USD).toFixed(2) : null,
+          mid: cm.avg ? +(cm.avg * EUR_TO_USD).toFixed(2) : null
+        }
       }
     }
   }

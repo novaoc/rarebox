@@ -3,10 +3,6 @@
   "outputDirectory": "dist",
   "framework": "vite",
   "rewrites": [
-    { "source": "/api/health", "destination": "/api/health" },
-    { "source": "/api/search", "destination": "/api/search" },
-    { "source": "/api/price", "destination": "/api/price" },
-    { "source": "/api/sealed", "destination": "/api/sealed" },
     { "source": "/((?!api/).*)", "destination": "/index.html" }
   ],
   "functions": {

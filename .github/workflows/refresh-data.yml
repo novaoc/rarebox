@@ -1,0 +1,48 @@
+# Daily refresh of the static data assets the local-only app ships with:
+#   public/riftbound-prices.json — Riftbound TCGplayer prices (tcgcsv)
+#   public/jp-prices.json        — Japanese Pokémon TCGplayer prices (tcgcsv)
+#   public/meta-decks/*.json     — scraped meta decks per game
+# tcgcsv updates once a day around 20:00 UTC; we pull an hour after. Commits
+# land on main, which triggers the normal Vercel static deploy — the app
+# itself stays local-only and just fetches these files as assets.
+
+name: Refresh data assets
+
+on:
+  schedule:
+    - cron: "0 21 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install scraper deps
+        run: pip install httpx beautifulsoup4
+
+      - name: Riftbound prices
+        run: python3 scripts/build_riftbound_prices.py
+
+      - name: Japanese Pokémon prices
+        run: python3 scripts/build_jp_prices.py
+
+      - name: Meta decks
+        run: python3 scripts/build_meta_decks.py
+        continue-on-error: true # scrapers depend on third-party HTML; stale decks beat no deploy
+
+      - name: Commit if changed
+        run: |
+          git add public/riftbound-prices.json public/jp-prices.json public/meta-decks
+          if git diff --cached --quiet; then
+            echo "no data changes"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "chore: refresh price & meta-deck data assets"
+          git push

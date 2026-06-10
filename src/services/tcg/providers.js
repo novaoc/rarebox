@@ -9,7 +9,7 @@
 // Data sources (English, free):
 //   • MTG       — Scryfall   (api.scryfall.com)    CORS *  — browser-direct
 //   • Lorcana   — Lorcast    (api.lorcast.com)     CORS *  — browser-direct
-//   • One Piece — optcgapi   (via /api/optcg proxy — optcgapi has no CORS)
+//   • One Piece — optcgapi   (optcgapi.com)        CORS *  — browser-direct
 //   • Riftbound — riftcodex  (api.riftcodex.com)   CORS *  — browser-direct
 //   • Yu-Gi-Oh! — YGOPRODeck (db.ygoprodeck.com)   CORS *  — browser-direct
 //   • Pokémon keeps its richer dedicated flow (SetsView) — not handled here.
