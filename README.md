@@ -87,6 +87,13 @@ Built by [Nova](https://github.com/novaoc).
 - Market prices from TCGPlayer / PriceCharting for every card
 - Cached for 24h with version-based invalidation — instant on repeat visits
 
+### Card Booth (IRL selling)
+- Set up a booth for a card show or store table: pick items from your shelves, put your asking price on them
+- Share as a link or QR — the **entire booth travels inside the link** (URL fragment), so nothing is uploaded or hosted anywhere
+- Small booths: one QR scannable by any phone camera; big booths: animated multi-frame QR (scanned from Booth → Scan)
+- Buyers see a read-only booth with your prices and a table total, and can **save shops** to revisit later — even offline
+- Booths and saved shops are included in backups and device transfer
+
 ### Trade Analyzer
 - Side-by-side trade comparison — add cards to Side A and Side B via search or camera scan
 - Live price delta with winning/losing/even label
