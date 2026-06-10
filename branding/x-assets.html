@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  /* Tactile tokens (light) */
+  :root {
+    --bg: #faf6ef;
+    --ink: #141414;
+    --accent: #ffd23f;
+    --pink: #ff6ba9;
+    --success: #2fbf71;
+    --info: #4f86f7;
+    --text-secondary: #5f5a51;
+  }
+  .dark {
+    --bg: #16140e;
+    --ink: #f0e8d8;
+    --accent: #e8c558;
+    --pink: #ea93b7;
+    --success: #4cc285;
+    --info: #8fb3f9;
+    --text-secondary: #b3a98f;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #888; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+  .board { position: relative; overflow: hidden; background: var(--bg); margin: 20px; }
+
+  /* ── Avatar 800×800 (circle-crop safe) ─────────────────────────── */
+  #avatar { width: 800px; height: 800px; display: flex; align-items: center; justify-content: center; }
+  .mark {
+    position: relative;
+    width: 400px; height: 400px;
+    transform: rotate(-6deg);
+  }
+  .mark .shadow-layer {
+    position: absolute; inset: 0;
+    transform: translate(26px, 26px);
+    background: #141414;
+    border-radius: 88px;
+  }
+  .mark .face {
+    position: absolute; inset: 0;
+    background: var(--accent);
+    border: 13px solid #141414;
+    border-radius: 88px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .mark .face span {
+    font-size: 168px; font-weight: 900; color: #141414;
+    letter-spacing: -0.02em;
+  }
+  /* tiny sticker accents around the mark, inside circle-safe zone */
+  .dot { position: absolute; border-radius: 50%; border: 6px solid #141414; }
+
+  /* ── Banner 1500×500 ───────────────────────────────────────────── */
+  .banner { width: 1500px; height: 500px; }
+  /* X profile avatar overlays bottom-left ~(0..220px wide); keep content clear */
+  .b-mark {
+    position: absolute; left: 120px; top: 118px;
+    width: 150px; height: 150px; transform: rotate(-6deg);
+  }
+  .b-mark .shadow-layer { position: absolute; inset: 0; transform: translate(10px, 10px); background: #141414; border-radius: 34px; }
+  .b-mark .face { position: absolute; inset: 0; background: var(--accent); border: 6px solid #141414; border-radius: 34px; display: flex; align-items: center; justify-content: center; }
+  .b-mark .face span { font-size: 62px; font-weight: 900; color: #141414; }
+
+  .b-word {
+    position: absolute; left: 318px; top: 118px;
+    font-size: 110px; font-weight: 900; letter-spacing: -0.035em;
+    color: var(--ink); line-height: 1;
+  }
+  .b-tag {
+    position: absolute; left: 324px; top: 248px;
+    font-size: 34px; font-weight: 700; color: var(--text-secondary);
+    letter-spacing: -0.01em;
+  }
+  .b-tag .hl {
+    background: var(--accent); color: #141414;
+    padding: 2px 10px; border-radius: 8px;
+    box-decoration-break: clone;
+  }
+  .dark .b-tag .hl { background: none; color: var(--accent); padding: 0; box-shadow: 0 5px 0 var(--accent); border-radius: 0; }
+
+  /* price-tag stickers, right side */
+  .tag {
+    position: absolute;
+    background: #fff; border: 5px solid #141414; border-radius: 18px;
+    padding: 14px 22px;
+    box-shadow: 9px 9px 0 #141414;
+    font-weight: 900; color: #141414;
+  }
+  .dark .tag { box-shadow: 9px 9px 0 #000; }
+  .tag .t-name { font-size: 24px; letter-spacing: -0.01em; }
+  .tag .t-price { font-size: 30px; margin-top: 2px; }
+  .tag .t-up { color: #1e9e5a; }
+  .tag-1 { right: 268px; top: 84px; transform: rotate(3deg); }
+  .tag-2 { right: 96px; top: 196px; transform: rotate(-4deg); background: var(--pink); }
+  .tag-3 { right: 320px; top: 296px; transform: rotate(2deg); background: var(--accent); }
+
+  /* marquee band along the bottom */
+  .band {
+    position: absolute; left: 0; right: 0; bottom: 0;
+    height: 64px; background: var(--accent);
+    border-top: 5px solid #141414;
+    display: flex; align-items: center; overflow: hidden;
+    white-space: nowrap;
+    font-size: 24px; font-weight: 900; color: #141414;
+    letter-spacing: 0.06em;
+  }
+  .band span { padding: 0 18px; }
+</style>
+</head>
+<body>
+
+<!-- Avatar: light -->
+<div class="board" id="avatar">
+  <div class="mark">
+    <div class="shadow-layer"></div>
+    <div class="face"><span>RB</span></div>
+  </div>
+  <div class="dot" style="width:34px;height:34px;background:var(--pink);left:178px;top:208px;"></div>
+  <div class="dot" style="width:26px;height:26px;background:var(--success);right:188px;top:548px;"></div>
+  <div class="dot" style="width:22px;height:22px;background:var(--info);right:218px;top:178px;"></div>
+</div>
+
+<!-- Banner: light -->
+<div class="board banner" id="banner-light">
+  <div class="b-mark">
+    <div class="shadow-layer"></div>
+    <div class="face"><span>RB</span></div>
+  </div>
+  <div class="b-word">rarebox</div>
+  <div class="b-tag">Every card you own, <span class="hl">tracked live</span>.</div>
+
+  <div class="tag tag-1"><div class="t-name">Monkey D. Luffy · OP01</div><div class="t-price">$3,975.00 <span class="t-up">▲</span></div></div>
+  <div class="tag tag-2"><div class="t-name">Blue-Eyes W. Dragon</div><div class="t-price">$681.49</div></div>
+  <div class="tag tag-3"><div class="t-name">Charizard · Base Set</div><div class="t-price">$614.49 <span class="t-up">▲</span></div></div>
+
+  <div class="band" id="band-light"></div>
+</div>
+
+<!-- Banner: dark -->
+<div class="board banner dark" id="banner-dark">
+  <div class="b-mark">
+    <div class="shadow-layer" style="background:#000"></div>
+    <div class="face"><span>RB</span></div>
+  </div>
+  <div class="b-word">rarebox</div>
+  <div class="b-tag">Every card you own, <span class="hl">tracked live</span>.</div>
+
+  <div class="tag tag-1"><div class="t-name">Monkey D. Luffy · OP01</div><div class="t-price">$3,975.00 <span class="t-up">▲</span></div></div>
+  <div class="tag tag-2"><div class="t-name">Blue-Eyes W. Dragon</div><div class="t-price">$681.49</div></div>
+  <div class="tag tag-3"><div class="t-name">Charizard · Base Set</div><div class="t-price">$614.49 <span class="t-up">▲</span></div></div>
+
+  <div class="band" id="band-dark"></div>
+</div>
+
+<script>
+  const GAMES = ['POKÉMON', '★', 'MAGIC', '★', 'YU-GI-OH!', '★', 'ONE PIECE', '★', 'LORCANA', '★', 'RIFTBOUND', '★'];
+  for (const id of ['band-light', 'band-dark']) {
+    const el = document.getElementById(id);
+    el.innerHTML = Array(4).fill(GAMES.map(g => `<span>${g}</span>`).join('')).join('');
+  }
+</script>
+</body>
+</html>
