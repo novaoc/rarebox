@@ -10,9 +10,13 @@ import router from './router'
 import App from './App.vue'
 import './assets/main.css'
 import { inject as injectAnalytics } from '@vercel/analytics'
+import { installOfflineArtFallback } from './utils/offlineArt'
 
 // Anonymous, cookieless page-view analytics (Vercel Web Analytics)
 injectAnalytics()
+
+// Card images that fail while offline become text-only placeholder mats
+installOfflineArtFallback()
 
 // Global error handler — catches Vue render errors
 const app = createApp(App)
