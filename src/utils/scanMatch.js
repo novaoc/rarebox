@@ -10,6 +10,7 @@
  */
 
 import { hashCard, parseIndex, matchIndex } from './imageHash'
+import { findCard } from './cardRectify'
 
 // index name → game + language hints for resolution
 export const SCAN_INDEXES = [
@@ -20,10 +21,12 @@ export const SCAN_INDEXES = [
   { name: 'one-piece', game: 'one-piece', lang: 'en' },
 ]
 
-// Combined Hamming distance (0..128) over dHash+pHash:
-// ≲22 → near-certain same card · ≲34 → plausible, show as candidate
-export const CONFIDENT_DIST = 22
-export const CANDIDATE_DIST = 34
+// Combined Hamming distance (0..128) over dHash+pHash. Calibrated on a
+// synthetic photo harness (36 distorted shots): correct matches landed at
+// 6-21, wrong matches at 28+ — 26 rejects every observed wrong match while
+// keeping 93% of correct ones. Better an honest miss than a wrong card.
+export const CONFIDENT_DIST = 18
+export const CANDIDATE_DIST = 26
 
 const _indexes = new Map() // name → Promise<parsed | null>
 
@@ -92,6 +95,13 @@ function framings(img) {
 export async function identifyCard(imageDataUrl, k = 6) {
   const img = await loadImage(imageDataUrl)
   const frames = framings(img)
+  // Rectification first: find the card's corners and flatten it — hashes have
+  // no tolerance for perspective tilt, so this is what makes phone photos
+  // match clean reference scans. Falls back to plain crops when no quad found.
+  try {
+    const flats = findCard(img)
+    if (flats) frames.unshift(...flats)
+  } catch { /* rectifier is best-effort */ }
   const hashes = frames.map(f => hashCard(f))
 
   const loaded = await Promise.all(SCAN_INDEXES.map(async meta => ({
