@@ -661,7 +661,7 @@ onMounted(loadSets)
   transition: all 0.15s;
 }
 .lang-tab:hover { color: var(--text-primary); }
-.lang-tab.active { background: var(--accent); color: var(--ink); font-weight: 700; }
+.lang-tab.active { background: var(--accent); color: var(--on-accent); font-weight: 700; }
 .search-input-wrap { flex: 1; position: relative; display: flex; align-items: center; max-width: 400px; }
 .search-icon { position: absolute; left: 12px; font-size: 16px; color: var(--text-muted); pointer-events: none; display: flex; align-items: center; }
 .search-input { padding-left: 36px; padding-right: 36px; font-size: 14px; }
@@ -793,7 +793,7 @@ onMounted(loadSets)
   padding: 4px 10px; border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer;
   border: none; background: none; color: var(--text-secondary);
 }
-.bulk-tab.active { background: var(--accent); color: var(--ink); font-weight: 700; }
+.bulk-tab.active { background: var(--accent); color: var(--on-accent); font-weight: 700; }
 .bulk-actions-row { display: flex; gap: 4px; margin-left: auto; }
 .bulk-grid {
   flex: 1; overflow-y: auto; padding: 12px 20px;
@@ -908,8 +908,8 @@ onMounted(loadSets)
 .panel-card-info { flex: 1; }
 .panel-card-set { font-size: 13px; color: var(--text-secondary); margin-bottom: 4px; }
 .panel-card-rarity {
-  display: inline-block; font-size: 11px; font-weight: 800; color: var(--ink);
-  background: var(--accent); border: var(--bw) solid var(--ink); border-radius: 999px;
+  display: inline-block; font-size: 11px; font-weight: 800; color: var(--on-accent);
+  background: var(--accent); border: var(--bw) solid var(--on-accent); border-radius: 999px;
   padding: 1px 10px; box-shadow: var(--shadow-pressed);
 }
 .panel-card-type { font-size: 12px; color: var(--text-muted); margin-top: 6px; }
@@ -918,8 +918,9 @@ onMounted(loadSets)
 .price-variant { color: var(--text-secondary); font-weight: 600; }
 .price-val {
   display: inline-block; font-weight: 800; font-variant-numeric: tabular-nums;
-  background: var(--accent); border: var(--bw) solid var(--ink); border-radius: 999px;
+  background: var(--accent); border: var(--bw) solid var(--on-accent); border-radius: 999px;
   padding: 1px 10px; font-size: 12px; box-shadow: var(--shadow-pressed); margin: 2px 0;
+  color: var(--on-accent);
 }
 .panel-chart { border-top: var(--bw) solid var(--border-subtle); padding-top: 20px; }
 

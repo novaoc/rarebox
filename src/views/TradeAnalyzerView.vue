@@ -865,12 +865,12 @@ onMounted(async () => {
   width: fit-content;
   margin: 4px auto 24px;
   padding: 10px 22px;
-  border: var(--bw) solid var(--ink);
+  border: var(--bw) solid var(--on-accent);
   border-radius: var(--radius);
   box-shadow: var(--shadow-sm);
   transform: rotate(-1.5deg);
   font-size: 14px;
-  color: var(--ink);
+  color: var(--on-accent);
 }
 .delta-label {
   font-size: 13px;
@@ -880,11 +880,11 @@ onMounted(async () => {
 }
 .delta-bar .font-bold { font-weight: 800; }
 .delta-win { background: var(--success); }
-.delta-win .font-bold { color: var(--ink); }
+.delta-win .font-bold { color: var(--on-accent); }
 .delta-lose { background: var(--danger); }
-.delta-lose .font-bold { color: var(--ink); }
+.delta-lose .font-bold { color: var(--on-accent); }
 .delta-even { background: var(--accent); }
-.delta-even .font-bold { color: var(--ink); }
+.delta-even .font-bold { color: var(--on-accent); }
 
 .trade-split {
   display: grid;
@@ -990,12 +990,12 @@ onMounted(async () => {
   padding: 3px 10px;
   margin-bottom: 8px;
   background: var(--accent);
-  border: var(--bw) solid var(--ink);
+  border: var(--bw) solid var(--on-accent);
   border-radius: 8px;
   box-shadow: var(--shadow-pressed);
   font-size: 12px;
   font-weight: 700;
-  color: var(--ink);
+  color: var(--on-accent);
 }
 
 .search-results {
@@ -1138,8 +1138,8 @@ onMounted(async () => {
   padding: 1px 6px;
   border-radius: 6px;
   background: var(--accent);
-  border: 1.5px solid var(--ink);
-  color: var(--ink);
+  border: 1.5px solid var(--on-accent);
+  color: var(--on-accent);
   cursor: pointer;
   vertical-align: middle;
   margin-left: 4px;

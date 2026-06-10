@@ -194,6 +194,7 @@ watch(() => route.path, () => {
 
 .can-release .indicator-inner {
   background: var(--accent);
+  color: var(--on-accent);
 }
 
 .pull-content {

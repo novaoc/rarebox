@@ -379,7 +379,8 @@ function gameLabel(game) {
 .deck-stat-pill.owned { background: var(--success-dim); }
 .deck-stat-pill.owned .pill-num { color: var(--ink); }
 .deck-stat-pill.cost { background: var(--accent); }
-.deck-stat-pill.cost .pill-num { color: var(--ink); }
+.deck-stat-pill.cost .pill-num { color: var(--on-accent); }
+.deck-stat-pill.cost .pill-label { color: var(--on-accent); }
 .deck-stat-pill.pct { min-width: 80px; }
 .pill-num { font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .pill-label { font-size: 9px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-secondary); margin-top: 2px; }

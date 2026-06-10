@@ -481,7 +481,7 @@ watch(() => props.card, () => {
   transition: background 0.12s, box-shadow 0.12s;
 }
 .type-tab:hover { background: var(--bg-hover); }
-.type-tab.active { background: var(--accent); color: var(--ink); box-shadow: var(--shadow-xs); }
+.type-tab.active { background: var(--accent); color: var(--on-accent); box-shadow: var(--shadow-xs); }
 
 .card-preview {
   display: flex;

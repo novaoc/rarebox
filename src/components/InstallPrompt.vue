@@ -226,8 +226,8 @@ onUnmounted(() => {
   height: 28px;
   border-radius: 50%;
   background: var(--accent);
-  color: var(--ink);
-  border: 1.5px solid var(--ink);
+  color: var(--on-accent);
+  border: 1.5px solid var(--on-accent);
   display: flex;
   align-items: center;
   justify-content: center;

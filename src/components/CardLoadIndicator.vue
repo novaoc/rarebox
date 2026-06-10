@@ -284,7 +284,7 @@ defineExpose({ start, onProgress, finish })
   font-variant-numeric: tabular-nums;
 }
 
-.done .pill-pct { color: #1e9e5a; }
+.done .pill-pct { color: var(--success-text); }
 
 .pill-bar-wrap {
   height: 8px;
@@ -323,7 +323,7 @@ defineExpose({ start, onProgress, finish })
 }
 
 .pill-game.active { color: var(--text-primary); font-weight: 700; }
-.pill-game.done { color: #1e9e5a; }
+.pill-game.done { color: var(--success-text); }
 .pill-game.failed { color: var(--danger); }
 
 .pill-game-status {

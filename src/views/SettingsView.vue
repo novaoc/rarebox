@@ -182,6 +182,17 @@
       </div>
     </div>
 
+    <!-- Appearance -->
+    <div class="settings-section card mb-4">
+      <h3 class="settings-section-title">Appearance</h3>
+      <p class="text-secondary" style="font-size:13px;margin-bottom:12px">Tactile comes in lights-on and lights-off. "System" follows your device setting.</p>
+      <div class="flex gap-2" style="flex-wrap:wrap">
+        <button v-for="opt in ['light','dark','system']" :key="opt"
+          class="btn btn-sm" :class="themePref === opt ? 'btn-primary' : 'btn-secondary'"
+          @click="setTheme(opt)" style="text-transform:capitalize">{{ opt }}</button>
+      </div>
+    </div>
+
     <!-- Collectr Import -->
     <div id="import" class="settings-section card mb-4">
       <h3 class="settings-section-title">Import from Collectr</h3>
@@ -350,6 +361,7 @@ import { getActiveAlerts, getTriggeredAlerts, removeAlert, clearTriggeredAlerts,
 import LocalSyncModal from '../components/LocalSyncModal.vue'
 import { getCardCounts, clearCardCache, saveCardDatabaseReady, buildSearchIndex } from '../services/tcg/cardCache'
 import { useTradeStore } from '../stores/trade'
+import { getThemePref, setThemePref } from '../utils/theme'
 import { saveTradeState } from '../db'
 import { refreshAll } from '../services/tcg/cardPreloader'
 const store = usePortfolioStore()
@@ -359,6 +371,8 @@ const confirmReset = ref(false)
 const resetConfirmText = ref('')
 const showLocalSync = ref(false)
 const hideLoader = ref(localStorage.getItem('hide_load_indicator') === 'true')
+const themePref = ref(getThemePref())
+function setTheme(opt) { themePref.value = opt; setThemePref(opt) }
 
 // Alert state
 const allAlerts = computed(() => {
@@ -608,7 +622,7 @@ function goToDashboard() {
   width: 14px;
   left: 2px;
   bottom: 2px;
-  background-color: #fff;
+  background-color: var(--bg-card);
   border: 1.5px solid var(--ink);
   transition: .25s;
   border-radius: 50%;
@@ -618,6 +632,7 @@ function goToDashboard() {
 }
 .toggle-input:checked + .toggle-label:before {
   transform: translateX(22px);
+  border-color: var(--on-accent);
 }
 
 /* PC key row — column layout */
@@ -673,7 +688,7 @@ function goToDashboard() {
   border-radius: var(--radius);
   width: 100%;
 }
-.import-result.success { background: var(--success-dim); color: #1e9e5a; border: 1.5px solid var(--ink); font-weight: 600; }
+.import-result.success { background: var(--success-dim); color: var(--success-text); border: 1.5px solid var(--ink); font-weight: 600; }
 .import-result.error { background: var(--danger-dim); color: var(--danger); border: 1.5px solid var(--ink); font-weight: 600; }
 .backup-import-btn { cursor: pointer; }
 
@@ -723,7 +738,7 @@ function goToDashboard() {
   height: 48px;
   background: var(--success);
   color: #fff;
-  border: var(--bw) solid var(--ink);
+  border: var(--bw) solid var(--on-accent);
   border-radius: 50%;
   display: flex;
   align-items: center;

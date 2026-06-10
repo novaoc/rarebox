@@ -168,7 +168,7 @@ function confirm() {
 
 .tcg-option.selected {
   background: var(--accent);
-  color: var(--ink);
+  color: var(--on-accent);
   box-shadow: var(--shadow-xs);
 }
 
@@ -191,12 +191,12 @@ function confirm() {
   font-size: 11px;
   color: var(--text-muted);
 }
-.tcg-option.selected .tcg-meta { color: var(--text-secondary); }
+.tcg-option.selected .tcg-meta { color: var(--on-accent); }
 
 .tcg-check {
   font-size: 13px;
   font-weight: 800;
-  color: var(--ink);
+  color: var(--on-accent);
   flex-shrink: 0;
 }
 

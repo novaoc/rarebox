@@ -52,6 +52,47 @@
   --shadow-sm: 3px 3px 0 var(--ink);
   --shadow-xs: 2px 2px 0 var(--ink);
   --shadow-pressed: 1px 1px 0 var(--ink);
+
+  /* Text colors that must NOT flip with the theme */
+  --on-accent: #141414;        /* text sitting on yellow/green/pink fills */
+  --success-text: #1e9e5a;     /* readable green text on the page surface */
+  --accent-text: #b8860b;      /* readable gold text on the page surface */
+  --scroll-thumb: #d8d0bf;
+}
+
+/* ── Dark Tactile ─────────────────────────────────────────────────────
+   Same soul, lights off: warm coal paper, cream ink lines, identical
+   accent fills (always with dark text on them), and true-black hard
+   shadows — light shadows read as glows, which Tactile never does. */
+:root[data-theme="dark"] {
+  --bg-primary: #16140e;
+  --bg-secondary: #1d1a12;
+  --bg-card: #211e15;
+  --bg-hover: #282417;
+
+  --ink: #f0e8d8;
+  --border: #f0e8d8;
+  --border-subtle: #353022;
+
+  --text-primary: #f0e8d8;
+  --text-secondary: #b5ac98;
+  --text-muted: #7d7565;
+
+  --accent-dim: rgba(255, 210, 63, 0.14);
+  --success-dim: rgba(47, 191, 113, 0.16);
+  --danger-dim: rgba(228, 67, 79, 0.18);
+  --info-dim: rgba(79, 134, 247, 0.18);
+  --pink-dim: rgba(255, 107, 169, 0.16);
+
+  --shadow: 4px 4px 0 #000;
+  --shadow-sm: 3px 3px 0 #000;
+  --shadow-xs: 2px 2px 0 #000;
+  --shadow-pressed: 1px 1px 0 #000;
+
+  --success-text: #4cd58a;
+  --accent-text: #ffd23f;
+  --scroll-thumb: #44402f;
+  color-scheme: dark;
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -88,7 +129,7 @@ img, .card-result, .set-card, .card-img-wrap, .set-logo-wrap,
 /* Scrollbars */
 ::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #d8d0bf; border-radius: 4px; border: 2px solid var(--bg-primary); }
+::-webkit-scrollbar-thumb { background: var(--scroll-thumb); border-radius: 4px; border: 2px solid var(--bg-primary); }
 ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
 
 /* Links */
@@ -132,7 +173,7 @@ a:hover { text-decoration: underline; text-decoration-thickness: 2px; text-under
 }
 .btn:disabled { opacity: 0.45; cursor: not-allowed; box-shadow: none; }
 
-.btn-primary { background: var(--accent); color: var(--ink); }
+.btn-primary { background: var(--accent); color: var(--on-accent); }
 .btn-primary:hover:not(:disabled) { background: var(--accent-hover); }
 
 .btn-secondary { background: var(--bg-card); color: var(--ink); }
@@ -176,8 +217,8 @@ a:hover { text-decoration: underline; text-decoration-thickness: 2px; text-under
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  border: 1.5px solid var(--ink);
-  color: var(--ink);
+  border: 1.5px solid var(--on-accent);
+  color: var(--on-accent);
 }
 .badge-success { background: var(--success); }
 .badge-danger { background: var(--danger); color: #fff; }
@@ -191,7 +232,7 @@ a:hover { text-decoration: underline; text-decoration-thickness: 2px; text-under
   gap: 4px;
   padding: 4px 12px;
   background: var(--accent);
-  border: var(--bw) solid var(--ink);
+  border: var(--bw) solid var(--on-accent);
   border-radius: 10px;
   box-shadow: var(--shadow-xs);
   font-weight: 800;
@@ -199,6 +240,7 @@ a:hover { text-decoration: underline; text-decoration-thickness: 2px; text-under
   text-transform: uppercase;
   letter-spacing: 0.04em;
   transform: rotate(-2deg);
+  color: var(--on-accent);
 }
 .sticker-green { background: var(--success); }
 .sticker-pink { background: var(--pink); }
@@ -208,6 +250,10 @@ a:hover { text-decoration: underline; text-decoration-thickness: 2px; text-under
 .marker {
   background: linear-gradient(transparent 35%, var(--accent) 35%, var(--accent) 92%, transparent 92%);
   padding: 0 4px;
+}
+:root[data-theme="dark"] .marker {
+  /* light heading text stays readable: in dark the marker becomes a thick underline */
+  background: linear-gradient(transparent 78%, var(--accent) 78%);
 }
 
 /* ── Form elements ──────────────────────────────────────────────────── */
@@ -289,9 +335,9 @@ a:hover { text-decoration: underline; text-decoration-thickness: 2px; text-under
 }
 
 /* ── Utility ───────────────────────────────────────────────────────── */
-.text-success { color: #1e9e5a; }
+.text-success { color: var(--success-text); }
 .text-danger { color: var(--danger); }
-.text-accent { color: #b8860b; }
+.text-accent { color: var(--accent-text); }
 .text-muted { color: var(--text-muted); }
 .text-secondary { color: var(--text-secondary); }
 

@@ -326,8 +326,8 @@ onMounted(() => { nextTick(generateQR) })
 }
 .sync-tab.active {
   background: var(--accent);
-  border-color: var(--ink);
-  color: var(--ink);
+  border-color: var(--on-accent);
+  color: var(--on-accent);
 }
 .sync-tab:hover:not(.active) { color: var(--text-primary); }
 
@@ -397,7 +397,7 @@ onMounted(() => { nextTick(generateQR) })
 .sync-preview-title {
   font-size: 13px;
   font-weight: 700;
-  color: #1e9e5a;
+  color: var(--success-text);
   margin-bottom: 4px;
 }
 .sync-preview-detail {

@@ -63,7 +63,7 @@
 </template>
 
 <script setup>
-import { ref, watch, computed, onMounted } from 'vue'
+import { ref, watch, computed, onMounted, onBeforeUnmount } from 'vue'
 import { fetchPriceHistory, buildChartSeries, getVariantLabel } from '../services/priceHistory'
 
 const props = defineProps({
@@ -94,51 +94,87 @@ const ranges = [
   { label: '3Y', value: '3y' },
 ]
 
-const chartOptions = ref({
-  chart: {
-    id: 'price-chart',
-    type: 'area',
-    background: 'transparent',
-    foreColor: '#141414',
-    toolbar: { show: false },
-    zoom: { enabled: true },
-    animations: { enabled: true, speed: 400 }
-  },
-  theme: { mode: 'light' },
-  dataLabels: { enabled: false },
-  stroke: { curve: 'smooth', width: 3 },
-  fill: {
-    type: 'solid',
-    colors: ['#fff3c4'],
-    opacity: 1
-  },
-  colors: ['#4f86f7'],
-  xaxis: {
-    type: 'datetime',
-    labels: { style: { colors: '#5f5a51', fontSize: '11px' } },
-    axisBorder: { show: false },
-    axisTicks: { show: false },
-  },
-  yaxis: {
-    labels: {
-      style: { colors: '#5f5a51', fontSize: '11px' },
-      formatter: (v) => `$${v?.toFixed(0)}`
-    }
-  },
-  tooltip: {
-    theme: 'light',
-    x: { format: 'MMM dd, yyyy' },
-    y: { formatter: (v) => `$${v?.toFixed(2)}` }
-  },
-  grid: {
-    borderColor: '#e7dfd0',
-    strokeDashArray: 3,
-    xaxis: { lines: { show: false } },
-    yaxis: { lines: { show: true } },
-    padding: { left: 0, right: 0 }
-  },
-  markers: { size: 0, hover: { size: 4 } }
+const dark = () => document.documentElement.dataset.theme === 'dark'
+const themeChunk = () => ({
+  foreColor: dark() ? '#f0e8d8' : '#141414',
+  gridColor: dark() ? '#353022' : '#e7dfd0',
+  labelColor: dark() ? '#b5ac98' : '#5f5a51',
+  tooltipTheme: dark() ? 'dark' : 'light',
+  areaFill: dark() ? 'rgba(255,210,63,0.10)' : '#fff3c4'
 })
+
+function buildChartOptions() {
+  const t = themeChunk()
+  return {
+    chart: {
+      id: 'price-chart',
+      type: 'area',
+      background: 'transparent',
+      foreColor: t.foreColor,
+      toolbar: { show: false },
+      zoom: { enabled: true },
+      animations: { enabled: true, speed: 400 }
+    },
+    theme: { mode: t.tooltipTheme },
+    dataLabels: { enabled: false },
+    stroke: { curve: 'smooth', width: 3 },
+    fill: {
+      type: 'solid',
+      colors: [t.areaFill],
+      opacity: 1
+    },
+    colors: ['#4f86f7'],
+    xaxis: {
+      type: 'datetime',
+      labels: { style: { colors: t.labelColor, fontSize: '11px' } },
+      axisBorder: { show: false },
+      axisTicks: { show: false },
+    },
+    yaxis: {
+      labels: {
+        style: { colors: t.labelColor, fontSize: '11px' },
+        formatter: (v) => `$${v?.toFixed(0)}`
+      }
+    },
+    tooltip: {
+      theme: t.tooltipTheme,
+      x: { format: 'MMM dd, yyyy' },
+      y: { formatter: (v) => `$${v?.toFixed(2)}` }
+    },
+    grid: {
+      borderColor: t.gridColor,
+      strokeDashArray: 3,
+      xaxis: { lines: { show: false } },
+      yaxis: { lines: { show: true } },
+      padding: { left: 0, right: 0 }
+    },
+    markers: { size: 0, hover: { size: 4 } }
+  }
+}
+
+const chartOptions = ref(buildChartOptions())
+
+// Re-apply theme colors while preserving range-dependent bits (series color, x-axis format)
+function applyTheme() {
+  const t = themeChunk()
+  const prev = chartOptions.value
+  chartOptions.value = {
+    ...prev,
+    chart: { ...prev.chart, foreColor: t.foreColor },
+    theme: { mode: t.tooltipTheme },
+    fill: { ...prev.fill, colors: [t.areaFill] },
+    xaxis: {
+      ...prev.xaxis,
+      labels: { ...prev.xaxis.labels, style: { ...prev.xaxis.labels.style, colors: t.labelColor } },
+    },
+    yaxis: {
+      ...prev.yaxis,
+      labels: { ...prev.yaxis.labels, style: { ...prev.yaxis.labels.style, colors: t.labelColor } },
+    },
+    tooltip: { ...prev.tooltip, theme: t.tooltipTheme },
+    grid: { ...prev.grid, borderColor: t.gridColor },
+  }
+}
 
 const priceStats = computed(() => {
   const data = chartSeries.value?.[0]?.data
@@ -257,7 +293,13 @@ function applyRange(allSeries) {
 }
 
 watch(() => props.cardId, load, { immediate: false })
-onMounted(load)
+onMounted(() => {
+  load()
+  window.addEventListener('rarebox-theme', applyTheme)
+})
+onBeforeUnmount(() => {
+  window.removeEventListener('rarebox-theme', applyTheme)
+})
 </script>
 
 <style scoped>

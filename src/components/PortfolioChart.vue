@@ -40,7 +40,7 @@
 </template>
 
 <script setup>
-import { ref, watch, onMounted, computed } from 'vue'
+import { ref, watch, onMounted, onBeforeUnmount, computed } from 'vue'
 import { fetchPriceHistory, buildChartSeries } from '../services/priceHistory'
 import { usePortfolioStore } from '../stores/portfolio'
 
@@ -93,48 +93,84 @@ const totalCost = computed(() => {
 const totalChange = computed(() => currentValue.value - totalCost.value)
 const totalChangePct = computed(() => totalCost.value > 0 ? (totalChange.value / totalCost.value) * 100 : 0)
 
-const chartOptions = ref({
-  chart: {
-    type: 'area',
-    background: 'transparent',
-    foreColor: '#141414',
-    toolbar: { show: false },
-    zoom: { enabled: false },
-    animations: { enabled: true, speed: 600 }
-  },
-  theme: { mode: 'light' },
-  dataLabels: { enabled: false },
-  stroke: { curve: 'smooth', width: 3 },
-  fill: {
-    type: 'solid',
-    colors: ['#fff3c4'],
-    opacity: 1
-  },
-  colors: ['#4f86f7'],
-  xaxis: {
-    type: 'datetime',
-    labels: { style: { colors: '#5f5a51', fontSize: '11px' } },
-    axisBorder: { show: false },
-    axisTicks: { show: false },
-  },
-  yaxis: {
-    labels: {
-      style: { colors: '#5f5a51', fontSize: '11px' },
-      formatter: (v) => `$${v >= 1000 ? (v/1000).toFixed(1) + 'k' : v?.toFixed(0)}`
-    }
-  },
-  tooltip: {
-    theme: 'light',
-    x: { format: 'MMM dd, yyyy' },
-    y: { formatter: (v) => `$${v?.toFixed(2)}` }
-  },
-  grid: {
-    borderColor: '#e7dfd0',
-    strokeDashArray: 3,
-    padding: { left: 4, right: 4 }
-  },
-  markers: { size: 0, hover: { size: 5 } }
+const dark = () => document.documentElement.dataset.theme === 'dark'
+const themeChunk = () => ({
+  foreColor: dark() ? '#f0e8d8' : '#141414',
+  gridColor: dark() ? '#353022' : '#e7dfd0',
+  labelColor: dark() ? '#b5ac98' : '#5f5a51',
+  tooltipTheme: dark() ? 'dark' : 'light',
+  areaFill: dark() ? 'rgba(255,210,63,0.10)' : '#fff3c4'
 })
+
+function buildChartOptions() {
+  const t = themeChunk()
+  return {
+    chart: {
+      type: 'area',
+      background: 'transparent',
+      foreColor: t.foreColor,
+      toolbar: { show: false },
+      zoom: { enabled: false },
+      animations: { enabled: true, speed: 600 }
+    },
+    theme: { mode: t.tooltipTheme },
+    dataLabels: { enabled: false },
+    stroke: { curve: 'smooth', width: 3 },
+    fill: {
+      type: 'solid',
+      colors: [t.areaFill],
+      opacity: 1
+    },
+    colors: ['#4f86f7'],
+    xaxis: {
+      type: 'datetime',
+      labels: { style: { colors: t.labelColor, fontSize: '11px' } },
+      axisBorder: { show: false },
+      axisTicks: { show: false },
+    },
+    yaxis: {
+      labels: {
+        style: { colors: t.labelColor, fontSize: '11px' },
+        formatter: (v) => `$${v >= 1000 ? (v/1000).toFixed(1) + 'k' : v?.toFixed(0)}`
+      }
+    },
+    tooltip: {
+      theme: t.tooltipTheme,
+      x: { format: 'MMM dd, yyyy' },
+      y: { formatter: (v) => `$${v?.toFixed(2)}` }
+    },
+    grid: {
+      borderColor: t.gridColor,
+      strokeDashArray: 3,
+      padding: { left: 4, right: 4 }
+    },
+    markers: { size: 0, hover: { size: 5 } }
+  }
+}
+
+const chartOptions = ref(buildChartOptions())
+
+// Re-apply theme colors while preserving range-dependent bits (series color, x-axis format)
+function applyTheme() {
+  const t = themeChunk()
+  const prev = chartOptions.value
+  chartOptions.value = {
+    ...prev,
+    chart: { ...prev.chart, foreColor: t.foreColor },
+    theme: { mode: t.tooltipTheme },
+    fill: { ...prev.fill, colors: [t.areaFill] },
+    xaxis: {
+      ...prev.xaxis,
+      labels: { ...prev.xaxis.labels, style: { ...prev.xaxis.labels.style, colors: t.labelColor } },
+    },
+    yaxis: {
+      ...prev.yaxis,
+      labels: { ...prev.yaxis.labels, style: { ...prev.yaxis.labels.style, colors: t.labelColor } },
+    },
+    tooltip: { ...prev.tooltip, theme: t.tooltipTheme },
+    grid: { ...prev.grid, borderColor: t.gridColor },
+  }
+}
 
 // Find which portfolio an item belongs to
 function portfolioForItem(itemId) {
@@ -306,7 +342,13 @@ function debouncedRebuild() {
 }
 
 watch(() => props.portfolios, debouncedRebuild, { deep: true })
-onMounted(buildPortfolioHistory)
+onMounted(() => {
+  buildPortfolioHistory()
+  window.addEventListener('rarebox-theme', applyTheme)
+})
+onBeforeUnmount(() => {
+  window.removeEventListener('rarebox-theme', applyTheme)
+})
 </script>
 
 <style scoped>

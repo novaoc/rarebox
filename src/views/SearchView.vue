@@ -423,7 +423,7 @@ function onAdded() {
 .card-overlay {
   position: absolute;
   inset: 0;
-  background: rgba(250, 246, 239, 0.82);
+  background: color-mix(in srgb, var(--bg-card) 82%, transparent);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -438,7 +438,7 @@ function onAdded() {
 @media (hover: none) {
   .card-overlay {
     opacity: 1;
-    background: rgba(250, 246, 239, 0.6);
+    background: color-mix(in srgb, var(--bg-card) 60%, transparent);
   }
   .card-overlay .btn { font-size: 12px; padding: 6px 12px; }
 }
@@ -446,15 +446,15 @@ function onAdded() {
 .card-meta { padding: 10px; }
 .card-name { font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .card-set-info { font-size: 10px; color: var(--text-muted); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; align-items: center; gap: 4px; }
-.card-game-badge { font-size: 8px; font-weight: 800; padding: 1px 4px; border: 1px solid var(--ink); border-radius: 4px; text-transform: uppercase; letter-spacing: 0.3px; flex-shrink: 0; }
-.game-pokemon { background: var(--accent); color: var(--ink); }
-.game-mtg { background: #f8991c; color: var(--ink); }
-.game-lorcana { background: var(--pink); color: var(--ink); }
+.card-game-badge { font-size: 8px; font-weight: 800; padding: 1px 4px; border: 1px solid var(--on-accent); border-radius: 4px; text-transform: uppercase; letter-spacing: 0.3px; flex-shrink: 0; }
+.game-pokemon { background: var(--accent); color: var(--on-accent); }
+.game-mtg { background: #f8991c; color: var(--on-accent); }
+.game-lorcana { background: var(--pink); color: var(--on-accent); }
 .game-one-piece { background: var(--danger); color: #fff; }
 .game-riftbound { background: var(--info); color: #fff; }
 .game-yugioh { background: var(--danger); color: #fff; }
 .card-price-row { display: flex; align-items: center; justify-content: space-between; margin-top: 4px; }
-.card-price { font-size: 11px; font-weight: 800; color: var(--ink); background: var(--accent); border: 1.5px solid var(--ink); border-radius: 6px; padding: 1px 6px; }
+.card-price { font-size: 11px; font-weight: 800; color: var(--on-accent); background: var(--accent); border: 1.5px solid var(--on-accent); border-radius: 6px; padding: 1px 6px; }
 .card-rarity { font-size: 9px !important; padding: 1px 5px !important; }
 
 .pagination {

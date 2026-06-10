@@ -35,6 +35,10 @@
       </div>
 
       <div class="topbar-actions">
+        <button class="btn btn-ghost btn-icon theme-btn" @click="toggleTheme" :aria-label="theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'">
+          <svg v-if="theme === 'dark'" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32 1.41 1.41M2 12h2m16 0h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+          <svg v-else xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+        </button>
         <router-link to="/search" class="btn btn-primary btn-sm add-card-btn">+ Add Card</router-link>
         <router-link to="/settings" class="btn btn-ghost btn-icon settings-btn" aria-label="Settings">
           <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
@@ -92,6 +96,11 @@
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 2h10"/><path d="M5 6h14"/><rect width="18" height="12" x="3" y="10" rx="2"/></svg>
             Decks
           </router-link>
+          <button class="more-item" role="menuitem" @click="toggleTheme">
+            <svg v-if="theme === 'dark'" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32 1.41 1.41M2 12h2m16 0h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+            <svg v-else xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+            {{ theme === 'dark' ? 'Light mode' : 'Dark mode' }}
+          </button>
           <button class="more-item" role="menuitem" @click="moreOpen = false; showNewPortfolioModal = true">
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
             New Portfolio
@@ -163,12 +172,22 @@ import CardDatabaseLoader from './components/CardDatabaseLoader.vue'
 import CardLoadIndicator from './components/CardLoadIndicator.vue'
 import { isCardDatabaseReady, buildSearchIndex, saveCardDatabaseReady, getTcgPrefs } from './services/tcg/cardCache.js'
 import { preloadGames } from './services/tcg/cardPreloader.js'
+import { applyTheme, setThemePref, getThemePref, resolvedTheme } from './utils/theme.js'
 
 const store = usePortfolioStore()
 const route = useRoute()
 const router = useRouter()
 
 const moreOpen = ref(false)
+const theme = ref(resolvedTheme())
+
+function toggleTheme() {
+  // explicit user toggle overrides 'system'
+  const next = theme.value === 'dark' ? 'light' : 'dark'
+  theme.value = setThemePref(next)
+}
+window.addEventListener('rarebox-theme', e => { theme.value = e.detail })
+applyTheme()
 const cardLoadIndicator = ref(null)
 const showLoader = ref(!isCardDatabaseReady() && !getTcgPrefs())
 const showNewPortfolioModal = ref(false)
@@ -381,6 +400,7 @@ onErrorCaptured((err, instance, info) => {
 .topbar-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
 .add-card-btn { display: none; }
 .settings-btn { display: none; }
+.theme-btn { display: inline-flex; }
 
 /* ── Main content ───────────────────────────────────────────────────── */
 .main-content {

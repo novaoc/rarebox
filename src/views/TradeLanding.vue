@@ -65,8 +65,8 @@
   height: 72px;
   border-radius: 50%;
   background: var(--accent);
-  color: var(--ink);
-  border: var(--bw) solid var(--ink);
+  color: var(--on-accent);
+  border: var(--bw) solid var(--on-accent);
   box-shadow: var(--shadow-xs);
   transform: rotate(-3deg);
   display: flex;
@@ -112,8 +112,8 @@
   height: 24px;
   border-radius: 50%;
   background: var(--accent);
-  color: var(--ink);
-  border: 1.5px solid var(--ink);
+  color: var(--on-accent);
+  border: 1.5px solid var(--on-accent);
   font-size: 12px;
   font-weight: 800;
   display: flex;

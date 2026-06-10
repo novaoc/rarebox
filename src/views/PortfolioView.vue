@@ -715,7 +715,7 @@ function deletePortfolio() { store.deletePortfolio(portfolio.value.id); router.p
 .filter-tabs-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; padding: 0 16px; }
 .filter-tabs { display: flex; gap: 8px; min-width: max-content; }
 .filter-tab { background: var(--bg-card); border: 1.5px solid var(--ink); color: var(--text-secondary); padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: 700; cursor: pointer; white-space: nowrap; }
-.filter-tab.active { background: var(--accent); color: var(--ink); border-color: var(--ink); box-shadow: var(--shadow-pressed); }
+.filter-tab.active { background: var(--accent); color: var(--on-accent); border-color: var(--on-accent); box-shadow: var(--shadow-pressed); }
 .filter-count { opacity: 0.7; font-weight: 800; }
 
 .table-wrap { overflow-x: auto; }
@@ -740,16 +740,16 @@ function deletePortfolio() { store.deletePortfolio(portfolio.value.id); router.p
 .mobile-item-name { font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mobile-item-sub { font-size: 12px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mobile-item-stats { display: flex; align-items: center; gap: 6px; font-size: 12px; }
-.mobile-item-gain { margin-left: auto; padding: 1px 8px; border: 1.5px solid var(--ink); border-radius: 999px; font-weight: 800; font-size: 11px; flex-shrink: 0; }
-.gain-pos { background: var(--success); color: var(--ink); }
+.mobile-item-gain { margin-left: auto; padding: 1px 8px; border: 1.5px solid var(--on-accent); border-radius: 999px; font-weight: 800; font-size: 11px; flex-shrink: 0; }
+.gain-pos { background: var(--success); color: var(--on-accent); }
 .gain-neg { background: var(--danger); color: #fff; }
 .mobile-item-menu { width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; color: var(--text-secondary); }
 
 /* Custom Checkbox */
 .mobile-item-checkbox { width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; }
 .custom-checkbox { width: 20px; height: 20px; border: 2px solid var(--ink); border-radius: 6px; position: relative; background: var(--bg-card); }
-.custom-checkbox.checked { background: var(--accent); border-color: var(--ink); }
-.custom-checkbox.checked::after { content: '✓'; position: absolute; color: var(--ink); font-size: 12px; font-weight: 900; top: 50%; left: 50%; transform: translate(-50%, -50%); }
+.custom-checkbox.checked { background: var(--accent); border-color: var(--on-accent); }
+.custom-checkbox.checked::after { content: '✓'; position: absolute; color: var(--on-accent); font-size: 12px; font-weight: 900; top: 50%; left: 50%; transform: translate(-50%, -50%); }
 
 /* Action Dropdown */
 .action-dropdown { position: relative; }
@@ -763,7 +763,7 @@ function deletePortfolio() { store.deletePortfolio(portfolio.value.id); router.p
 .bulk-info { display: flex; align-items: center; }
 .bulk-label { font-size: 13px; font-weight: 700; }
 .bulk-actions { display: flex; gap: 8px; }
-.bulk-count { background: var(--accent); color: var(--ink); border: 1.5px solid var(--ink); padding: 2px 9px; border-radius: 10px; font-weight: 800; margin-right: 8px; }
+.bulk-count { background: var(--accent); color: var(--on-accent); border: 1.5px solid var(--on-accent); padding: 2px 9px; border-radius: 10px; font-weight: 800; margin-right: 8px; }
 
 /* Bottom Sheet */
 .bottom-sheet-overlay { position: fixed; inset: 0; background: rgba(20, 20, 20, 0.45); z-index: 100; display: flex; align-items: flex-end; }
