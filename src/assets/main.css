@@ -58,6 +58,7 @@
 
 html, body, #app {
   height: 100%;
+  overflow-x: clip;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', sans-serif;
   background: var(--bg-primary);
   color: var(--text-primary);

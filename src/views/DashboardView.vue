@@ -692,7 +692,16 @@ onMounted(async () => {
 .ld-tag-green { background: var(--success); }
 .ld-tag-pink { background: var(--pink); }
 
-.ld-marquee { border-top: var(--bw) solid var(--ink); border-bottom: var(--bw) solid var(--ink); background: var(--accent); overflow: hidden; margin: 0 calc(-1 * clamp(14px, 2.5vw, 28px)); }
+.ld-marquee {
+  border-top: var(--bw) solid var(--ink);
+  border-bottom: var(--bw) solid var(--ink);
+  background: var(--accent);
+  overflow: hidden;
+  /* full viewport bleed out of the centered container */
+  width: 100vw;
+  margin-left: calc(50% - 50vw);
+  margin-right: calc(50% - 50vw);
+}
 .ld-marquee-track { display: flex; white-space: nowrap; animation: ld-scroll 28s linear infinite; padding: 10px 0; }
 .ld-marquee-seg { font-weight: 900; font-size: 13.5px; letter-spacing: 0.06em; }
 @keyframes ld-scroll { to { transform: translateX(-50%); } }
