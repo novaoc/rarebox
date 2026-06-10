@@ -153,9 +153,10 @@
 
     <InstallPrompt />
 
-    <!-- Tour videos (replayable via info icon) -->
-    <TourModal v-if="showSetsTour" :key="tourKey" src="/videos/sets-tour.mp4" storage-key="rarebox_sets_tour_seen" />
-    <TourModal v-if="showDecksTour" :key="tourKey" src="/videos/decks-tour.mp4" storage-key="rarebox_deck_tour_seen" />
+    <!-- Tour videos (replayable via info icon; theme-matched) -->
+    <TourModal v-if="showSetsTour" :key="tourKey + theme" :src="`/videos/sets-tour-${theme}.mp4`" storage-key="rarebox_sets_tour_seen" />
+    <TourModal v-if="showDecksTour" :key="tourKey + theme" :src="`/videos/decks-tour-${theme}.mp4`" storage-key="rarebox_deck_tour_seen" />
+    <TourModal v-if="showTradeTour" :key="tourKey + theme" :src="`/videos/trade-tour-${theme}.mp4`" storage-key="rarebox_trade_tour_seen" />
 
     <!-- Background card loading indicator -->
     <CardLoadIndicator ref="cardLoadIndicator" />
@@ -195,6 +196,7 @@ const newPortfolioName = ref('')
 const newPortfolioColor = ref('#ffd23f')
 const showSetsTour = ref(false)
 const showDecksTour = ref(false)
+const showTradeTour = ref(false)
 const tourKey = ref(0)
 
 // Close the More sheet on navigation
@@ -216,6 +218,8 @@ function isTab(tab) {
 const tourPages = {
   Sets:  { storageKey: 'rarebox_sets_tour_seen',  showRef: showSetsTour },
   Decks: { storageKey: 'rarebox_deck_tour_seen',  showRef: showDecksTour },
+  TradeLanding:  { storageKey: 'rarebox_trade_tour_seen', showRef: showTradeTour },
+  TradeAnalyzer: { storageKey: 'rarebox_trade_tour_seen', showRef: showTradeTour },
 }
 
 const currentTour = computed(() => tourPages[route.name] || null)

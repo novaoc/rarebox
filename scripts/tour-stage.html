@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Rarebox tour stage</title>
+<style>
+  /* ── Tactile tokens, both themes ── */
+  :root {
+    --bg: #faf6ef; --bg2: #f3ede1; --card: #ffffff; --ink: #141414;
+    --sub: #5f5a51; --line: #e7dfd0;
+    --accent: #ffd23f; --success: #2fbf71; --danger: #e4434f; --info: #4f86f7; --pink: #ff6ba9;
+    --on: #141414; --shadow: #141414;
+  }
+  [data-theme="dark"] {
+    --bg: #16140e; --bg2: #1d1a12; --card: #211e15; --ink: #f5efe2;
+    --sub: #b5ac98; --line: #353022;
+    --accent: #e8c558; --success: #4cc285; --danger: #e07a76; --info: #8fb3f9; --pink: #ea93b7;
+    --on: #141414; --shadow: #000000;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 1280px; height: 720px; overflow: hidden; }
+  body {
+    background: var(--bg);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    color: var(--ink);
+    position: relative;
+  }
+
+  /* ── primitives ── */
+  .ease { transition: all .55s cubic-bezier(.22, 1, .36, 1); }
+  .hidden { opacity: 0; }
+  .panel {
+    background: var(--card); border: 3px solid var(--ink); border-radius: 18px;
+    box-shadow: 5px 5px 0 var(--shadow);
+  }
+  .chip {
+    display: inline-flex; align-items: center; padding: 5px 14px;
+    background: var(--accent); color: var(--on); border: 2.5px solid var(--on);
+    border-radius: 10px; font-weight: 800; font-size: 19px;
+    box-shadow: 2px 2px 0 var(--shadow);
+  }
+  .chip.green { background: var(--success); }
+  .chip.pink { background: var(--pink); }
+  .chip.blue { background: var(--info); }
+  .chip.red { background: var(--danger); }
+  .sticker { transform: rotate(-3deg); }
+  .marker-word { position: relative; white-space: nowrap; }
+  .marker-word i {
+    position: absolute; left: -6px; right: -6px; bottom: 6px; height: 38%;
+    background: var(--accent); z-index: -1; transform: scaleX(0); transform-origin: left;
+    transition: transform .5s cubic-bezier(.22, 1, .36, 1);
+  }
+  .marker-word.on i { transform: scaleX(1); }
+  [data-theme="dark"] .marker-word i { bottom: 0; height: 14%; }
+
+  /* brand */
+  .brand { position: absolute; top: 36px; left: 44px; display: flex; align-items: center; gap: 14px; z-index: 50; }
+  .rb {
+    width: 58px; height: 58px; border-radius: 15px; background: var(--accent);
+    border: 4px solid var(--on); box-shadow: 4px 4px 0 var(--shadow);
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 900; font-size: 24px; color: var(--on); transform: rotate(-6deg) scale(0);
+    transition: transform .6s cubic-bezier(.34, 1.56, .64, 1);
+  }
+  .rb.on { transform: rotate(-6deg) scale(1); }
+  .wordmark { font-size: 34px; font-weight: 900; letter-spacing: -0.03em; opacity: 0; transition: opacity .4s; }
+  .wordmark.on { opacity: 1; }
+
+  /* headline */
+  .headline {
+    position: absolute; top: 130px; left: 44px; font-size: 64px; font-weight: 900;
+    letter-spacing: -0.03em; line-height: 1.05; opacity: 0; transform: translateY(24px);
+    transition: all .6s cubic-bezier(.22, 1, .36, 1); z-index: 40; max-width: 700px;
+  }
+  .headline.on { opacity: 1; transform: translateY(0); }
+  .subline { font-size: 26px; font-weight: 600; color: var(--sub); margin-top: 14px; letter-spacing: 0; }
+
+  /* marquee */
+  .marquee {
+    position: absolute; left: 0; right: 0; bottom: 0; height: 52px; overflow: hidden;
+    background: var(--accent); border-top: 3px solid var(--ink); z-index: 60;
+    display: flex; align-items: center;
+  }
+  .marquee-track {
+    display: flex; white-space: nowrap; font-weight: 900; font-size: 19px;
+    letter-spacing: .08em; color: var(--on); animation: scroll 26s linear infinite;
+  }
+  @keyframes scroll { to { transform: translateX(-50%); } }
+
+  /* cards */
+  .tcard {
+    position: absolute; width: 218px; aspect-ratio: 63/88;
+    background: var(--card); border: 3.5px solid var(--ink); border-radius: 16px;
+    box-shadow: 5px 5px 0 var(--shadow); padding: 8px;
+    opacity: 0; transform: translateY(60px) rotate(var(--rot, 0deg)) scale(.92);
+    transition: all .65s cubic-bezier(.22, 1, .36, 1);
+  }
+  .tcard.on { opacity: 1; transform: translateY(0) rotate(var(--rot, 0deg)) scale(1); }
+  .tcard img { width: 100%; height: 100%; object-fit: contain; }
+  .tcard .tag {
+    position: absolute; bottom: -18px; left: 50%; transform: translateX(-50%) rotate(-4deg) scale(0);
+    transition: transform .45s cubic-bezier(.34, 1.56, .64, 1) .15s;
+  }
+  .tcard.on .tag { transform: translateX(-50%) rotate(-4deg) scale(1); }
+
+  /* press-compression button */
+  .pressbtn {
+    display: inline-flex; align-items: center; justify-content: center;
+    padding: 12px 26px; border-radius: 13px; border: 3px solid var(--ink);
+    background: var(--accent); color: var(--on); font-weight: 800; font-size: 22px;
+    box-shadow: 4px 4px 0 var(--shadow); transition: all .12s ease;
+  }
+  .pressbtn.pressed { box-shadow: 1px 1px 0 var(--shadow); transform: translate(3px, 3px); }
+
+  .cursor {
+    position: absolute; width: 30px; height: 30px; border-radius: 50%;
+    background: var(--ink); opacity: 0; z-index: 80;
+    border: 3px solid var(--bg); transition: all .7s cubic-bezier(.45, 0, .25, 1);
+  }
+  .cursor.on { opacity: .85; }
+  .cursor.tap { transform: scale(.72); }
+
+  .bigsticker {
+    position: absolute; padding: 16px 30px; font-size: 38px; font-weight: 900;
+    border: 4px solid var(--on); border-radius: 16px; box-shadow: 5px 5px 0 var(--shadow);
+    background: var(--success); color: var(--on); letter-spacing: -0.01em;
+    opacity: 0; transform: rotate(-3deg) scale(.6); z-index: 70;
+    transition: all .5s cubic-bezier(.34, 1.56, .64, 1);
+  }
+  .bigsticker.on { opacity: 1; transform: rotate(-3deg) scale(1); }
+  .bigsticker.red { background: var(--danger); }
+  .bigsticker.yellow { background: var(--accent); }
+
+  .endpill {
+    position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%) scale(.7);
+    background: var(--ink); color: var(--bg); padding: 22px 44px; border-radius: 18px;
+    font-size: 44px; font-weight: 900; letter-spacing: -0.02em; opacity: 0; z-index: 90;
+    box-shadow: 6px 6px 0 var(--shadow); transition: all .55s cubic-bezier(.34, 1.56, .64, 1);
+  }
+  .endpill.on { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+
+  .fade-veil {
+    position: absolute; inset: 0; background: var(--bg); opacity: 0; z-index: 85;
+    transition: opacity .5s ease; pointer-events: none;
+  }
+  .fade-veil.on { opacity: 1; }
+
+  /* scene-specific containers */
+  .stagebox { position: absolute; inset: 0; }
+  .row { display: flex; gap: 18px; align-items: center; }
+
+  .listpanel { position: absolute; padding: 26px; }
+  .listrow {
+    display: flex; align-items: center; gap: 16px; padding: 13px 6px;
+    border-bottom: 2px solid var(--line); opacity: 0; transform: translateX(34px);
+    transition: all .5s cubic-bezier(.22, 1, .36, 1);
+  }
+  .listrow.on { opacity: 1; transform: translateX(0); }
+  .listrow:last-child { border-bottom: none; }
+  .listrow img { width: 52px; height: 72px; object-fit: contain; border: 2px solid var(--ink); border-radius: 7px; background: var(--card); }
+  .listrow .nm { font-weight: 800; font-size: 21px; flex: 1; }
+  .listrow .meta { font-size: 16px; color: var(--sub); font-weight: 600; }
+
+  .bar {
+    height: 18px; border: 3px solid var(--ink); border-radius: 10px; background: var(--bg2); overflow: hidden;
+  }
+  .bar i { display: block; height: 100%; width: 0%; background: var(--success); transition: width 1.4s cubic-bezier(.22, 1, .36, 1); }
+
+  .vsdisc {
+    position: absolute; width: 92px; height: 92px; border-radius: 50%;
+    background: var(--pink); border: 4px solid var(--on); color: var(--on);
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 900; font-size: 30px; box-shadow: 4px 4px 0 var(--shadow);
+    transform: scale(0); transition: transform .55s cubic-bezier(.34, 1.56, .64, 1); z-index: 65;
+  }
+  .vsdisc.on { transform: scale(1); }
+
+  .scanline {
+    position: absolute; left: 8%; right: 8%; height: 5px; background: var(--accent);
+    border-radius: 3px; box-shadow: 0 0 0 2px var(--ink); opacity: 0; top: 12%;
+  }
+  .scanline.on { opacity: 1; animation: scan 1.6s ease-in-out infinite alternate; }
+  @keyframes scan { from { top: 10%; } to { top: 86%; } }
+  .vfcorner { position: absolute; width: 44px; height: 44px; border: 0 solid var(--accent); opacity: 0; transition: opacity .4s; }
+  .vfcorner.on { opacity: 1; }
+</style>
+</head>
+<body>
+  <div class="brand"><div class="rb" id="rb">RB</div><div class="wordmark" id="wm">rarebox</div></div>
+  <div class="headline" id="headline"></div>
+  <div class="stagebox" id="stage"></div>
+  <div class="marquee"><div class="marquee-track" id="mq"></div></div>
+  <div class="cursor" id="cursor"></div>
+  <div class="fade-veil" id="veil"></div>
+  <div class="endpill" id="endpill">rarebox.io</div>
+
+<script>
+const Q = new URLSearchParams(location.search)
+const SCENE = Q.get('scene') || 'hero'
+const THEME = Q.get('theme') || 'light'
+document.documentElement.dataset.theme = THEME
+
+const CARDS = {
+  charizard: { img: 'https://images.pokemontcg.io/base1/4.png', name: 'Charizard', sub: 'Base Set · #4', price: '$614.49' },
+  lugia: { img: 'https://images.pokemontcg.io/neo1/9.png', name: 'Lugia', sub: 'Neo Genesis · #9', price: '$1,599.98' },
+  mewtwo: { img: 'https://images.pokemontcg.io/sv10/231.png', name: "TR's Mewtwo ex", sub: 'Destined Rivals · #231', price: '$569.18' },
+  mewex: { img: 'https://images.pokemontcg.io/sv3pt5/151.png', name: 'Mew ex', sub: '151 · #151', price: '$9.60' },
+  megachar: { img: 'https://images.pokemontcg.io/me2/13.png', name: 'Mega Charizard X ex', sub: 'Phantasmal Flames · #13', price: '$4.38' },
+  luffy: { img: 'https://optcgapi.com/media/static/Card_Images/OP05-119_r2.jpg', name: 'Monkey.D.Luffy', sub: 'OP-05 · Manga', price: '$3,975.00' },
+  chocobo: { img: 'https://cards.scryfall.io/normal/front/7/1/71b97e69-f198-41ec-9385-015ec2f0160f.jpg', name: 'Traveling Chocobo', sub: 'Final Fantasy', price: '$5,950.00' },
+  bewd: { img: 'https://images.ygoprodeck.com/images/cards_small/89631139.jpg', name: 'Blue-Eyes White Dragon', sub: 'LOB', price: '$681.49' },
+}
+
+const mq = document.getElementById('mq')
+mq.innerHTML = ('POKÉMON&nbsp;&nbsp;★&nbsp;&nbsp;MAGIC&nbsp;&nbsp;★&nbsp;&nbsp;YU-GI-OH!&nbsp;&nbsp;★&nbsp;&nbsp;LORCANA&nbsp;&nbsp;★&nbsp;&nbsp;ONE&nbsp;PIECE&nbsp;&nbsp;★&nbsp;&nbsp;RIFTBOUND&nbsp;&nbsp;★&nbsp;&nbsp;').repeat(8)
+
+const $ = id => document.getElementById(id)
+const stage = $('stage')
+
+function el(html) {
+  const d = document.createElement('div')
+  d.innerHTML = html.trim()
+  const node = d.firstChild
+  stage.appendChild(node)
+  return node
+}
+function headline(html) {
+  $('headline').innerHTML = html
+  requestAnimationFrame(() => requestAnimationFrame(() => $('headline').classList.add('on')))
+}
+function markerOn() { document.querySelectorAll('.marker-word').forEach(m => m.classList.add('on')) }
+function tcard(key, x, y, rot, w) {
+  const c = CARDS[key]
+  const n = el(`<div class="tcard" style="left:${x}px;top:${y}px;--rot:${rot}deg;${w ? `width:${w}px;` : ''}">
+    <img src="${c.img}" />
+    <div class="tag chip">${c.price}</div>
+  </div>`)
+  return n
+}
+function moveCursor(x, y) { const c = $('cursor'); c.classList.add('on'); c.style.left = x + 'px'; c.style.top = y + 'px' }
+function tap(node) {
+  $('cursor').classList.add('tap')
+  if (node) node.classList.add('pressed')
+  setTimeout(() => { $('cursor').classList.remove('tap'); if (node) node.classList.remove('pressed') }, 320)
+}
+function countUp(node, target, ms, prefix = '$') {
+  const t0 = performance.now()
+  function frame(t) {
+    const k = Math.min(1, (t - t0) / ms)
+    const eased = 1 - Math.pow(1 - k, 3)
+    node.textContent = prefix + (target * eased).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    if (k < 1) requestAnimationFrame(frame)
+  }
+  requestAnimationFrame(frame)
+}
+function run(steps) {
+  for (const [t, fn] of steps) setTimeout(fn, t)
+}
+function outro(t) {
+  return [
+    [t, () => $('veil').classList.add('on')],
+    [t + 350, () => $('endpill').classList.add('on')],
+  ]
+}
+
+// ───────────────────────── scenes ─────────────────────────
+const scenes = {
+  sets() {
+    run([
+      [200, () => $('rb').classList.add('on')],
+      [600, () => $('wm').classList.add('on')],
+      [900, () => headline('Browse <span class="marker-word">every set<i></i></span>.<div class="subline">Six games. Live prices on every card.</div>')],
+      [1600, markerOn],
+      // TCG tiles
+      [2300, () => {
+        const games = [['POKÉMON', 'var(--accent)'], ['MAGIC', 'var(--danger)'], ['RIFTBOUND', 'var(--info)'], ['ONE PIECE', 'var(--pink)']]
+        games.forEach(([g, c], i) => {
+          const n = el(`<div class="panel ease hidden" style="position:absolute;left:${64 + i * 290}px;top:360px;width:262px;padding:26px 22px;font-weight:900;font-size:25px;text-align:center;transform:translateY(40px)">
+            <div style="width:46px;height:46px;border-radius:12px;border:3px solid var(--ink);background:${c};margin:0 auto 12px"></div>${g}</div>`)
+          setTimeout(() => { n.classList.remove('hidden'); n.style.transform = 'translateY(0)' }, 120 * i)
+        })
+      }],
+      // wipe tiles, show real cards with prices
+      [4800, () => { stage.querySelectorAll('.panel').forEach(n => { n.style.opacity = 0; n.style.transform = 'translateY(-30px)' }) }],
+      [5300, () => {
+        const ks = ['charizard', 'lugia', 'mewtwo', 'mewex']
+        ks.forEach((k, i) => setTimeout(() => tcard(k, 90 + i * 290, 330, (i % 2 ? 2 : -2)).classList.add('on'), i * 170))
+      }],
+      // press add
+      [7600, () => {
+        const b = el(`<div class="pressbtn" id="addbtn" style="position:absolute;left:512px;top:248px;opacity:0;transition:opacity .4s">+ Add to portfolio</div>`)
+        requestAnimationFrame(() => b.style.opacity = 1)
+      }],
+      [8300, () => moveCursor(610, 276)],
+      [9200, () => tap(document.getElementById('addbtn'))],
+      [9650, () => {
+        const s = el(`<div class="bigsticker on" style="left:472px;top:180px;opacity:0">Added ✓</div>`)
+        requestAnimationFrame(() => { s.style.opacity = 1 })
+        $('cursor').classList.remove('on')
+      }],
+      // shelf total
+      [11600, () => {
+        stage.querySelectorAll('.bigsticker, .pressbtn').forEach(n => n.style.opacity = 0)
+        const p = el(`<div class="panel" style="position:absolute;left:840px;top:120px;width:360px;padding:26px;opacity:0;transform:translateY(26px);transition:all .55s cubic-bezier(.22,1,.36,1)">
+          <div style="font-size:15px;font-weight:800;letter-spacing:.06em;color:var(--sub);text-transform:uppercase">Your shelf</div>
+          <div class="chip green sticker" id="total" style="font-size:34px;margin-top:10px;padding:10px 20px">$0.00</div>
+        </div>`)
+        requestAnimationFrame(() => { p.style.opacity = 1; p.style.transform = 'translateY(0)' })
+        setTimeout(() => countUp(document.getElementById('total'), 2793.25, 1700), 500)
+      }],
+      ...outro(15600),
+    ])
+  },
+
+  decks() {
+    run([
+      [200, () => $('rb').classList.add('on')],
+      [600, () => $('wm').classList.add('on')],
+      [900, () => headline('Build the deck.<br/>Know the <span class="marker-word">cost<i></i></span>.<div class="subline">Track what you own. Price what you need.</div>')],
+      [1700, markerOn],
+      [2600, () => {
+        el(`<div class="panel listpanel" id="deckp" style="left:700px;top:120px;width:510px;opacity:0;transform:translateY(28px);transition:all .55s cubic-bezier(.22,1,.36,1)">
+          <div style="font-weight:900;font-size:26px;margin-bottom:6px">Charizard ex deck</div>
+          <div id="rows"></div>
+          <div style="display:flex;align-items:center;gap:14px;margin-top:18px">
+            <div class="bar" style="flex:1"><i id="fill"></i></div>
+            <div class="chip" id="cost" style="font-size:21px">$0.00</div>
+          </div>
+        </div>`)
+        const p = document.getElementById('deckp')
+        requestAnimationFrame(() => { p.style.opacity = 1; p.style.transform = 'translateY(0)' })
+      }],
+      [3400, () => {
+        const rows = [
+          ['megachar', '2×', 'Owned', 'green'],
+          ['charizard', '1×', 'Need', ''],
+          ['mewex', '3×', 'Owned', 'green'],
+          ['bewd', '1×', 'Need', ''],
+        ]
+        rows.forEach(([k, qty, st, cls], i) => {
+          const c = CARDS[k]
+          setTimeout(() => {
+            const r = document.createElement('div')
+            r.className = 'listrow'
+            r.innerHTML = `<img src="${c.img}"/><div class="nm">${c.name}<div class="meta">${c.sub}</div></div>
+              <div class="meta" style="font-weight:800">${qty}</div><div class="chip ${cls}" style="font-size:15px;padding:3px 11px">${st}</div>`
+            document.getElementById('rows').appendChild(r)
+            requestAnimationFrame(() => requestAnimationFrame(() => r.classList.add('on')))
+          }, i * 480)
+        })
+      }],
+      [5900, () => { document.getElementById('fill').style.width = '64%'; countUp(document.getElementById('cost'), 1305.47, 1500) }],
+      [8200, () => {
+        const left = el(`<div style="position:absolute;left:64px;top:360px;max-width:520px;opacity:0;transform:translateY(22px);transition:all .55s cubic-bezier(.22,1,.36,1)">
+          <div style="font-size:38px;font-weight:900;letter-spacing:-0.02em">Import the meta<br/>in one tap.</div>
+          <div class="pressbtn" id="metabtn" style="margin-top:22px">Add to My Decks</div>
+        </div>`)
+        requestAnimationFrame(() => { left.style.opacity = 1; left.style.transform = 'translateY(0)' })
+      }],
+      [9300, () => moveCursor(210, 540)],
+      [10200, () => tap(document.getElementById('metabtn'))],
+      [10650, () => {
+        const s = el(`<div class="bigsticker on" style="left:96px;top:600px;opacity:0;font-size:28px">Deck imported ✓</div>`)
+        requestAnimationFrame(() => s.style.opacity = 1)
+        $('cursor').classList.remove('on')
+      }],
+      ...outro(13800),
+    ])
+  },
+
+  trade() {
+    run([
+      [200, () => $('rb').classList.add('on')],
+      [600, () => $('wm').classList.add('on')],
+      [900, () => headline('Trade with <span class="marker-word">receipts<i></i></span>.<div class="subline">Both sides on the table — who wins, in dollars.</div>')],
+      [1700, markerOn],
+      // side panels + VS
+      [2600, () => {
+        ;['Side A — You', 'Side B — Them'].forEach((t, i) => {
+          const p = el(`<div class="panel" id="side${i}" style="position:absolute;${i ? 'right' : 'left'}:64px;top:300px;width:480px;height:330px;padding:22px;opacity:0;transform:translateX(${i ? 60 : -60}px);transition:all .6s cubic-bezier(.22,1,.36,1)">
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <div class="chip ${i ? 'blue' : ''}" style="font-size:16px">${t}</div>
+              <div style="font-weight:900;font-size:27px;font-family:ui-monospace,monospace" id="tot${i}">$0.00</div>
+            </div>
+          </div>`)
+          requestAnimationFrame(() => { p.style.opacity = 1; p.style.transform = 'translateX(0)' })
+        })
+        setTimeout(() => el(`<div class="vsdisc" style="left:594px;top:430px">VS</div>`).classList.add('on'), 450)
+      }],
+      // cards drop in
+      [4100, () => {
+        tcard('charizard', 120, 386, -3, 170).classList.add('on')
+        setTimeout(() => countUp(document.getElementById('tot0'), 614.49, 800), 350
+      )}],
+      [5100, () => {
+        tcard('luffy', 980, 386, 3, 170).classList.add('on')
+        setTimeout(() => countUp(document.getElementById('tot1'), 3975.00, 800), 350)
+      }],
+      [6500, () => {
+        const s = el(`<div class="bigsticker red on" id="verdict" style="left:472px;top:196px;opacity:0;transform:rotate(-2deg) scale(.6)">You're losing −$3,360.51</div>`)
+        requestAnimationFrame(() => { s.style.opacity = 1; s.style.transform = 'rotate(-2deg) scale(1)' })
+      }],
+      // add chocobo to side A, verdict flips
+      [9000, () => { tcard('chocobo', 300, 386, 4, 170).classList.add('on'); setTimeout(() => countUp(document.getElementById('tot0'), 6564.49, 900), 350) }],
+      [10500, () => {
+        const v = document.getElementById('verdict')
+        v.style.opacity = 0
+        setTimeout(() => {
+          const s = el(`<div class="bigsticker on" style="left:452px;top:196px;opacity:0;transform:rotate(2deg) scale(.6)">You're winning +$2,589.49</div>`)
+          requestAnimationFrame(() => { s.style.opacity = 1; s.style.transform = 'rotate(2deg) scale(1)' })
+        }, 280)
+      }],
+      // scan beat
+      [13200, () => {
+        $('veil').classList.add('on')
+        setTimeout(() => {
+          $('veil').classList.remove('on')
+          stage.innerHTML = ''
+          headlineReset()
+          headline('Scan it. <span class="marker-word">One second<i></i></span>.')
+          setTimeout(markerOn, 600)
+          const c = tcard('megachar', 840, 240, 0, 250)
+          c.classList.add('on')
+          const corners = [[810, 210, 'border-top-width:6px;border-left-width:6px'], [1108, 210, 'border-top-width:6px;border-right-width:6px'], [810, 600, 'border-bottom-width:6px;border-left-width:6px'], [1108, 600, 'border-bottom-width:6px;border-right-width:6px']]
+          corners.forEach(([x, y, b]) => el(`<div class="vfcorner on" style="left:${x}px;top:${y}px;${b}"></div>`))
+          el(`<div class="scanline on" style="left:830px;right:auto;width:270px"></div>`)
+          setTimeout(() => {
+            const id = el(`<div class="chip green sticker" style="position:absolute;left:64px;top:380px;font-size:30px;padding:12px 22px;opacity:0;transition:opacity .4s">Mega Charizard X ex · $4.38 ✓</div>`)
+            requestAnimationFrame(() => id.style.opacity = 1)
+          }, 2300)
+        }, 600)
+      }],
+      ...outro(18600),
+    ])
+  },
+
+  hero() {
+    run([
+      [200, () => $('rb').classList.add('on')],
+      [550, () => $('wm').classList.add('on')],
+      [800, () => headline('Collect. Track.<br/><span class="marker-word">Trade.<i></i></span> Win.<div class="subline">Live prices for six TCGs — your whole binder, one shelf.</div>')],
+      [1500, markerOn],
+      [1900, () => {
+        ;[['FREE', ''], ['6 TCGS', 'blue'], ['NO ACCOUNT', 'pink']].forEach(([t, cls], i) => {
+          const c = el(`<div class="chip ${cls} sticker" style="position:absolute;left:${64 + i * 170}px;top:420px;opacity:0;transform:rotate(-3deg) scale(.5);transition:all .45s cubic-bezier(.34,1.56,.64,1)">${t}</div>`)
+          setTimeout(() => { c.style.opacity = 1; c.style.transform = 'rotate(-3deg) scale(1)' }, i * 160)
+        })
+      }],
+      [2300, () => {
+        const ks = [['lugia', 760, 150, -7], ['luffy', 1010, 170, 8], ['megachar', 880, 120, 2]]
+        ks.forEach(([k, x, y, r], i) => setTimeout(() => {
+          const c = tcard(k, x, y, r, 226)
+          c.classList.add('on')
+          c.style.animation = `bob ${5 + i}s ease-in-out ${i * .6}s infinite alternate`
+        }, i * 240))
+        const st = document.createElement('style')
+        st.textContent = '@keyframes bob { from { margin-top: 0 } to { margin-top: -14px } }'
+        document.head.appendChild(st)
+      }],
+      [3600, () => {
+        const p = el(`<div class="panel" style="position:absolute;left:64px;top:500px;padding:18px 24px;display:flex;align-items:center;gap:18px;opacity:0;transition:opacity .5s">
+          <div style="font-size:15px;font-weight:800;letter-spacing:.06em;color:var(--sub);text-transform:uppercase">Your shelf</div>
+          <div class="chip green sticker" id="heroTotal" style="font-size:30px;padding:9px 18px">$0.00</div>
+        </div>`)
+        requestAnimationFrame(() => p.style.opacity = 1)
+        setTimeout(() => countUp(document.getElementById('heroTotal'), 12847.32, 2000), 400)
+      }],
+      // loop point: gentle fade to restart state (recorder trims)
+      [9400, () => $('veil').classList.add('on')],
+      [9950, () => location.reload()],
+    ])
+  },
+}
+
+function headlineReset() {
+  const h = $('headline')
+  h.classList.remove('on')
+  h.innerHTML = ''
+  requestAnimationFrame(() => {})
+}
+
+scenes[SCENE]()
+</script>
+</body>
+</html>

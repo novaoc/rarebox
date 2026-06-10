@@ -1,5 +1,8 @@
 <p align="center">
-  <img src="assets/rarebox-intro.gif" alt="Rarebox — Multi-TCG Portfolio Tracker" width="640">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/rarebox-intro-dark.gif">
+    <img src="assets/rarebox-intro-light.gif" alt="Rarebox — Collect. Track. Trade. Win." width="640">
+  </picture>
 </p>
 
 # Rarebox
@@ -138,10 +141,10 @@ Built by [Nova](https://github.com/novaoc).
 - Anonymous, cookieless page-view analytics via Vercel Web Analytics — no personal data, no cross-site tracking; portfolio contents never leave the device
 
 ### Feature Tour Videos
-- In-app tutorial videos for Browse Sets and Decks pages
+- In-app tutorial videos for Browse Sets, Decks, and Trade Analyzer — Tactile-branded motion graphics with real cards and live-style prices, in light and dark variants matched to your theme
 - Auto-play once on first visit
 - Replay anytime via ⓘ info icon next to the page title
-- Built with Manim Community Edition, rendered at 1080p60
+- Authored as a Tactile animation stage (scripts/tour-stage.html) and recorded headless — regenerate with scripts/record-tours (Playwright + ffmpeg)
 
 ## Performance
 
