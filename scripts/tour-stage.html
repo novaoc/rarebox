@@ -283,7 +283,7 @@ const scenes = {
       // wipe tiles, show real cards with prices
       [4800, () => { stage.querySelectorAll('.panel').forEach(n => { n.style.opacity = 0; n.style.transform = 'translateY(-30px)' }) }],
       [5300, () => {
-        const ks = ['charizard', 'lugia', 'mewtwo', 'mewex']
+        const ks = ['charizard', 'bewd', 'luffy', 'chocobo'] // one per TCG — it's the multi-game hub
         ks.forEach((k, i) => setTimeout(() => tcard(k, 90 + i * 290, 330, (i % 2 ? 2 : -2)).classList.add('on'), i * 170))
       }],
       // press add
@@ -306,7 +306,7 @@ const scenes = {
           <div class="chip green sticker" id="total" style="font-size:34px;margin-top:10px;padding:10px 20px">$0.00</div>
         </div>`)
         requestAnimationFrame(() => { p.style.opacity = 1; p.style.transform = 'translateY(0)' })
-        setTimeout(() => countUp(document.getElementById('total'), 2793.25, 1700), 500)
+        setTimeout(() => countUp(document.getElementById('total'), 11220.98, 1700), 500)
       }],
       ...outro(15600),
     ])
