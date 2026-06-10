@@ -65,6 +65,12 @@
    accent fills (always with dark text on them), and true-black hard
    shadows — light shadows read as glows, which Tactile never does. */
 :root[data-theme="dark"] {
+  /* the daylight yellow reads neon on coal — dark gets a muted gold */
+  --accent: #d9a92f;
+  --accent-hover: #e6b73d;
+  --pink: #e2649b;
+  --purple: #e2649b;
+  --success: #2fb56d;
   --bg-primary: #16140e;
   --bg-secondary: #1d1a12;
   --bg-card: #211e15;
@@ -78,7 +84,7 @@
   --text-secondary: #b5ac98;
   --text-muted: #7d7565;
 
-  --accent-dim: rgba(255, 210, 63, 0.14);
+  --accent-dim: rgba(217, 169, 47, 0.15);
   --success-dim: rgba(47, 191, 113, 0.16);
   --danger-dim: rgba(228, 67, 79, 0.18);
   --info-dim: rgba(79, 134, 247, 0.18);
@@ -90,7 +96,7 @@
   --shadow-pressed: 1px 1px 0 #000;
 
   --success-text: #4cd58a;
-  --accent-text: #ffd23f;
+  --accent-text: #e6b73d;
   --scroll-thumb: #44402f;
   color-scheme: dark;
 }
