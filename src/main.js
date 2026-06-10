@@ -31,3 +31,13 @@ app.mount('#app')
 window.addEventListener('unhandledrejection', (e) => {
   console.error('[unhandled rejection]', e.reason)
 })
+
+// Offline support: the service worker precaches the app shell so the site
+// opens without a connection (collection data already lives in IndexedDB).
+if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch((err) => {
+      console.warn('[sw] registration failed', err)
+    })
+  })
+}

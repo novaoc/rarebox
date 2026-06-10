@@ -155,6 +155,13 @@
     <InstallPrompt />
 
     <!-- Tour videos (replayable via info icon; theme-matched) -->
+    <transition name="fade">
+      <div v-if="!online" class="offline-chip" role="status">
+        <span class="offline-dot" aria-hidden="true"></span>
+        Offline — your shelf still works. Live prices &amp; new searches need a connection.
+      </div>
+    </transition>
+
     <TourModal v-if="showSetsTour" :key="tourKey + theme" :src="`/videos/sets-tour-${theme}.mp4`" storage-key="rarebox_sets_tour_seen" />
     <TourModal v-if="showDecksTour" :key="tourKey + theme" :src="`/videos/decks-tour-${theme}.mp4`" storage-key="rarebox_deck_tour_seen" />
     <TourModal v-if="showTradeTour" :key="tourKey + theme" :src="`/videos/trade-tour-${theme}.mp4`" storage-key="rarebox_trade_tour_seen" />
@@ -190,6 +197,12 @@ function toggleTheme() {
 }
 window.addEventListener('rarebox-theme', e => { theme.value = e.detail })
 applyTheme()
+
+// Offline awareness — shelf/decks work offline; live prices and new
+// card searches don't, so say so instead of failing silently.
+const online = ref(navigator.onLine)
+window.addEventListener('online', () => { online.value = true })
+window.addEventListener('offline', () => { online.value = false })
 const cardLoadIndicator = ref(null)
 const showLoader = ref(!isCardDatabaseReady() && !getTcgPrefs())
 const showNewPortfolioModal = ref(false)
@@ -414,6 +427,32 @@ onErrorCaptured((err, instance, info) => {
 
 .topbar-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
 .tour-info-desktop { display: none; } /* mobile uses the one in .topbar-page */
+
+/* ── Offline chip ───────────────────────────────────────────────────── */
+.offline-chip {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: calc(var(--tabbar-height) + env(safe-area-inset-bottom) + 12px);
+  z-index: 300;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: calc(100vw - 32px);
+  padding: 9px 16px;
+  background: var(--ink);
+  color: var(--bg-primary);
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+.offline-dot {
+  width: 9px; height: 9px;
+  border-radius: 50%;
+  background: var(--danger);
+  flex-shrink: 0;
+}
 .add-card-btn { display: none; }
 .settings-btn { display: none; }
 .theme-btn { display: inline-flex; }
@@ -557,6 +596,7 @@ onErrorCaptured((err, instance, info) => {
   .topnav { display: flex; }
   .topbar-page { display: none; }
   .tour-info-desktop { display: inline-flex; align-items: center; justify-content: center; }
+  .offline-chip { bottom: 20px; }
   .add-card-btn { display: inline-flex; }
   .settings-btn { display: inline-flex; }
   .tabbar { display: none; }
