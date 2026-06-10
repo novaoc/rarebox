@@ -25,6 +25,11 @@
           </div>
           <p v-else class="share-hint">Scannable with any phone camera — it's just a link.</p>
 
+          <button class="btn btn-secondary btn-sm share-poster-btn" :disabled="posterBusy" @click="downloadPoster">
+            {{ posterBusy ? 'Building poster…' : '🖼 Download as picture' }}
+          </button>
+          <p v-if="posterError" class="share-short-note share-short-error">{{ posterError }}</p>
+
           <div class="share-link-row">
             <input class="input share-link-input" :value="shareUrl" readonly @click="$event.target.select()" />
             <button class="btn btn-primary btn-sm" @click="copyLink">{{ copied ? '✓' : 'Copy link' }}</button>
@@ -74,6 +79,8 @@ const shortUrl = ref('')
 const shortening = ref(false)
 const shortenError = ref('')
 const copiedShort = ref(false)
+const posterBusy = ref(false)
+const posterError = ref('')
 const frameCount = ref(0)
 const currentFrame = ref(0)
 const total = boothTotal(props.booth)
@@ -144,6 +151,130 @@ async function shorten() {
   }
 }
 
+/**
+ * Downloadable QR poster — Tactile-branded (cream paper, RB sticker,
+ * booth-name chip, QR on a white mat with a hard shadow, games band).
+ * 1080×1350 (4:5) so it posts clean on socials and prints fine.
+ * Big booths can't fit a camera-scannable QR, so the poster falls back
+ * to the TinyURL short link (shortened on demand).
+ */
+async function downloadPoster() {
+  posterBusy.value = true
+  posterError.value = ''
+  try {
+    let url = shareUrl.value
+    if (url.length > SINGLE_QR_LIMIT) {
+      if (!shortUrl.value) await shorten()
+      if (!shortUrl.value) throw new Error('shorten-failed')
+      url = shortUrl.value
+    }
+
+    const qr = document.createElement('canvas')
+    await QRCode.toCanvas(qr, url, {
+      width: 520, margin: 0,
+      color: { dark: '#141414', light: '#ffffff' },
+      errorCorrectionLevel: 'M',
+    })
+
+    const W = 1080, H = 1350
+    const canvas = document.createElement('canvas')
+    canvas.width = W; canvas.height = H
+    const ctx = canvas.getContext('2d')
+    const FONT = '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
+    const INK = '#141414', CREAM = '#faf6ef', YELLOW = '#ffd23f'
+
+    ctx.fillStyle = CREAM
+    ctx.fillRect(0, 0, W, H)
+
+    // header: RB sticker + wordmark
+    ctx.save()
+    ctx.translate(120, 120)
+    ctx.rotate(-6 * Math.PI / 180)
+    ctx.fillStyle = INK
+    ctx.beginPath(); ctx.roundRect(-36, -36, 84, 84, 20); ctx.fill() // hard shadow
+    ctx.fillStyle = YELLOW
+    ctx.beginPath(); ctx.roundRect(-44, -44, 84, 84, 20); ctx.fill()
+    ctx.lineWidth = 6; ctx.strokeStyle = INK; ctx.stroke()
+    ctx.fillStyle = INK
+    ctx.font = `900 34px ${FONT}`
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
+    ctx.fillText('RB', -2, 0)
+    ctx.restore()
+    ctx.fillStyle = INK
+    ctx.font = `900 64px ${FONT}`
+    ctx.textAlign = 'left'; ctx.textBaseline = 'middle'
+    ctx.fillText('rarebox', 188, 118)
+
+    // booth name chip (rotated sticker)
+    const name = (props.booth.name || 'Card booth').slice(0, 34)
+    ctx.font = `900 50px ${FONT}`
+    const nameW = ctx.measureText(name).width + 72
+    ctx.save()
+    ctx.translate(W / 2, 268)
+    ctx.rotate(-2 * Math.PI / 180)
+    ctx.fillStyle = INK
+    ctx.beginPath(); ctx.roundRect(-nameW / 2 + 7, -45 + 7, nameW, 90, 18); ctx.fill()
+    ctx.fillStyle = YELLOW
+    ctx.beginPath(); ctx.roundRect(-nameW / 2, -45, nameW, 90, 18); ctx.fill()
+    ctx.lineWidth = 5; ctx.strokeStyle = INK; ctx.stroke()
+    ctx.fillStyle = INK
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
+    ctx.fillText(name, 0, 2)
+    ctx.restore()
+
+    // venue / date
+    const meta = [props.booth.venue, props.booth.date].filter(Boolean).join('  ·  ')
+    if (meta) {
+      ctx.fillStyle = '#5f5a51'
+      ctx.font = `700 34px ${FONT}`
+      ctx.textAlign = 'center'
+      ctx.fillText(meta.slice(0, 52), W / 2, 358)
+    }
+
+    // QR on a white mat with hard shadow
+    const matSize = 600, matX = (W - matSize) / 2, matY = 410
+    ctx.fillStyle = INK
+    ctx.beginPath(); ctx.roundRect(matX + 14, matY + 14, matSize, matSize, 28); ctx.fill()
+    ctx.fillStyle = '#ffffff'
+    ctx.beginPath(); ctx.roundRect(matX, matY, matSize, matSize, 28); ctx.fill()
+    ctx.lineWidth = 6; ctx.strokeStyle = INK; ctx.stroke()
+    ctx.drawImage(qr, matX + 40, matY + 40, 520, 520)
+
+    // scan hint + table line
+    ctx.fillStyle = '#5f5a51'
+    ctx.font = `700 32px ${FONT}`
+    ctx.textAlign = 'center'
+    ctx.fillText('Scan to browse this booth', W / 2, matY + matSize + 68)
+    const count = props.booth.items?.length || 0
+    ctx.fillStyle = INK
+    ctx.font = `900 42px ${FONT}`
+    ctx.fillText(`${count} listing${count !== 1 ? 's' : ''}  ·  ${fmtMoney(total)} full table`, W / 2, matY + matSize + 128)
+
+    // marketing line + games band
+    ctx.font = `900 40px ${FONT}`
+    ctx.fillText('Collect. Track. Trade. Win.', W / 2, H - 138)
+    ctx.fillStyle = YELLOW
+    ctx.fillRect(0, H - 78, W, 78)
+    ctx.fillStyle = INK
+    ctx.fillRect(0, H - 84, W, 6)
+    ctx.font = `900 26px ${FONT}`
+    ctx.fillText('POKÉMON  ★  MAGIC  ★  YU-GI-OH!  ★  ONE PIECE  ★  LORCANA  ★  RIFTBOUND', W / 2, H - 38)
+
+    const blob = await new Promise(res => canvas.toBlob(res, 'image/png'))
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(blob)
+    a.download = `${(props.booth.name || 'booth').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}-qr.png`
+    a.click()
+    setTimeout(() => URL.revokeObjectURL(a.href), 5000)
+  } catch {
+    posterError.value = navigator.onLine
+      ? "Couldn't build the poster — big booths need a short link first."
+      : 'Big booths need a connection once to build a poster (short link).'
+  } finally {
+    posterBusy.value = false
+  }
+}
+
 async function copyShort() {
   try {
     await navigator.clipboard.writeText(shortUrl.value)
@@ -179,6 +310,7 @@ onBeforeUnmount(() => { if (frameTimer) clearInterval(frameTimer) })
 .share-link-row { display: flex; gap: 8px; margin-bottom: 10px; }
 .share-link-short { font-size: 13px; font-weight: 700; }
 .share-shorten-btn { width: 100%; margin-bottom: 10px; }
+.share-poster-btn { display: block; margin: 0 auto 12px; }
 .share-short-note { font-size: 11.5px; color: var(--text-muted); text-align: center; margin-bottom: 10px; line-height: 1.4; }
 .share-short-error { color: var(--danger); font-weight: 600; }
 .share-link-input { flex: 1; font-family: monospace; font-size: 11px; }
