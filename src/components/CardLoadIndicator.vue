@@ -135,7 +135,14 @@ function handlePillClick() {
   expanded.value = !expanded.value
 }
 
+// The Settings toggle ("hide loading progress") is the law — when set,
+// the pill never appears, including background refreshes and price passes.
+function hiddenByPref() {
+  try { return localStorage.getItem('hide_load_indicator') === 'true' } catch { return false }
+}
+
 function start(games) {
+  if (hiddenByPref()) { visible.value = false; return }
   visible.value = true
   dismissed.value = false
   expanded.value = true
@@ -166,6 +173,7 @@ function onProgress({ game, phase, loaded, total }) {
 }
 
 function finish() {
+  if (hiddenByPref() || !visible.value) { visible.value = false; return }
   isDone.value = true
   expanded.value = true
   // Reset dismissed state on finish so they see the final checkmark
