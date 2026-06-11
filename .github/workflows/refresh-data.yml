@@ -1,6 +1,7 @@
 # Daily refresh of the static data assets the local-only app ships with:
 #   public/riftbound-prices.json — Riftbound TCGplayer prices (tcgcsv)
 #   public/jp-prices.json        — Japanese Pokémon TCGplayer prices (tcgcsv)
+#   public/sealed-index/*.json   — sealed products per game w/ UPC + price (tcgcsv)
 #   public/meta-decks/*.json     — scraped meta decks per game
 # tcgcsv updates once a day around 20:00 UTC; we pull an hour after, with a
 # 23:00 retry in case tcgcsv ran late (the scripts' last-updated stamp check
@@ -29,7 +30,9 @@ jobs:
     # a fork, change this guard AND the User-Agent in scripts/build_*_prices.py.
     if: github.repository == 'novaoc/rarebox'
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # The sealed index walks every group of every category (~1900 groups,
+    # rate-limited to tcgcsv's 10 req/s) — most of the budget is that walk.
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v5
 
@@ -42,13 +45,16 @@ jobs:
       - name: Japanese Pokémon prices
         run: python3 scripts/build_jp_prices.py
 
+      - name: Sealed product index
+        run: python3 scripts/build_sealed_index.py
+
       - name: Meta decks
         run: python3 scripts/build_meta_decks.py
         continue-on-error: true # scrapers depend on third-party HTML; stale decks beat no deploy
 
       - name: Commit if changed
         run: |
-          git add public/riftbound-prices.json public/jp-prices.json public/meta-decks
+          git add public/riftbound-prices.json public/jp-prices.json public/sealed-index public/meta-decks
           if git diff --cached --quiet; then
             echo "no data changes"
             exit 0
