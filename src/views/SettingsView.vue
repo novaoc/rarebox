@@ -465,7 +465,13 @@ const oiSelectedBytes = computed(() => oiGames.value.filter(g => g.selected).red
 async function startOfflineImages() {
   const games = oiGames.value.filter(g => g.selected).map(g => g.game)
   if (!games.length) return
-  downloadOfflineImages(games).then(refreshOfflineImages)
+  downloadOfflineImages(games).then(async () => {
+    await refreshOfflineImages()
+    // Finished (not paused): point straight at the next step
+    if (oiState.total > 0 && oiState.done >= oiState.total) {
+      oiTransferMsg.value = `✓ Pack complete — ${oiCached.value.toLocaleString()} images stored. Export below to move them to your phone or tablet.`
+    }
+  })
 }
 const oiBusy = ref('')
 const oiTransferMsg = ref('')
