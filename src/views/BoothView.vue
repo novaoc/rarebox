@@ -54,14 +54,22 @@
         <button class="btn btn-ghost btn-icon" aria-label="Dismiss" @click="dismissInvite">✕</button>
       </div>
 
-      <div class="shop-head card">
+      <div class="shop-head card" :style="viewBrand?.color ? { borderTopWidth: '7px', borderTopColor: viewBrand.color } : null">
         <div class="shop-head-main">
+          <div v-if="viewBrand" class="shop-brand">
+            <img v-if="viewBrand.logo" :src="viewBrand.logo" class="shop-brand-logo" alt="" @error="$event.target.style.display='none'" />
+            <span v-else class="shop-brand-mark" :style="{ background: viewBrand.color || 'var(--accent)', color: brandMarkText }">{{ viewBrand.mark || '◆' }}</span>
+          </div>
           <span class="sticker">{{ viewing.booth.name }}</span>
           <div class="shop-meta">
             <span v-if="viewing.booth.venue">📍 {{ viewing.booth.venue }}</span>
             <span v-if="viewing.booth.table">🪧 Table {{ viewing.booth.table }}</span>
             <span v-if="viewing.booth.date">🗓 {{ fmtBoothDate(viewing.booth.date) }}</span>
+            <span v-if="snapshotAge" class="shop-age" :class="{ stale: snapshotAge.stale }">⏱ snapshot {{ snapshotAge.label }}</span>
           </div>
+          <p v-if="snapshotAge?.stale" class="shop-stale-note">
+            Shared a while back — inventory at a table turns over fast. If you're at the show, re-scan the booth's live QR for the current list.
+          </p>
           <p v-if="viewing.booth.note" class="shop-note">{{ viewing.booth.note }}</p>
           <a v-if="viewing.booth.loc" class="btn btn-secondary btn-sm shop-directions" :href="directionsUrl(viewing.booth.loc, viewing.booth.locName || viewing.booth.name)" target="_blank" rel="noopener">
             🧭 Get directions{{ viewing.booth.locName ? ` — ${viewing.booth.locName}` : '' }}
@@ -80,6 +88,11 @@
         <button class="btn btn-secondary" :disabled="comparing" @click="compareMarket">
           {{ comparing ? `Checking prices ${compareDone}/${compareTotal}…` : '📊 Compare to market' }}
         </button>
+        <select v-if="viewing.booth.items.length > 3" v-model="shopSortMode" class="select shop-sort-mode" aria-label="Sort listings">
+          <option value="listed">Seller's order</option>
+          <option value="cheap">Price: low → high</option>
+          <option value="dear">Price: high → low</option>
+        </select>
         <button class="btn btn-secondary" @click="closeViewer">Back to Booth</button>
       </div>
       <p v-if="viewing.market" class="shop-compare-note">
@@ -87,8 +100,21 @@
         asking {{ fmtMoney(viewing.market.askTotal) }} vs market {{ fmtMoney(viewing.market.marketTotal) }}.
       </p>
 
+      <div v-if="viewMatches" class="shop-wants card">
+        <span class="shop-wants-mark" aria-hidden="true">🎯</span>
+        <span class="shop-wants-text">
+          <strong>{{ viewMatches.hits.length }} listing{{ viewMatches.hits.length !== 1 ? 's' : '' }}</strong>
+          here match{{ viewMatches.hits.length === 1 ? 'es' : '' }} your wantlist.
+        </span>
+        <button class="btn btn-sm" :class="matchesOnly ? 'btn-primary' : 'btn-secondary'" @click="matchesOnly = !matchesOnly">
+          {{ matchesOnly ? 'Show everything' : 'Show matches only' }}
+        </button>
+      </div>
+
       <div class="shop-grid">
-        <div v-for="(it, i) in viewing.booth.items" :key="i" class="shop-item card-sm card">
+        <div v-for="{ it, i } in displayItems" :key="i" v-show="!matchesOnly || viewMatches?.idx.has(i)"
+             class="shop-item card-sm card" :class="{ 'shop-item-want': viewMatches?.idx.has(i) }">
+          <span v-if="viewMatches?.idx.has(i)" class="shop-want-tag">ON YOUR LIST</span>
           <div class="shop-item-img">
             <img v-if="it.img" :src="it.img" :alt="it.name" loading="lazy" @error="$event.target.style.display='none'" />
             <span v-else class="shop-item-noimg" aria-hidden="true">🃏</span>
@@ -138,12 +164,15 @@
             </div>
             <div class="booth-card-actions">
               <router-link :to="`/booth/${b.id}`" class="btn btn-secondary btn-sm">Edit</router-link>
+              <router-link v-if="b.items.length" :to="`/booth/${b.id}/table`" class="btn btn-secondary btn-sm">🔥 Table</router-link>
               <button class="btn btn-primary btn-sm" :disabled="!b.items.length" @click="shareBooth = b">Share</button>
               <button class="btn btn-ghost btn-sm" @click="deleteBooth(b.id)">Delete</button>
             </div>
           </div>
         </div>
       </section>
+
+      <WantlistPanel @changed="onWantsChanged" />
 
       <section class="booth-section">
         <div class="booth-section-head">
@@ -167,6 +196,11 @@
 
         <div v-if="savedShops.length" class="booth-tools">
           <input v-model="shopFilter" class="input booth-filter" placeholder="🔍 Find a card across every saved shop…" />
+          <select v-model="filterGame" class="select booth-game" aria-label="Filter by game">
+            <option value="all">All games</option>
+            <option v-for="(label, g) in GAME_LABELS" :key="g" :value="g">{{ label }}</option>
+          </select>
+          <input v-model.number="filterMax" type="number" min="0" class="input booth-max" placeholder="Max $" aria-label="Max price" />
           <select v-model="shopSort" class="select booth-sort" aria-label="Sort saved shops">
             <option value="newest">Newest first</option>
             <option value="cheap">Total: low → high</option>
@@ -180,7 +214,7 @@
         </div>
 
         <!-- Cross-shop card search results -->
-        <template v-if="shopFilter.trim()">
+        <template v-if="filterActive">
           <p class="booth-filter-note">
             {{ filterHits.reduce((s, h) => s + h.items.length, 0) }} match{{ filterHits.reduce((s, h) => s + h.items.length, 0) !== 1 ? 'es' : '' }}
             across {{ filterHits.length }} shop{{ filterHits.length !== 1 ? 's' : '' }}
@@ -218,6 +252,7 @@
             <div class="booth-card-sub">
               Saved {{ fmtDate(s.savedAt) }}
               <span v-if="shopVerdict(s)" class="badge booth-card-verdict" :class="`badge-${shopVerdict(s).cls}`">{{ shopVerdict(s).label }}</span>
+              <span v-if="shopMatches.get(s.id)" class="badge badge-accent booth-card-verdict">🎯 {{ shopMatches.get(s.id).count }} want{{ shopMatches.get(s.id).count !== 1 ? 's' : '' }} here</span>
             </div>
             <div class="booth-card-actions">
               <button class="btn btn-primary btn-sm" @click="openSaved(s)">Open</button>
@@ -234,17 +269,19 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import jsQR from 'jsqr'
 import BoothShareModal from '../components/BoothShareModal.vue'
 import BoothShareListModal from '../components/BoothShareListModal.vue'
+import WantlistPanel from '../components/WantlistPanel.vue'
 import {
   loadBooths, saveBooths, loadSavedShops, saveSavedShops,
   boothFromLocation, directoryFromLocation, boothFromDirectoryRef, dagdResolve,
   decodeBoothBytes, decodeDirectoryBytes, boothTotal, generateBoothId,
   directionsUrl, fmtBoothDate,
 } from '../utils/booth'
+import { loadWantlist, matchBooth, matchShops } from '../utils/wantlist'
 import { compareBoothToMarket, marketVerdict } from '../utils/boothMarket'
 import { FrameCollector, isFrame } from '../utils/qrTransfer'
 
@@ -255,6 +292,39 @@ const shareBooth = ref(null)
 const shareListOpen = ref(false)
 const viewing = ref(null) // { booth, saved, savedId?, market? }
 const dirViewing = ref(null) // { title, entries: [{name, venue, count, total, ref, status}] }
+
+// ── Wantlist matching ──
+// Reloaded whenever a booth opens — the panel only exists on the hub, so a
+// want added there must still light up a booth opened later in the session.
+const wants = ref(loadWantlist())
+const matchesOnly = ref(false)
+
+function onWantsChanged(list) {
+  wants.value = [...list]
+}
+
+const viewMatches = computed(() => {
+  if (!viewing.value || !wants.value.length) return null
+  const { hits, wantIds } = matchBooth(viewing.value.booth, wants.value)
+  return hits.length ? { hits, wantIds, idx: new Set(hits.map(h => h.index)) } : null
+})
+
+const shopMatches = computed(() => matchShops(savedShops.value, wants.value))
+
+watch(viewing, (v) => {
+  if (v) { wants.value = loadWantlist(); matchesOnly.value = false; shopSortMode.value = 'listed' }
+})
+
+// Sort pairs of (item, original index) — market deltas and want-highlights
+// are keyed by original index, so sorting must never renumber them.
+const shopSortMode = ref('listed')
+const displayItems = computed(() => {
+  const items = viewing.value?.booth.items || []
+  const pairs = items.map((it, i) => ({ it, i }))
+  if (shopSortMode.value === 'cheap') pairs.sort((a, b) => (a.it.price || 0) - (b.it.price || 0))
+  else if (shopSortMode.value === 'dear') pairs.sort((a, b) => (b.it.price || 0) - (a.it.price || 0))
+  return pairs
+})
 const dirBusy = ref(false)
 const dirDone = ref(0)
 
@@ -322,6 +392,8 @@ function saveShop() {
 
 function openSaved(s) {
   shopFilter.value = ''
+  filterGame.value = 'all'
+  filterMax.value = null
   viewing.value = { booth: s.booth, saved: true, savedId: s.id, market: s.market || null }
 }
 
@@ -346,6 +418,33 @@ function summaryOf(m) {
 }
 
 const viewingVerdict = computed(() => marketVerdict(viewing.value?.market?.deltaPct))
+
+// ── Branding (decoded shares carry brand; older saved shops may not) ──
+const viewBrand = computed(() => {
+  const b = viewing.value?.booth?.brand
+  return b && (b.color || b.mark || b.logo) ? b : null
+})
+const brandMarkText = computed(() => {
+  const c = viewBrand.value?.color || ''
+  if (!/^#[0-9a-f]{6}$/i.test(c)) return '#141414'
+  const [r, g, b] = [1, 3, 5].map(i => parseInt(c.slice(i, i + 2), 16))
+  return (0.299 * r + 0.587 * g + 0.114 * b) > 140 ? '#141414' : '#ffffff'
+})
+
+// How frozen is this snapshot? Booth shares carry the moment they were
+// encoded (booth.ts, epoch seconds; 0 on pre-ts shares). Past a day, nudge
+// the buyer toward the live QR at the table.
+const snapshotAge = computed(() => {
+  const ts = viewing.value?.booth?.ts
+  if (!ts) return null
+  const mins = Math.max(0, Math.round((Date.now() / 1000 - ts) / 60))
+  const label =
+    mins < 2 ? 'just now'
+    : mins < 60 ? `${mins} min ago`
+    : mins < 48 * 60 ? `${Math.round(mins / 60)}h ago`
+    : `${Math.round(mins / 1440)} days ago`
+  return { label, stale: mins >= 24 * 60 }
+})
 
 function itemDelta(i) {
   const m = viewing.value?.market
@@ -386,6 +485,18 @@ function shopVerdict(s) {
 // ── Saved-shop sorting & cross-shop filtering ──
 const shopSort = ref('newest')
 const shopFilter = ref('')
+const filterGame = ref('all')
+const filterMax = ref(null)
+
+const GAME_LABELS = {
+  pokemon: 'Pokémon', mtg: 'Magic', yugioh: 'Yu-Gi-Oh!', lorcana: 'Lorcana',
+  'one-piece': 'One Piece', riftbound: 'Riftbound',
+}
+
+// Any of the three controls makes it a search — "everything under $20 at
+// every table" needs no text at all
+const filterActive = computed(() =>
+  Boolean(shopFilter.value.trim()) || filterGame.value !== 'all' || filterMax.value > 0)
 
 const sortedShops = computed(() => {
   const shops = [...savedShops.value]
@@ -397,12 +508,14 @@ const sortedShops = computed(() => {
 })
 
 const filterHits = computed(() => {
+  if (!filterActive.value) return []
   const q = shopFilter.value.trim().toLowerCase()
-  if (!q) return []
   const hits = []
   for (const s of sortedShops.value) {
     const items = (s.booth.items || []).filter(it =>
-      (it.name || '').toLowerCase().includes(q) || (it.setName || '').toLowerCase().includes(q))
+      (!q || (it.name || '').toLowerCase().includes(q) || (it.setName || '').toLowerCase().includes(q))
+      && (filterGame.value === 'all' || (it.game || '') === filterGame.value)
+      && (!(filterMax.value > 0) || ((it.price || 0) <= filterMax.value)))
     if (items.length) hits.push({ shop: s, items })
   }
   // cheapest matching item first — that's what you're hunting for
@@ -577,7 +690,9 @@ onBeforeUnmount(() => {
 
 .booth-tools { display: flex; gap: 10px; margin: 4px 0 6px; flex-wrap: wrap; }
 .booth-filter { flex: 1; min-width: 200px; }
-.booth-sort { width: auto; }
+.booth-sort, .booth-game { width: auto; }
+.booth-max { width: 88px; }
+.shop-sort-mode { width: auto; }
 .booth-filter-note { font-size: 12.5px; color: var(--text-secondary); margin: 8px 0 4px; font-weight: 700; }
 
 .booth-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 250px), 1fr)); gap: 14px; margin-top: 12px; }
@@ -602,8 +717,19 @@ onBeforeUnmount(() => {
 
 /* shop viewer */
 .shop-head { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; padding: 18px; margin-top: 16px; flex-wrap: wrap; }
+.shop-brand { margin-bottom: 10px; }
+.shop-brand-logo { height: 46px; max-width: 200px; object-fit: contain; border: 1.5px solid var(--ink); border-radius: 10px; background: #fff; padding: 3px; display: block; }
+.shop-brand-mark {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 46px; height: 46px; padding: 0 10px;
+  border: 2px solid var(--ink); border-radius: 12px;
+  font-size: 20px; font-weight: 900;
+  box-shadow: var(--shadow-xs);
+}
 .shop-meta { display: flex; gap: 14px; flex-wrap: wrap; font-size: 13px; color: var(--text-secondary); margin-top: 12px; }
 .shop-note { font-size: 13px; color: var(--text-secondary); margin-top: 8px; max-width: 480px; }
+.shop-age.stale { color: var(--danger); font-weight: 700; }
+.shop-stale-note { font-size: 12px; color: var(--text-secondary); margin-top: 8px; max-width: 480px; font-weight: 600; }
 .shop-directions { margin-top: 12px; }
 .shop-total-label { font-size: 11.5px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-secondary); }
 .shop-total-val { font-size: 26px; font-weight: 900; }
@@ -630,6 +756,26 @@ onBeforeUnmount(() => {
 .shop-item-noimg { font-size: 34px; opacity: 0.35; }
 .shop-item-body { display: flex; flex-direction: column; flex: 1; }
 .shop-item-body .shop-item-row { margin-top: auto; padding-top: 6px; }
+
+/* wantlist matches */
+.shop-wants {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 14px; margin: -4px 0 12px;
+  background: var(--accent-dim);
+  flex-wrap: wrap;
+}
+.shop-wants-mark { font-size: 18px; }
+.shop-wants-text { flex: 1; font-size: 13px; min-width: 160px; }
+.shop-item-want { position: relative; box-shadow: 0 0 0 2.5px var(--accent); }
+.shop-want-tag {
+  position: absolute; top: -9px; left: 50%; transform: translateX(-50%) rotate(-3deg);
+  z-index: 1;
+  font-size: 9px; font-weight: 900; letter-spacing: 0.5px; white-space: nowrap;
+  padding: 2px 8px;
+  background: var(--accent); color: var(--on-accent);
+  border: 1.5px solid var(--ink); border-radius: 6px;
+  box-shadow: var(--shadow-pressed);
+}
 
 .shop-mkt { font-size: 10.5px; font-weight: 800; white-space: nowrap; }
 .shop-mkt.under { color: var(--text-success, #1e9e5a); }
