@@ -60,7 +60,7 @@
           <div class="shop-meta">
             <span v-if="viewing.booth.venue">📍 {{ viewing.booth.venue }}</span>
             <span v-if="viewing.booth.table">🪧 Table {{ viewing.booth.table }}</span>
-            <span v-if="viewing.booth.date">🗓 {{ viewing.booth.date }}</span>
+            <span v-if="viewing.booth.date">🗓 {{ fmtBoothDate(viewing.booth.date) }}</span>
           </div>
           <p v-if="viewing.booth.note" class="shop-note">{{ viewing.booth.note }}</p>
           <a v-if="viewing.booth.loc" class="btn btn-secondary btn-sm shop-directions" :href="directionsUrl(viewing.booth.loc, viewing.booth.locName || viewing.booth.name)" target="_blank" rel="noopener">
@@ -243,7 +243,7 @@ import {
   loadBooths, saveBooths, loadSavedShops, saveSavedShops,
   boothFromLocation, directoryFromLocation, boothFromDirectoryRef, dagdResolve,
   decodeBoothBytes, decodeDirectoryBytes, boothTotal, generateBoothId,
-  directionsUrl,
+  directionsUrl, fmtBoothDate,
 } from '../utils/booth'
 import { compareBoothToMarket, marketVerdict } from '../utils/boothMarket'
 import { FrameCollector, isFrame } from '../utils/qrTransfer'

@@ -64,7 +64,7 @@
 <script setup>
 import { ref, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import QRCode from 'qrcode'
-import { encodeBoothBytes, boothToUrl, boothTotal } from '../utils/booth'
+import { encodeBoothBytes, boothToUrl, boothTotal, fmtBoothDate } from '../utils/booth'
 import { buildFrames } from '../utils/qrTransfer'
 
 const props = defineProps({ booth: { type: Object, required: true } })
@@ -223,7 +223,7 @@ async function downloadPoster() {
     ctx.restore()
 
     // venue / table / date
-    const meta = [props.booth.venue, props.booth.table && `Table ${props.booth.table}`, props.booth.date].filter(Boolean).join('  ·  ')
+    const meta = [props.booth.venue, props.booth.table && `Table ${props.booth.table}`, fmtBoothDate(props.booth.date)].filter(Boolean).join('  ·  ')
     if (meta) {
       ctx.fillStyle = '#5f5a51'
       ctx.font = `700 34px ${FONT}`

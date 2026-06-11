@@ -151,6 +151,14 @@ export function generateBoothId() {
   return 'booth-' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36)
 }
 
+/** Booth dates are ISO (yyyy-mm-dd) from the date picker; older booths
+ *  carried free text ("Sat June 14") — render those untouched. */
+export function fmtBoothDate(d) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(d || '')) return d || ''
+  const [y, m, day] = d.split('-').map(Number)
+  return new Date(y, m - 1, day).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+}
+
 // ── Location ───────────────────────────────────────────────────────────
 
 /** Best "open in maps" URL for a booth location. Apple/Android map apps
