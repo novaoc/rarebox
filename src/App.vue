@@ -27,6 +27,7 @@
         <router-link to="/sets" class="topnav-link" :class="{ active: isTab('browse') }">Browse</router-link>
         <router-link to="/decks" class="topnav-link" :class="{ active: isTab('decks') }">Decks</router-link>
         <router-link to="/trade" class="topnav-link" :class="{ active: isTab('trade') }">Trade</router-link>
+        <router-link to="/booth" class="topnav-link" :class="{ active: isTab('booth') }">Booth</router-link>
       </nav>
 
       <div class="topbar-page" aria-hidden="true">
@@ -232,6 +233,7 @@ const TAB_FOR_ROUTE = {
   Browse: 'browse', Sets: 'browse', TcgSets: 'browse',
   Decks: 'decks', MetaDecks: 'decks', DeckBuilder: 'decks',
   TradeLanding: 'trade', TradeAnalyzer: 'trade',
+  Booth: 'booth', BoothEdit: 'booth',
 }
 function isTab(tab) {
   return TAB_FOR_ROUTE[route.name] === tab

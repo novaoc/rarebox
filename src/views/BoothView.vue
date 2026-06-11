@@ -149,7 +149,7 @@
         <div class="booth-section-head">
           <h2>Saved shops</h2>
           <div class="booth-head-actions">
-            <button v-if="savedShops.length > 1" class="btn btn-secondary btn-sm" @click="shareListOpen = true">📣 Share list</button>
+            <button v-if="savedShops.length" class="btn btn-secondary btn-sm" @click="shareListOpen = true">📣 Share list</button>
             <button class="btn btn-secondary btn-sm" @click="startScan">📷 Scan a booth</button>
           </div>
         </div>
