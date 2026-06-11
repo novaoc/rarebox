@@ -196,9 +196,10 @@ Built by [Nova](https://github.com/novaoc).
 - optcgapi API (One Piece sets/cards/market prices)
 - YGOPRODeck API (Yu-Gi-Oh! sets/cards/prices)
 - riftcodex.com API (Riftbound sets/cards/images)
-- PriceCharting JSON API (sealed + graded prices for all TCGs)
+- PriceCharting JSON API (sealed + graded prices for all TCGs; Riftbound singles fallback)
+- tcgcsv.com TCGplayer dumps (Riftbound + Japanese Pokémon prices, via daily CI — see below)
 - Pokellector CDN (Japanese set logos)
-- Vercel (static hosting + stateless price-proxy functions)
+- Vercel (static hosting; the only serverless function left is `/api/og` for social-embed images)
 
 ## Multi-TCG Browse (architecture)
 
@@ -229,13 +230,40 @@ getSetCards(id)  -> [{ id, name, number, image, price, rarity }]
 | Lorcana | Lorcast (CORS `*`) | ✅ sets, cards, USD prices |
 | One Piece | optcgapi (CORS allowed) | ✅ 20 sets, 3300+ cards, USD market prices |
 | Yu-Gi-Oh! | YGOPRODeck (CORS `*`) | ✅ all sets, 13000+ cards, TCGPlayer prices |
-| Riftbound | riftcodex.com (CORS `*`) | ✅ 7 sets, 1000+ cards, images from Riot CDN, PriceCharting prices |
+| Riftbound | riftcodex.com (CORS `*`) | ✅ 7 sets, 1000+ cards, images from Riot CDN, TCGplayer prices (static asset; PriceCharting fallback) |
 
 **To add a TCG:** add a provider object (`getSets`/`getSetCards`) to
 `providers.js`, register it in `PROVIDERS`, and add a `TCGS` entry with
 `available:true` + `route:'/sets/<id>'`. Optionally add a preloader in
 `cardPreloader.js`, an API endpoint in `multiSearch.js`, and a resolver in
 `resolveCard()`. No view changes needed.
+
+## Static data assets (daily CI refresh)
+
+The app is local-only: Vercel serves only code and static assets, and your
+device makes every API call itself — no serverless data endpoints. Sources
+that can't be called from a browser (tcgcsv.com has no CORS and is
+backend-scripts-only by policy; meta-deck sites need scraping) are instead
+pre-built into static JSON by `.github/workflows/refresh-data.yml`, which runs
+daily at 21:00 UTC (23:00 retry) and commits only when the data changed:
+
+| Asset | Built by | Contents |
+|-------|----------|----------|
+| `public/riftbound-prices.json` | `scripts/build_riftbound_prices.py` | TCGplayer market prices for all Riftbound cards, keyed by product id |
+| `public/jp-prices.json` | `scripts/build_jp_prices.py` | TCGplayer prices for 16k+ Japanese Pokémon cards, keyed `set-number` |
+| `public/meta-decks/*.json` | `scripts/build_meta_decks.py` | Scraped meta decks per game (scrapers keep yesterday's file on failure) |
+
+Each commit triggers the normal Vercel static deploy, so the app just fetches
+these as same-origin assets (works in plain `vite dev` too).
+
+**Forks:** the workflow job is gated on `github.repository == 'novaoc/rarebox'`
+so forks don't hit tcgcsv with Rarebox-attributed traffic. A fork still works
+without it — the committed JSON ships with the clone, just frozen at fork
+time. To self-refresh: edit the guard in `refresh-data.yml`, change the
+`User-Agent` in `scripts/build_*_prices.py` to identify *your* deployment
+(tcgcsv requires an identifying UA — generic browser UAs get 401), and enable
+the workflow in your fork's Actions tab (GitHub disables inherited crons by
+default).
 
 ## Releases
 
