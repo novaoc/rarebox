@@ -23,9 +23,22 @@ async function getJson(url, { signal } = {}) {
   return res.json()
 }
 
-// Simple in-memory cache — avoids re-fetching sets on repeated visits.
-// TTL: sets (1hr, they rarely change), cards (10min).
+import db from '../../db'
+
+// Two-layer cache: memory (TTL-fresh) + IndexedDB (durable, no TTL).
+// The durable layer is what makes Browse work offline — the card database
+// lives on-device, so "can't reach the database" made no sense. Fresh data
+// still wins whenever the network is there; the durable copy is served when
+// the device is offline or the API is down (stale beats blank).
 const _cache = new Map()
+
+async function fromDurable(key) {
+  try { return (await db.state.get('browse:' + key))?.value ?? null } catch { return null }
+}
+function toDurable(key, val) {
+  db.state.put({ key: 'browse:' + key, value: JSON.parse(JSON.stringify(val)) }).catch(() => {})
+}
+
 function cached(key, ttlMs, fn, { signal } = {}) {
   const hit = _cache.get(key)
   if (hit && Date.now() - hit.ts < ttlMs) return Promise.resolve(hit.val)
@@ -36,7 +49,22 @@ function cached(key, ttlMs, fn, { signal } = {}) {
   const merged = signal
     ? AbortSignal.any([signal, ac.signal, AbortSignal.timeout(30000)])
     : AbortSignal.timeout(30000)
-  const p = fn(merged).then(val => { _cache.set(key, { val, ts: Date.now() }); return val })
+  const p = (async () => {
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      const stale = hit?.val ?? await fromDurable(key)
+      if (stale) return stale
+    }
+    try {
+      const val = await fn(merged)
+      _cache.set(key, { val, ts: Date.now() })
+      toDurable(key, val)
+      return val
+    } catch (e) {
+      const stale = hit?.val ?? await fromDurable(key)
+      if (stale) return stale
+      throw e
+    }
+  })()
   p.abort = () => ac.abort()
   return p
 }

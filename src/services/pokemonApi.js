@@ -1,3 +1,4 @@
+import db from '../db'
 const BASE_URL = 'https://api.pokemontcg.io/v2'
 
 const cache = new Map()
@@ -49,10 +50,29 @@ async function fetchWithCache(url) {
   if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
     return cached.data
   }
-  // Return stale cache if fetch fails — better than crashing
-  const data = await fetchWithRetry(url)
-  cache.set(url, { data, timestamp: Date.now() })
-  return data
+  // Durable second layer (IndexedDB): serves Browse offline and rides out
+  // API outages — set lists and card pages persist across sessions.
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    const stale = cached?.data ?? await fromDurableUrl(url)
+    if (stale) return stale
+  }
+  try {
+    const data = await fetchWithRetry(url)
+    cache.set(url, { data, timestamp: Date.now() })
+    toDurableUrl(url, data)
+    return data
+  } catch (e) {
+    const stale = cached?.data ?? await fromDurableUrl(url)
+    if (stale) return stale
+    throw e
+  }
+}
+
+async function fromDurableUrl(url) {
+  try { return (await db.state.get('browse:url:' + url))?.value ?? null } catch { return null }
+}
+function toDurableUrl(url, data) {
+  db.state.put({ key: 'browse:url:' + url, value: JSON.parse(JSON.stringify(data)) }).catch(() => {})
 }
 
 export async function searchCards(query, page = 1, pageSize = 20) {
@@ -82,6 +102,9 @@ export async function getSets() {
   const ts = localStorage.getItem(LS_TS)
   if (cached && ts && Date.now() - Number(ts) < 24 * 60 * 60 * 1000) {
     return JSON.parse(cached)
+  }
+  if (cached && typeof navigator !== 'undefined' && !navigator.onLine) {
+    return JSON.parse(cached) // stale sets beat an offline error
   }
   const url = `${BASE_URL}/sets?orderBy=-releaseDate&select=id,name,series,total,printedTotal,releaseDate,images`
   const data = await fetchWithCache(url)

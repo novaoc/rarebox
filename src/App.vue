@@ -174,6 +174,7 @@
 
     <!-- Background card loading indicator -->
     <CardLoadIndicator v-show="!isBoothRoute" ref="cardLoadIndicator" />
+    <OfflineImagesPill />
   </div>
 </template>
 
@@ -185,6 +186,7 @@ import InstallPrompt from './components/InstallPrompt.vue'
 import TourModal from './components/TourModal.vue'
 import CardDatabaseLoader from './components/CardDatabaseLoader.vue'
 import CardLoadIndicator from './components/CardLoadIndicator.vue'
+import OfflineImagesPill from './components/OfflineImagesPill.vue'
 import { isCardDatabaseReady, buildSearchIndex, saveCardDatabaseReady, getTcgPrefs, saveTcgPrefs } from './services/tcg/cardCache.js'
 import { preloadGames } from './services/tcg/cardPreloader.js'
 import { applyTheme, setThemePref, getThemePref, resolvedTheme } from './utils/theme.js'

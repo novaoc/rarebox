@@ -126,8 +126,8 @@
             v-for="card in filteredCards"
             :key="card.id"
             class="card-result"
-            :class="{ selected: selectedCard?.id === card.id }"
-            @click="selectCard(card)"
+            :class="{ selected: selectedCard?.id === card.id, revealed: revealedCard === card.id }"
+            @click="tapCard(card)"
           >
             <div class="card-img-wrap">
               <img
@@ -372,6 +372,14 @@ const ownedCardsBySet = computed(() => {
 
 // Card detail / add modal
 const selectedCard = ref(null)
+
+// Tap-to-reveal on touch devices (desktop reveals on hover; taps no-op there)
+const revealedCard = ref(null)
+const _canHover = typeof window !== 'undefined' && window.matchMedia('(hover: hover)').matches
+function tapCard(card) {
+  if (_canHover) { selectCard(card); return } // desktop: click = details, as before
+  revealedCard.value = revealedCard.value === card.id ? null : card.id
+}
 const showAddModal = ref(false)
 const modalCard = ref(null)
 
@@ -850,9 +858,11 @@ onMounted(loadSets)
 }
 .card-result:hover .card-overlay { opacity: 1; }
 
-/* Touch devices: show overlay always */
+/* Touch: buttons stay hidden until the card is tapped once — art first.
+   A second tap (on a button) acts; tapping the card again hides them. */
+.card-result.revealed .card-overlay { opacity: 1; }
 @media (hover: none) {
-  .card-overlay { opacity: 1; background: rgba(20,20,20,0.45); }
+  .card-result.revealed .card-overlay { background: rgba(20,20,20,0.45); }
   .card-overlay .btn { font-size: 12px; padding: 6px 12px; }
 }
 .card-img-placeholder {

@@ -87,7 +87,7 @@
 
       <div v-else>
         <div class="cards-grid">
-          <div v-for="card in filteredCards" :key="card.id" class="card-result">
+          <div v-for="card in filteredCards" :key="card.id" class="card-result" :class="{ revealed: revealedCard === card.id }" @click="tapCard(card)">
             <div class="card-img-wrap">
               <img v-if="card.image" :src="card.image" :alt="card.name" class="card-img" loading="lazy" draggable="false"
                    @error="$event.target.style.display='none'; $event.target.nextElementSibling.style.display='flex'" />
@@ -226,6 +226,14 @@ const filteredCards = computed(() => {
   return cards.value.filter(c => tokenMatch(q, c.name, String(c.number)))
 })
 
+// Tap-to-reveal on touch devices (desktop reveals on hover; taps no-op there)
+const revealedCard = ref(null)
+const _canHover = typeof window !== 'undefined' && window.matchMedia('(hover: hover)').matches
+function tapCard(card) {
+  if (_canHover) return
+  revealedCard.value = revealedCard.value === card.id ? null : card.id
+}
+
 async function loadSets() {
   if (!provider.value) return
   abortPending()
@@ -236,7 +244,7 @@ async function loadSets() {
   try {
     sets.value = await provider.value.getSets({ signal: ac.signal })
   } catch (e) {
-    if (e.name !== 'AbortError') setsError.value = 'Could not reach the card database. Please try again.'
+    if (e.name !== 'AbortError') setsError.value = navigator.onLine ? 'Could not reach the card database. Please try again.' : 'You\'re offline and this list hasn\'t been viewed yet — open it once online and it stays available offline.'
   } finally {
     if (_abort === ac) _abort = null
     loadingSets.value = false
@@ -259,7 +267,7 @@ async function loadSetCards(set) {
     cards.value = await provider.value.getSetCards(set.id, { signal: ac.signal })
     if (cards.value.length === 0) cardsError.value = 'No cards found for this set.'
   } catch (e) {
-    if (e.name !== 'AbortError') cardsError.value = 'Could not load cards for this set. Please try again.'
+    if (e.name !== 'AbortError') cardsError.value = navigator.onLine ? 'Could not load cards for this set. Please try again.' : 'You\'re offline and this set hasn\'t been opened yet — open it once online and it stays available offline.'
   } finally {
     if (_abort === ac) _abort = null
     loadingCards.value = false
@@ -427,7 +435,10 @@ onMounted(loadSets)
 .card-img-ph { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; padding: 8px; text-align: center; font-size: 11px; font-weight: 600; color: var(--text-secondary); background: var(--bg-secondary); border: var(--bw) dashed var(--border-subtle); }
 .card-overlay { position: absolute; inset: 0; background: rgba(20,20,20,0.55); display: flex; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.2s; }
 .card-result:hover .card-overlay { opacity: 1; }
-@media (hover: none) { .card-overlay { opacity: 1; background: linear-gradient(transparent 60%, rgba(20,20,20,0.65)); align-items: flex-end; padding-bottom: 8px; } }
+/* Touch: buttons stay hidden until the card is tapped once — art first.
+   A second tap (on a button) acts; tapping the card again hides them. */
+.card-result.revealed .card-overlay { opacity: 1; }
+@media (hover: none) { .card-result.revealed .card-overlay { background: linear-gradient(transparent 60%, rgba(20,20,20,0.65)); align-items: flex-end; padding-bottom: 8px; } }
 .card-meta { padding: 8px 10px; }
 .card-name { font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .card-num { font-size: 10px; }

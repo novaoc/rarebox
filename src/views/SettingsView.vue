@@ -88,6 +88,50 @@
       </div>
     </div>
 
+    <!-- Offline Images -->
+    <div class="settings-section card mb-4">
+      <h3 class="settings-section-title">Offline Card Images</h3>
+      <p class="settings-desc">
+        Download the card pictures for your games so browsing is fully visual offline —
+        images are recompressed on your device to a fraction of their original size.
+      </p>
+
+      <div class="oi-warning">
+        ⚠ This can use <strong>{{ fmtBytes(oiSelectedBytes) }}</strong> of storage and the same in
+        data — use Wi-Fi. Your browser may evict it if the device runs low on space.
+      </div>
+
+      <div class="oi-games">
+        <label v-for="g in oiGames" :key="g.game" class="oi-game-row">
+          <input type="checkbox" v-model="g.selected" :disabled="oiState.running" />
+          <span class="oi-game-name">{{ g.name }}</span>
+          <span class="oi-game-est">{{ g.count.toLocaleString() }} cards · ~{{ fmtBytes(g.bytes) }}</span>
+        </label>
+        <p v-if="!oiGames.length" class="text-muted" style="font-size:12.5px">Load your card database first (above) — the image pack downloads whatever games you have.</p>
+      </div>
+
+      <div class="settings-item">
+        <div>
+          <div class="settings-item-label">{{ oiState.running ? `Downloading… ${oiState.done.toLocaleString()} / ${oiState.total.toLocaleString()}` : 'Download images' }}</div>
+          <div class="settings-item-sub">
+            <template v-if="oiState.running">{{ fmtBytes(oiState.bytes) }} stored · runs in the background, safe to keep using the app</template>
+            <template v-else-if="oiCached > 0">{{ oiCached.toLocaleString() }} images stored — re-run any time to top up new sets (already-downloaded cards are skipped)</template>
+            <template v-else>Picks up where it left off if interrupted</template>
+          </div>
+        </div>
+        <button v-if="!oiState.running" class="btn btn-primary btn-sm" :disabled="!oiGames.some(g => g.selected)" @click="startOfflineImages">{{ oiCached > 0 ? 'Top up' : 'Download' }}</button>
+        <button v-else class="btn btn-secondary btn-sm" @click="stopOfflineImages()">Pause</button>
+      </div>
+
+      <div v-if="oiCached > 0 && !oiState.running" class="settings-item">
+        <div>
+          <div class="settings-item-label">Remove offline images</div>
+          <div class="settings-item-sub">Frees the space; cards go back to loading pictures from the internet</div>
+        </div>
+        <button class="btn btn-secondary btn-sm" @click="removeOfflineImages">Remove</button>
+      </div>
+    </div>
+
     <!-- Price Data Sources -->
     <div class="settings-section card mb-4">
       <h3 class="settings-section-title">Price Data Sources</h3>
@@ -370,6 +414,7 @@ import { exportBackup, validateBackup, importBackup } from '../utils/backup'
 import { parseCollectrFile } from '../utils/collectrImport'
 import { getActiveAlerts, getTriggeredAlerts, removeAlert, clearTriggeredAlerts, clearAllAlerts } from '../utils/alerts'
 import LocalSyncModal from '../components/LocalSyncModal.vue'
+import { offlineImagesState, estimateGames, downloadOfflineImages, stopOfflineImages, bulkCacheCount, clearBulkCache, fmtBytes } from '../utils/offlineImages'
 import { getCardCounts, clearCardCache, saveCardDatabaseReady, buildSearchIndex } from '../services/tcg/cardCache'
 import { useTradeStore } from '../stores/trade'
 import { getThemePref, setThemePref } from '../utils/theme'
@@ -382,6 +427,27 @@ const confirmReset = ref(false)
 const resetConfirmText = ref('')
 const showLocalSync = ref(false)
 const appVersion = __APP_VERSION__ // injected by Vite from package.json
+
+// ── Offline card images ──
+const oiGames = ref([])
+const oiCached = ref(0)
+const oiState = offlineImagesState
+async function refreshOfflineImages() {
+  oiGames.value = await estimateGames()
+  oiCached.value = await bulkCacheCount()
+}
+const oiSelectedBytes = computed(() => oiGames.value.filter(g => g.selected).reduce((s, g) => s + g.bytes, 0))
+async function startOfflineImages() {
+  const games = oiGames.value.filter(g => g.selected).map(g => g.game)
+  if (!games.length) return
+  downloadOfflineImages(games).then(refreshOfflineImages)
+}
+async function removeOfflineImages() {
+  if (!confirm('Remove all offline card images? Browsing will need internet for pictures again.')) return
+  await clearBulkCache()
+  await refreshOfflineImages()
+}
+refreshOfflineImages()
 const hideLoader = ref(localStorage.getItem('hide_load_indicator') === 'true')
 const themePref = ref(getThemePref())
 function setTheme(opt) { themePref.value = opt; setThemePref(opt) }
@@ -805,4 +871,22 @@ function goToDashboard() {
   font-weight: 600;
   text-align: center;
 }
+
+/* offline images */
+.oi-warning {
+  font-size: 12.5px; line-height: 1.5;
+  padding: 9px 12px; margin-bottom: 12px;
+  background: var(--accent-dim);
+  border: 1.5px solid var(--ink);
+  border-radius: var(--radius);
+}
+.oi-games { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; }
+.oi-game-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 7px 10px; border: 1.5px solid var(--border-subtle); border-radius: 10px;
+  font-size: 13.5px; cursor: pointer;
+}
+.oi-game-row input { width: 17px; height: 17px; accent-color: var(--accent); }
+.oi-game-name { font-weight: 700; flex: 1; }
+.oi-game-est { font-size: 12px; color: var(--text-muted); }
 </style>
