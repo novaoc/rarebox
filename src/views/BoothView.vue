@@ -7,23 +7,28 @@
           <span class="sticker">{{ dirViewing.title }}</span>
           <div class="shop-meta">
             <span>📦 {{ dirViewing.entries.length }} booth{{ dirViewing.entries.length !== 1 ? 's' : '' }}</span>
+            <span v-if="dirChecking" class="text-muted">checking links…</span>
+            <span v-else-if="dirExpired" class="badge badge-danger">{{ dirExpired }} expired</span>
           </div>
           <p class="shop-note">A booth directory — each entry downloads as its own shop, saved for offline.</p>
         </div>
       </div>
 
       <div class="shop-actions">
-        <button class="btn btn-primary" :disabled="dirBusy" @click="addAllFromDirectory">
-          {{ dirBusy ? `Adding booth ${dirDone + 1} / ${dirViewing.entries.length}…` : '⭐ Add all to saved shops' }}
+        <button class="btn btn-primary" :disabled="dirBusy || !dirLive" @click="addAllFromDirectory">
+          {{ dirBusy ? `Adding booth ${dirDone + 1} / ${dirViewing.entries.length}…` : `⭐ Add all to saved shops${dirExpired ? ` (${dirLive})` : ''}` }}
         </button>
         <button class="btn btn-secondary" :disabled="dirBusy" @click="dirViewing = null">Back to Booth</button>
       </div>
+      <p v-if="dirExpired && !dirChecking" class="shop-compare-note">
+        {{ dirExpired }} booth{{ dirExpired !== 1 ? 's' : '' }} expired — the seller's share link no longer exists, so {{ dirExpired !== 1 ? 'they are' : 'it is' }} skipped.
+      </p>
       <div v-if="dirBusy" class="dir-progress">
         <div class="bar"><i :style="{ width: (dirDone / dirViewing.entries.length * 100) + '%' }"></i></div>
       </div>
 
       <div class="booth-grid">
-        <div v-for="(en, i) in dirViewing.entries" :key="i" class="booth-card card">
+        <div v-for="(en, i) in dirViewing.entries" :key="i" class="booth-card card" :class="{ 'booth-card-dead': en.status === 'dead' }">
           <div class="booth-card-name">{{ en.name }}</div>
           <div class="booth-card-meta">
             <span v-if="en.venue">📍 {{ en.venue }}</span>
@@ -32,6 +37,7 @@
           </div>
           <div class="booth-card-sub">
             <span v-if="en.status === 'ok'" class="badge badge-success">✓ Saved</span>
+            <span v-else-if="en.status === 'dead'" class="badge badge-danger">Expired — link is gone</span>
             <span v-else-if="en.status === 'err'" class="badge badge-danger">⚠ Couldn't load</span>
             <span v-else-if="en.status === 'busy'" class="badge badge-info">Downloading…</span>
           </div>
@@ -235,7 +241,7 @@ import BoothShareModal from '../components/BoothShareModal.vue'
 import BoothShareListModal from '../components/BoothShareListModal.vue'
 import {
   loadBooths, saveBooths, loadSavedShops, saveSavedShops,
-  boothFromLocation, directoryFromLocation, boothFromDirectoryRef,
+  boothFromLocation, directoryFromLocation, boothFromDirectoryRef, dagdResolve,
   decodeBoothBytes, decodeDirectoryBytes, boothTotal, generateBoothId,
   directionsUrl,
 } from '../utils/booth'
@@ -289,7 +295,7 @@ async function checkIncoming() {
   try {
     const dir = await directoryFromLocation(window.location.hash)
     if (dir) {
-      dirViewing.value = { ...dir, entries: dir.entries.map(e => ({ ...e, status: '' })) }
+      showDirectory(dir)
       history.replaceState(null, '', window.location.pathname)
       return
     }
@@ -405,15 +411,53 @@ const filterHits = computed(() => {
 })
 
 // ── Directory import ──
+const dirChecking = ref(false)
+
+function showDirectory(dir) {
+  dirViewing.value = { ...dir, entries: dir.entries.map(e => ({ ...e, status: '', resolvedUrl: '' })) }
+  verifyDirectory()
+}
+
+// Short-link entries can rot (the seller's da.gd code is gone). Verify
+// them as soon as the directory opens — the check IS the resolve, so
+// nothing is wasted: live entries keep their resolved URL and Add All
+// skips the second fetch. Self-contained (full-URL) entries can't die.
+async function verifyDirectory() {
+  const dir = dirViewing.value
+  const queue = dir.entries.filter(en => en.ref.startsWith('dgd:'))
+  if (!queue.length || !navigator.onLine) return
+  dirChecking.value = true
+  async function worker() {
+    while (queue.length) {
+      const en = queue.shift()
+      try {
+        const url = await dagdResolve(en.ref.slice(4))
+        if (!/[#&]b=/.test(url)) throw new Error('not a booth link')
+        en.resolvedUrl = url
+      } catch {
+        en.status = 'dead'
+      }
+    }
+  }
+  await Promise.all(Array.from({ length: 4 }, worker))
+  if (dirViewing.value === dir) dirChecking.value = false
+}
+
+const dirExpired = computed(() => dirViewing.value?.entries.filter(e => e.status === 'dead').length || 0)
+const dirLive = computed(() => dirViewing.value ? dirViewing.value.entries.length - dirExpired.value : 0)
+
 async function addAllFromDirectory() {
   if (!dirViewing.value || dirBusy.value) return
   dirBusy.value = true
   dirDone.value = 0
   for (const en of dirViewing.value.entries) {
-    if (en.status === 'ok') { dirDone.value++; continue }
+    if (en.status === 'ok' || en.status === 'dead') { dirDone.value++; continue }
     en.status = 'busy'
     try {
-      const booth = await boothFromDirectoryRef(en.ref)
+      const booth = en.resolvedUrl
+        ? await boothFromLocation(en.resolvedUrl)
+        : await boothFromDirectoryRef(en.ref)
+      if (!booth) throw new Error('not a booth')
       savedShops.value.unshift({ id: generateBoothId(), savedAt: new Date().toISOString(), booth })
       en.status = 'ok'
     } catch {
@@ -476,7 +520,7 @@ async function scanTick() {
     stopScan()
     try {
       const dir = await directoryFromLocation(code.data)
-      dirViewing.value = { ...dir, entries: dir.entries.map(e => ({ ...e, status: '' })) }
+      showDirectory(dir)
     } catch { scanError.value = "Couldn't read that directory code." }
     return
   }
@@ -492,7 +536,7 @@ async function scanTick() {
         catch {
           try {
             const dir = await decodeDirectoryBytes(payload)
-            dirViewing.value = { ...dir, entries: dir.entries.map(e => ({ ...e, status: '' })) }
+            showDirectory(dir)
           } catch { scanError.value = 'Transfer corrupted — try scanning again.' }
         }
       }
@@ -550,6 +594,8 @@ onBeforeUnmount(() => {
 .booth-hit-price { font-size: 11px; flex-shrink: 0; }
 
 /* directory import */
+.booth-card-dead { opacity: 0.55; }
+.booth-card-dead .booth-card-name { text-decoration: line-through; }
 .dir-progress { margin: -4px 0 12px; }
 .bar { height: 14px; border: 2px solid var(--ink); border-radius: 8px; background: var(--bg-secondary); overflow: hidden; }
 .bar i { display: block; height: 100%; background: var(--success); transition: width .3s ease; }
