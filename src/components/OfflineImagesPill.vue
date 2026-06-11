@@ -2,7 +2,7 @@
   <transition name="fade">
     <div v-if="st.running" class="oi-pill" role="status" :title="`Downloading ${gameName} card images`">
       <span class="oi-spinner" aria-hidden="true"></span>
-      🖼 {{ pct }}% · {{ st.done.toLocaleString() }}/{{ st.total.toLocaleString() }}
+      🖼 {{ pct }}% · {{ st.done.toLocaleString() }}/{{ st.total.toLocaleString() }}<template v-if="eta"> · {{ eta }}</template>
     </div>
   </transition>
 </template>
@@ -12,6 +12,11 @@ import { computed } from 'vue'
 import { offlineImagesState as st, GAME_NAMES } from '../utils/offlineImages'
 
 const pct = computed(() => (st.total ? Math.floor((st.done / st.total) * 100) : 0))
+const eta = computed(() => {
+  if (!st.etaSec) return ''
+  if (st.etaSec < 90) return `${st.etaSec}s left`
+  return `${Math.round(st.etaSec / 60)}m left`
+})
 const gameName = computed(() => GAME_NAMES[st.game] || st.game)
 </script>
 

@@ -28,7 +28,10 @@ import { getProvider } from '../services/tcg/providers'
 import { getSets as getPokemonSets, getJapaneseSets } from '../services/pokemonApi'
 
 export const BULK_CACHE = 'rarebox-img-bulk'
-const CONCURRENCY = 5
+// All six image sources are HTTP/2 CDNs (and the relay is Vercel's edge) —
+// they multiplex many streams per connection, so 14-wide is comfortable.
+// Measured: 5-wide ≈ 18 img/s, 14-wide ≈ 45+ img/s on a home connection.
+const CONCURRENCY = 14
 const TRANSCODE_MAX_BYTES = 30_000 // smaller than this → store as-is
 const TRANSCODE_QUALITY = 0.72
 
@@ -50,8 +53,24 @@ export const offlineImagesState = reactive({
   skipped: 0,
   failed: 0,
   bytes: 0,
+  ratePerSec: 0,
+  etaSec: null,
   finishedAt: null,
 })
+
+// Sliding-window rate → honest ETA in the pill
+const _samples = []
+function trackRate(st) {
+  const now = Date.now()
+  _samples.push([now, st.done])
+  while (_samples.length > 2 && now - _samples[0][0] > 15000) _samples.shift()
+  const [t0, d0] = _samples[0]
+  const dt = (now - t0) / 1000
+  if (dt >= 2) {
+    st.ratePerSec = (st.done - d0) / dt
+    st.etaSec = st.ratePerSec > 0.2 ? Math.round((st.total - st.done) / st.ratePerSec) : null
+  }
+}
 
 let _abort = null
 
@@ -172,8 +191,10 @@ export async function downloadOfflineImages(games) {
           st.failed++
         }
         st.done++
+        if (st.done % 10 === 0) trackRate(st)
       }
     }
+    _samples.length = 0
     await Promise.all(Array.from({ length: CONCURRENCY }, worker))
   } finally {
     st.running = false
