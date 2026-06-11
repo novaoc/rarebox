@@ -2,25 +2,36 @@
 #   public/riftbound-prices.json — Riftbound TCGplayer prices (tcgcsv)
 #   public/jp-prices.json        — Japanese Pokémon TCGplayer prices (tcgcsv)
 #   public/meta-decks/*.json     — scraped meta decks per game
-# tcgcsv updates once a day around 20:00 UTC; we pull an hour after. Commits
-# land on main, which triggers the normal Vercel static deploy — the app
-# itself stays local-only and just fetches these files as assets.
+# tcgcsv updates once a day around 20:00 UTC; we pull an hour after, with a
+# 23:00 retry in case tcgcsv ran late (the scripts' last-updated stamp check
+# makes the retry a no-op when the first run already synced). Commits land on
+# main, which triggers the normal Vercel static deploy — the app itself stays
+# local-only and just fetches these files as assets.
 
 name: Refresh data assets
 
 on:
   schedule:
     - cron: "0 21 * * *"
+    - cron: "0 23 * * *"
   workflow_dispatch:
 
 permissions:
   contents: write
 
+concurrency:
+  group: refresh-data
+
 jobs:
   refresh:
+    # Forks inherit this file — don't run their copies against tcgcsv and the
+    # deck sites (the scripts identify themselves as Rarebox). To self-refresh
+    # a fork, change this guard AND the User-Agent in scripts/build_*_prices.py.
+    if: github.repository == 'novaoc/rarebox'
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Install scraper deps
         run: pip install httpx beautifulsoup4
@@ -45,4 +56,5 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git commit -m "chore: refresh price & meta-deck data assets"
+          git pull --rebase origin main
           git push

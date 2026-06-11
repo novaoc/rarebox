@@ -9,7 +9,7 @@ ships the result as a static asset, same as the scan indexes. riftcodex.com
 card objects carry the same `tcgplayer_id`, so the client joins prices
 exactly — no fuzzy name/number matching.
 
-Run daily via .github/workflows/riftbound-prices.yml, or manually:
+Run daily via .github/workflows/refresh-data.yml, or manually:
 
     python3 scripts/build_riftbound_prices.py
 """
