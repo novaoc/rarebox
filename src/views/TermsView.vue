@@ -42,11 +42,15 @@
             for Lorcana, optcgapi for One Piece, and riftcodex (with card images from
             Riot Games' CDN) for Riftbound.</li>
           <li><strong>Price data</strong> — current prices come from the same per-game
-            APIs plus PriceCharting for graded slabs, sealed products, and Riftbound
-            singles. Card price history is fetched from tcgdex and PriceCharting's
-            public JSON API. A small set of requests (sealed product search, the
-            link-preview banner) is served through Rarebox's own serverless functions,
-            which hold no user data.</li>
+            APIs, plus PriceCharting for graded slabs and sealed products. Riftbound
+            and Japanese Pokémon prices are TCGplayer market data: an automated daily
+            build fetches tcgcsv.com's public TCGplayer dump and ships the result as
+            static files alongside the app, so your browser never contacts tcgcsv
+            (PriceCharting serves as the Riftbound fallback). Card price history is
+            fetched from tcgdex and PriceCharting's public JSON API. The only
+            server-side code Rarebox runs is a single stateless function that renders
+            link-preview banner images for chat apps' crawlers — the app itself never
+            calls it, and it holds no user data.</li>
           <li><strong>Card scanning</strong> — the camera scanner and OCR run entirely
             on your device (Tesseract.js compiled to WebAssembly). Photos you capture
             are processed in your browser's memory and are never uploaded anywhere.
@@ -59,7 +63,8 @@
             API key you provide. Data is transmitted directly from your browser to
             jsonbin.io. We do not intermediate or store your data.</li>
           <li><strong>Deck building</strong> — decks and meta deck data are stored
-            locally. Meta deck data is fetched from our GitHub-hosted JSON files.</li>
+            locally. Meta deck data is rebuilt daily by an automated job and served
+            as static files from the app's own host.</li>
         </ul>
       </section>
 
@@ -105,19 +110,26 @@
           <li><strong>optcgapi.com</strong> — One Piece Card Game data, prices, and images</li>
           <li><strong>riftcodex.com</strong> — Riftbound card data; card images served
             from Riot Games' content CDN</li>
-          <li><strong>PriceCharting</strong> — graded, sealed, and Riftbound pricing</li>
+          <li><strong>PriceCharting</strong> — graded and sealed pricing; Riftbound
+            fallback prices</li>
+          <li><strong>TCGplayer data via tcgcsv.com</strong> — daily market prices for
+            Riftbound and Japanese Pokémon cards, fetched by Rarebox's automated build
+            system (never by your browser) and shipped as static files</li>
           <li><strong>jsDelivr</strong> — CDN for the bulk Pokémon card dataset and OCR
             language files</li>
           <li><strong>Pokellector</strong> — Japanese set logos</li>
-          <li><strong>Vercel</strong> — hosting, CDN, and Rarebox's serverless functions</li>
+          <li><strong>Vercel</strong> — hosting and CDN for the app and its static data
+            files; also runs the link-preview image function</li>
           <li><strong>jsonbin.io</strong> — optional cross-device sync (only if you
             configure it)</li>
-          <li><strong>GitHub</strong> — source code hosting and meta deck data</li>
+          <li><strong>GitHub</strong> — source code hosting; GitHub Actions runs the
+            daily data refresh that builds the price and meta-deck files</li>
         </ul>
         <p>
-          We have no control over these services. Your browser makes direct requests
-          to them, and they may log standard request data (IP address, user agent)
-          according to their own privacy policies.
+          We have no control over these services. Apart from the build-time sources
+          noted above, your browser makes direct requests to them, and they may log
+          standard request data (IP address, user agent) according to their own
+          privacy policies.
         </p>
       </section>
 
@@ -236,9 +248,11 @@
         <p>
           <strong>We do not collect any data. None.</strong> Rarebox has no user
           accounts, no login systems, no cookies, and no analytics of any kind —
-          we don't even count page views. The only servers involved are static
-          hosting and a few stateless serverless functions that proxy public
-          price data — they store nothing about you. The app also works fully
+          we don't even count page views. The only server involved is static
+          hosting: price data that can't be fetched from a browser is pre-built
+          into static files by an automated daily job, not proxied through live
+          servers. (One stateless function renders link-preview images for chat
+          apps' crawlers; the app itself never calls it.) The app also works fully
           offline, which is the strongest privacy statement a web app can make:
           your collection doesn't need to talk to anyone.
         </p>
@@ -278,17 +292,21 @@
         <h2>5. Third-Party Services</h2>
         <p>Your browser makes direct requests to:</p>
         <ul>
-          <li><strong>Vercel</strong> — hosting provider and serverless functions. May
-            log standard request data (IP, user agent) per their privacy policy.</li>
+          <li><strong>Vercel</strong> — hosting and CDN for the app and its static
+            data files. May log standard request data (IP, user agent) per their
+            privacy policy.</li>
           <li><strong>pokemontcg.io, tcgdex.net, Scryfall, YGOPRODeck, Lorcast,
             optcgapi.com, riftcodex.com (Riot CDN), PriceCharting, jsDelivr,
             Pokellector</strong> — card data, images, and pricing APIs/CDNs</li>
           <li><strong>jsonbin.io</strong> — only if you configure sync</li>
-          <li><strong>GitHub</strong> — source code and meta deck data</li>
+          <li><strong>GitHub</strong> — source code hosting</li>
         </ul>
         <p>
           These requests are made directly from your browser and never include your
-          shelf contents — only the card or product being looked up.
+          shelf contents — only the card or product being looked up. TCGplayer price
+          data for Riftbound and Japanese Pokémon comes pre-bundled with the app
+          (built daily on GitHub Actions from tcgcsv.com's public dump) — your
+          browser never contacts tcgcsv or TCGplayer.
         </p>
 
       </section>
