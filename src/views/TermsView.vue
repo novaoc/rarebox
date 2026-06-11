@@ -196,10 +196,16 @@
       <section>
         <h2>13. Intellectual Property</h2>
         <p>
-          Pokémon and Pokémon character names are trademarks of Nintendo, The Pokémon
-          Company, and/or Game Freak. Rarebox is not affiliated with, endorsed by, or
-          sponsored by any of these entities. Card images and data are sourced from
-          third-party APIs and are the property of their respective owners.
+          Card images, card names, set names, and related artwork are © and ™ their
+          respective owners — including Nintendo / The Pokémon Company / Game Freak
+          (Pokémon), Wizards of the Coast (Magic: The Gathering), Konami (Yu-Gi-Oh!),
+          Disney / Ravensburger (Lorcana), Bandai (One Piece Card Game), and Riot
+          Games (Riftbound). Rarebox is unofficial fan software: it is not produced
+          by, affiliated with, endorsed by, or sponsored by any of these companies.
+          Card images are displayed solely for card identification and personal
+          collection tracking. Rarebox does not host, sell, or redistribute card
+          images; they are loaded by your browser from each game's public sources,
+          the same way they appear on any card database site.
         </p>
       </section>
 

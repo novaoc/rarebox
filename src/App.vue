@@ -61,6 +61,11 @@
         <a href="https://docs.rarebox.io" target="_blank" rel="noopener" class="app-footer-link">Docs</a>
         <span class="app-footer-dot">·</span>
         <a href="https://github.com/novaoc/rarebox" target="_blank" rel="noopener" class="app-footer-link">GitHub</a>
+        <p class="app-footer-ip">
+          Card images © their respective owners (The Pokémon Company, Wizards of the
+          Coast, Konami, Disney, Bandai, Riot Games) — used for identification and
+          personal collection tracking only. Rarebox is unaffiliated fan software.
+        </p>
       </div>
     </main>
 
@@ -498,6 +503,7 @@ onErrorCaptured((err, instance, info) => {
 
 .app-footer {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: center;
   gap: 8px;
@@ -508,6 +514,16 @@ onErrorCaptured((err, instance, info) => {
 .app-footer-link { color: var(--text-muted); }
 .app-footer-link:hover { color: var(--ink); }
 .app-footer-dot { opacity: 0.5; }
+.app-footer-ip {
+  flex-basis: 100%;
+  margin: 6px auto 0;
+  max-width: 560px;
+  padding: 0 16px;
+  text-align: center;
+  font-size: 10.5px;
+  line-height: 1.5;
+  opacity: 0.75;
+}
 
 /* ── Bottom tab bar ─────────────────────────────────────────────────── */
 .tabbar {
