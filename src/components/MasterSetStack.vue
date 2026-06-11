@@ -26,7 +26,9 @@
     </div>
 
     <div class="ms-actions">
-      <button class="btn btn-secondary btn-sm" @click="$emit('open')">{{ group.complete ? 'View cards ▸' : '🎯 Hunt ▸' }}</button>
+      <button class="btn btn-secondary btn-sm" :class="{ 'btn-primary': open }" @click="$emit('open')">
+        {{ open ? 'Hide cards ▴' : 'Show cards ▾' }}
+      </button>
       <button class="btn btn-ghost btn-sm ms-unstack" title="Back to single rows" @click="$emit('unshowcase')">Unstack</button>
     </div>
   </div>
@@ -38,6 +40,7 @@ import { sleeveDataUri } from '../utils/offlineArt'
 
 const props = defineProps({
   group: { type: Object, required: true },
+  open: { type: Boolean, default: false },
 })
 defineEmits(['open', 'unshowcase'])
 

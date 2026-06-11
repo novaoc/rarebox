@@ -111,26 +111,26 @@
         </div>
       </div>
 
-      <!-- Master sets showcase -->
+      <!-- Master sets showcase — each stack's Hunt gallery expands inline
+           right beneath it, accordion-style -->
       <div v-if="masterSetGroups.length" class="ms-showcase">
-        <MasterSetStack
-          v-for="g in masterSetGroups"
-          :key="g.key"
-          :group="g"
-          @open="msGalleryKey = g.key"
-          @unshowcase="store.unshowcaseMasterSet(portfolio.id, g.key)"
-        />
+        <div v-for="g in masterSetGroups" :key="g.key" class="ms-showcase-item">
+          <MasterSetStack
+            :group="g"
+            :open="msGalleryKey === g.key"
+            @open="msGalleryKey === g.key ? (msGalleryKey = null) : (msGalleryKey = g.key)"
+            @unshowcase="store.unshowcaseMasterSet(portfolio.id, g.key)"
+          />
+          <MasterSetGallery
+            v-if="msGalleryKey === g.key"
+            :group="g"
+            :marks="g.hunt"
+            @close="msGalleryKey = null"
+            @toggle-mark="(cardId) => store.toggleHuntMark(portfolio.id, g.key, cardId)"
+            @add-found="addFoundCards"
+          />
+        </div>
       </div>
-
-      <!-- Hunt-mode gallery -->
-      <MasterSetGallery
-        v-if="msGalleryGroup"
-        :group="msGalleryGroup"
-        :marks="msGalleryGroup.hunt"
-        @close="msGalleryKey = null"
-        @toggle-mark="(cardId) => store.toggleHuntMark(portfolio.id, msGalleryGroup.key, cardId)"
-        @add-found="addFoundCards"
-      />
 
       <!-- Items view -->
       <div class="card no-padding-mobile">
@@ -1008,6 +1008,7 @@ function deletePortfolio() { store.deletePortfolio(portfolio.value.id); router.p
 .ms-suggest-text { font-size: 13px; line-height: 1.45; }
 .ms-suggest-actions { display: flex; gap: 8px; flex-shrink: 0; }
 .ms-showcase { display: flex; flex-direction: column; gap: 12px; margin-bottom: 16px; }
+.ms-showcase-item { display: flex; flex-direction: column; gap: 10px; }
 .ms-modal-hint { font-size: 12.5px; color: var(--text-secondary); margin-bottom: 14px; line-height: 1.5; }
 .ms-modal-progress { font-size: 12.5px; font-weight: 700; color: var(--success-text); margin-top: 4px; }
 .ms-modal-error { font-size: 12.5px; font-weight: 700; color: var(--danger-text); margin-top: 4px; }
