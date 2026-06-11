@@ -23,7 +23,7 @@
         </div>
         <div class="ld-hero-visual" aria-hidden="true">
           <div v-for="(c, i) in heroCards" :key="c.key" class="ld-card" :class="'ld-card-' + (i + 1)">
-            <img :src="sleeveDataUri(c.name)" :alt="c.name" loading="lazy" />
+            <img :src="c.img" :alt="c.name" loading="lazy" @error="hideIfOnline" />
             <span class="ld-price-tag" :class="['', 'ld-tag-green', 'ld-tag-pink'][i]">{{ fmtPrice(c.price) }}</span>
           </div>
         </div>
@@ -101,7 +101,7 @@
           </div>
           <div class="ld-shelf-grid">
             <div class="ld-shelf-card" v-for="c in shelfCards" :key="c.key">
-              <div class="ld-shelf-img"><img :src="sleeveDataUri(c.name)" :alt="c.name" loading="lazy" /></div>
+              <div class="ld-shelf-img"><img :src="c.img" :alt="c.name" loading="lazy" @error="hideIfOnline" /></div>
               <div class="ld-shelf-name">{{ c.name }}</div>
               <div class="ld-shelf-sub">{{ c.sub }}</div>
               <span class="ld-shelf-price">{{ fmtPrice(c.price) }}</span>
@@ -242,7 +242,11 @@ import { usePortfolioStore } from '../stores/portfolio'
 import { getCard, getMarketPrice } from '../services/pokemonApi'
 import { getPrice as getTcgPrice } from '../services/priceFeedService'
 import { checkAlerts, notifyTriggered } from '../utils/alerts'
-import { sleeveDataUri } from '../utils/offlineArt'
+// Online failures hide the card; offline failures are handled globally by
+// the offlineArt sweep (which swaps the src to a sleeve — don't hide that)
+function hideIfOnline(e) {
+  if (navigator.onLine) e.target.style.display = 'none'
+}
 import PortfolioChart from '../components/PortfolioChart.vue'
 
 const store = usePortfolioStore()
@@ -256,20 +260,20 @@ const isNewUser = computed(() => {
 // ── Landing showcase — a rotating, cross-TCG pool. Prices are seeded with
 // values from rarebox's own feeds and refreshed live on every page view.
 const SHOWCASE = [
-  { key: 'charizard', name: 'Charizard', sub: 'Base Set · Pokémon', price: 614.49, live: { t: 'ptcg', id: 'base1-4' } },
-  { key: 'lugia', name: 'Lugia (1st Edition)', sub: 'Neo Genesis · Pokémon', price: 1599.98, live: { t: 'ptcg', id: 'neo1-9' } },
-  { key: 'trmewtwo', name: "Team Rocket's Mewtwo ex", sub: 'Destined Rivals · Pokémon', price: 569.18, live: { t: 'ptcg', id: 'sv10-231' } },
-  { key: 'pikachu', name: 'Pikachu', sub: 'Base Set · Pokémon', price: 7.59, live: { t: 'ptcg', id: 'base1-58' } },
-  { key: 'mewex', name: 'Mew ex', sub: '151 · Pokémon', price: 9.6, live: { t: 'ptcg', id: 'sv3pt5-151' } },
-  { key: 'megachar', name: 'Mega Charizard X ex', sub: 'Phantasmal Flames · Pokémon', price: 4.38, live: { t: 'ptcg', id: 'me2-13' } },
-  { key: 'luffy', name: 'Monkey.D.Luffy (Manga)', sub: 'OP-05 · One Piece', price: 3975.0, live: { t: 'optcg', set: 'OP-05', id: 'OP05-119', match: 'Manga' } },
-  { key: 'bewd', name: 'Blue-Eyes White Dragon', sub: 'Legend of Blue Eyes · Yu-Gi-Oh!', price: 681.49, live: { t: 'ygo', name: 'Blue-Eyes White Dragon', set: 'LOB-E001' } },
-  { key: 'ahrisig', name: 'Ahri Signature', sub: 'Origins · Riftbound', price: 2250.67, live: { t: 'pc', q: 'riftbound origins ahri', match: '[Signature] #303' } },
-  { key: 'mfsig', name: 'Miss Fortune Signature', sub: 'Origins · Riftbound', price: 968.75, live: { t: 'pc', q: 'riftbound origins miss fortune', match: '[Signature] #309' } },
-  { key: 'jinx', name: 'Jinx - Loose Cannon', sub: 'Origins · Riftbound', price: 65.0, live: { t: 'pc', q: 'riftbound origins jinx', match: 'Jinx - Loose Cannon #301' } },
-  { key: 'mickey', name: 'Mickey Mouse - Brave Little Tailor', sub: 'First Chapter · Lorcana', price: 42.89, live: { t: 'lorcast', q: 'mickey brave little tailor', num: '115' } },
-  { key: 'chocobo', name: 'Traveling Chocobo (foil)', sub: 'Final Fantasy · Magic', price: 5950.0, live: { t: 'scry', id: '71b97e69-f198-41ec-9385-015ec2f0160f' } },
-  { key: 'soulstone', name: 'The Soul Stone (foil)', sub: 'Spider-Man · Magic', price: 1224.49, live: { t: 'scry', id: 'f9d80efc-e829-4257-83e8-f37b0b68de57' } },
+  { key: 'charizard', name: 'Charizard', sub: 'Base Set · Pokémon', img: 'https://images.pokemontcg.io/base1/4.png', price: 614.49, live: { t: 'ptcg', id: 'base1-4' } },
+  { key: 'lugia', name: 'Lugia (1st Edition)', sub: 'Neo Genesis · Pokémon', img: 'https://images.pokemontcg.io/neo1/9.png', price: 1599.98, live: { t: 'ptcg', id: 'neo1-9' } },
+  { key: 'trmewtwo', name: "Team Rocket's Mewtwo ex", sub: 'Destined Rivals · Pokémon', img: 'https://images.pokemontcg.io/sv10/231.png', price: 569.18, live: { t: 'ptcg', id: 'sv10-231' } },
+  { key: 'pikachu', name: 'Pikachu', sub: 'Base Set · Pokémon', img: 'https://images.pokemontcg.io/base1/58.png', price: 7.59, live: { t: 'ptcg', id: 'base1-58' } },
+  { key: 'mewex', name: 'Mew ex', sub: '151 · Pokémon', img: 'https://images.pokemontcg.io/sv3pt5/151.png', price: 9.6, live: { t: 'ptcg', id: 'sv3pt5-151' } },
+  { key: 'megachar', name: 'Mega Charizard X ex', sub: 'Phantasmal Flames · Pokémon', img: 'https://images.pokemontcg.io/me2/13.png', price: 4.38, live: { t: 'ptcg', id: 'me2-13' } },
+  { key: 'luffy', name: 'Monkey.D.Luffy (Manga)', sub: 'OP-05 · One Piece', img: 'https://optcgapi.com/media/static/Card_Images/OP05-119_r2.jpg', price: 3975.0, live: { t: 'optcg', set: 'OP-05', id: 'OP05-119', match: 'Manga' } },
+  { key: 'bewd', name: 'Blue-Eyes White Dragon', sub: 'Legend of Blue Eyes · Yu-Gi-Oh!', img: 'https://images.ygoprodeck.com/images/cards_small/89631139.jpg', price: 681.49, live: { t: 'ygo', name: 'Blue-Eyes White Dragon', set: 'LOB-E001' } },
+  { key: 'ahrisig', name: 'Ahri Signature', sub: 'Origins · Riftbound', img: 'https://cmsassets.rgpub.io/sanity/images/dsfx7636/game_data_live/e5fe571a8f09c0a9e76345ec32b446480f54617c-1488x2078.png', price: 2250.67, live: { t: 'pc', q: 'riftbound origins ahri', match: '[Signature] #303' } },
+  { key: 'mfsig', name: 'Miss Fortune Signature', sub: 'Origins · Riftbound', img: 'https://cmsassets.rgpub.io/sanity/images/dsfx7636/game_data_live/37153cce7f58b2fceb28ea9ff91deb0411f849e2-1488x2078.png', price: 968.75, live: { t: 'pc', q: 'riftbound origins miss fortune', match: '[Signature] #309' } },
+  { key: 'jinx', name: 'Jinx - Loose Cannon', sub: 'Origins · Riftbound', img: 'https://cmsassets.rgpub.io/sanity/images/dsfx7636/game_data_live/8a7dbbed04133926e58843f1d586f51178ef2ebd-1488x2078.png', price: 65.0, live: { t: 'pc', q: 'riftbound origins jinx', match: 'Jinx - Loose Cannon #301' } },
+  { key: 'mickey', name: 'Mickey Mouse - Brave Little Tailor', sub: 'First Chapter · Lorcana', img: 'https://cards.lorcast.io/card/digital/small/crd_e74ef94562b9440e8dd95ada098728d6.avif', price: 42.89, live: { t: 'lorcast', q: 'mickey brave little tailor', num: '115' } },
+  { key: 'chocobo', name: 'Traveling Chocobo (foil)', sub: 'Final Fantasy · Magic', img: 'https://cards.scryfall.io/small/front/7/1/71b97e69-f198-41ec-9385-015ec2f0160f.jpg', price: 5950.0, live: { t: 'scry', id: '71b97e69-f198-41ec-9385-015ec2f0160f' } },
+  { key: 'soulstone', name: 'The Soul Stone (foil)', sub: 'Spider-Man · Magic', img: 'https://cards.scryfall.io/small/front/f/9/f9d80efc-e829-4257-83e8-f37b0b68de57.jpg', price: 1224.49, live: { t: 'scry', id: 'f9d80efc-e829-4257-83e8-f37b0b68de57' } },
 ]
 
 const heroCards = ref([])
