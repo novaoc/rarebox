@@ -444,17 +444,19 @@ const scenes = {
       // booth panel builds on the left
       [2400, () => {
         const st = document.createElement('style')
-        st.textContent = '#boothp .listrow{padding:8px 6px} #boothp .listrow img{width:46px;height:64px} #boothp .listrow .nm{font-size:19px}'
+        st.textContent = '#boothp .listrow{padding:7px 6px} #boothp .listrow img{width:42px;height:58px} #boothp .listrow .nm{font-size:19px}'
         document.head.appendChild(st)
-        el(`<div class="panel listpanel" id="boothp" style="left:64px;top:312px;width:560px;opacity:0;transform:translateY(28px);transition:all .55s cubic-bezier(.22,1,.36,1)">
+        // bottom of the panel must clear the marquee band (top edge 668)
+        // with visible paper between them — keep total height ≤ ~340px
+        el(`<div class="panel listpanel" id="boothp" style="left:64px;top:304px;width:560px;padding:20px 26px;opacity:0;transform:translateY(28px);transition:all .55s cubic-bezier(.22,1,.36,1)">
           <div style="display:flex;align-items:center;gap:12px;margin-bottom:4px">
             <div style="font-weight:900;font-size:25px">Wren's table</div>
             <div class="chip blue" style="font-size:14px;padding:3px 11px">HALL B · TABLE 42</div>
           </div>
           <div id="rows"></div>
-          <div style="display:flex;align-items:center;gap:14px;margin-top:16px">
+          <div style="display:flex;align-items:center;gap:14px;margin-top:12px">
             <div style="font-size:14px;font-weight:800;letter-spacing:.05em;color:var(--sub);text-transform:uppercase">Full table</div>
-            <div class="chip green" id="btotal" style="font-size:22px">$0.00</div>
+            <div class="chip green" id="btotal" style="font-size:21px;padding:4px 14px">$0.00</div>
           </div>
         </div>`)
         const p = document.getElementById('boothp')
