@@ -14,8 +14,9 @@
         </div>
       </div>
 
-      <!-- Filters -->
-      <div class="msg-filters">
+      <!-- Filters — only when there's actually something to filter (i.e.
+           you don't own the whole set yet) -->
+      <div v-if="!loading && hasUnowned" class="msg-filters">
         <button v-for="f in filters" :key="f.id" class="msg-filter-btn" :class="{ active: filter === f.id }" @click="filter = f.id">
           {{ f.label }} <span class="msg-filter-count">{{ f.count }}</span>
         </button>
@@ -76,6 +77,7 @@ const owned = computed(() => new Set((props.group.items || []).map(i => i.cardId
 const ownedCount = computed(() => cards.value.filter(c => owned.value.has(c.id)).length)
 const needCount = computed(() => cards.value.filter(c => !owned.value.has(c.id) && !props.marks[c.id]).length)
 const markedCards = computed(() => cards.value.filter(c => props.marks[c.id]))
+const hasUnowned = computed(() => cards.value.some(c => !owned.value.has(c.id)))
 const foundToday = computed(() => {
   const dayStart = new Date(); dayStart.setHours(0, 0, 0, 0)
   return Object.values(props.marks).filter(ts => ts >= dayStart.getTime()).length
@@ -88,6 +90,8 @@ const filters = computed(() => [
 ])
 
 const visibleCards = computed(() => {
+  // Complete set → no filter bar, always show the whole set
+  if (!hasUnowned.value) return cards.value
   if (filter.value === 'owned') return cards.value.filter(c => owned.value.has(c.id))
   if (filter.value === 'need') return cards.value.filter(c => !owned.value.has(c.id))
   return cards.value
