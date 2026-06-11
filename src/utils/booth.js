@@ -88,21 +88,48 @@ function packBooth(booth) {
   return packed
 }
 
+// Shared payloads are attacker-controllable (anyone can craft a #b= link),
+// so decode clamps everything: counts, string lengths, numeric ranges.
+// gzip amplifies — a few-KB fragment can inflate to millions of items —
+// hence the hard caps BEFORE the data reaches Vue's reactivity.
+function str(v, max = 200) {
+  return typeof v === 'string' ? v.slice(0, max) : ''
+}
+function num(v, max = 1e9) {
+  const n = Number(v)
+  return Number.isFinite(n) && n >= 0 ? Math.min(n, max) : 0
+}
+function imgUrl(v) {
+  const s = str(v, 500)
+  return /^https:\/\//.test(s) ? s : ''
+}
+
 function unpackBooth(packed) {
   if (!packed || packed.v !== SHARE_VERSION || !Array.isArray(packed.items)) {
     throw new Error('Not a Rarebox booth')
   }
   return {
-    name: packed.n,
-    venue: packed.venue,
-    date: packed.date,
-    note: packed.note,
-    table: packed.table || '',
-    loc: Array.isArray(packed.loc) && packed.loc.length === 2 ? packed.loc : null,
-    locName: packed.locName || '',
-    items: packed.items.map(([type, game, cardId, name, setName, number, qty, price, img]) => ({
-      type, game, cardId, name, setName, number, qty, price, img,
-    })),
+    name: str(packed.n, 80),
+    venue: str(packed.venue, 120),
+    date: str(packed.date, 40),
+    note: str(packed.note, 500),
+    table: str(packed.table, 40),
+    loc: Array.isArray(packed.loc) && packed.loc.length === 2 ? [num(packed.loc[0] + 90, 180) - 90, num(packed.loc[1] + 180, 360) - 180] : null,
+    locName: str(packed.locName, 120),
+    items: packed.items.slice(0, MAX_BOOTH_ITEMS).map((it) => {
+      const [type, game, cardId, name, setName, number, qty, price, img] = Array.isArray(it) ? it : []
+      return {
+        type: str(type, 20),
+        game: str(game, 20),
+        cardId: str(cardId, 80),
+        name: str(name, 120),
+        setName: str(setName, 120),
+        number: str(number, 20),
+        qty: num(qty, 9999),
+        price: num(price),
+        img: imgUrl(img),
+      }
+    }),
   }
 }
 
@@ -131,8 +158,13 @@ export async function boothToUrl(booth, origin = window.location.origin) {
   return `${origin}/booth#b=${bytesToBase64Url(bytes)}`
 }
 
+// Decompression amplification guard: a legit 250-item booth gzips to
+// ~15KB; anything past 64KB compressed is not a booth someone made.
+const MAX_SHARE_BYTES = 64 * 1024
+
 /** share bytes → booth (QR scan path) */
 export async function decodeBoothBytes(bytes) {
+  if (bytes.length > MAX_SHARE_BYTES) throw new Error('Share payload too large')
   return unpackBooth(JSON.parse(await gunzip(bytes)))
 }
 
@@ -185,13 +217,17 @@ function packDirectory(title, entries) {
   }
 }
 
+const MAX_DIR_ENTRIES = 200
 function unpackDirectory(packed) {
   if (!packed || packed.dv !== DIR_VERSION || !Array.isArray(packed.e)) {
     throw new Error('Not a Rarebox booth directory')
   }
   return {
-    title: packed.t,
-    entries: packed.e.map(([name, venue, count, total, ref]) => ({ name, venue, count, total, ref })),
+    title: str(packed.t, 120),
+    entries: packed.e.slice(0, MAX_DIR_ENTRIES).map((en) => {
+      const [name, venue, count, total, ref] = Array.isArray(en) ? en : []
+      return { name: str(name, 80), venue: str(venue, 120), count: num(count, 9999), total: num(total), ref: str(ref, 200) }
+    }),
   }
 }
 
@@ -205,6 +241,7 @@ export async function directoryToUrl(title, entries, origin = window.location.or
 }
 
 export async function decodeDirectoryBytes(bytes) {
+  if (bytes.length > MAX_SHARE_BYTES) throw new Error('Share payload too large')
   return unpackDirectory(JSON.parse(await gunzip(bytes)))
 }
 

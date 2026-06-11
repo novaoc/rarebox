@@ -45,24 +45,26 @@ async function fetchWithRetry(url, retries = MAX_RETRIES) {
   }
 }
 
-async function fetchWithCache(url) {
+async function fetchWithCache(url, { durable = true } = {}) {
   const cached = cache.get(url)
   if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
     return cached.data
   }
   // Durable second layer (IndexedDB): serves Browse offline and rides out
   // API outages — set lists and card pages persist across sessions.
+  // Per-query search URLs opt out (durable: false): every distinct query
+  // would otherwise pile up a row in IndexedDB forever.
   if (typeof navigator !== 'undefined' && !navigator.onLine) {
-    const stale = cached?.data ?? await fromDurableUrl(url)
+    const stale = cached?.data ?? (durable ? await fromDurableUrl(url) : null)
     if (stale) return stale
   }
   try {
     const data = await fetchWithRetry(url)
     cache.set(url, { data, timestamp: Date.now() })
-    toDurableUrl(url, data)
+    if (durable) toDurableUrl(url, data)
     return data
   } catch (e) {
-    const stale = cached?.data ?? await fromDurableUrl(url)
+    const stale = cached?.data ?? (durable ? await fromDurableUrl(url) : null)
     if (stale) return stale
     throw e
   }
@@ -80,7 +82,7 @@ export async function searchCards(query, page = 1, pageSize = 20) {
   const term = query.replace(/\s+/g, '*')
   const encoded = encodeURIComponent(term)
   const url = `${BASE_URL}/cards?q=name:${encoded}*&page=${page}&pageSize=${pageSize}&orderBy=-set.releaseDate&select=id,name,number,set,supertype,rarity,tcgplayer,images`
-  const data = await fetchWithCache(url)
+  const data = await fetchWithCache(url, { durable: false })
   return data
 }
 
@@ -100,12 +102,16 @@ export async function getSets() {
   const LS_TS = 'rarebox_en_sets_ts'
   const cached = localStorage.getItem(LS_KEY)
   const ts = localStorage.getItem(LS_TS)
-  if (cached && ts && Date.now() - Number(ts) < 24 * 60 * 60 * 1000) {
-    return JSON.parse(cached)
-  }
-  if (cached && typeof navigator !== 'undefined' && !navigator.onLine) {
-    return JSON.parse(cached) // stale sets beat an offline error
-  }
+  // One corrupt localStorage write must not brick the sets list forever —
+  // parse failures fall through to the network
+  try {
+    if (cached && ts && Date.now() - Number(ts) < 24 * 60 * 60 * 1000) {
+      return JSON.parse(cached)
+    }
+    if (cached && typeof navigator !== 'undefined' && !navigator.onLine) {
+      return JSON.parse(cached) // stale sets beat an offline error
+    }
+  } catch { /* corrupt cache — refetch */ }
   const url = `${BASE_URL}/sets?orderBy=-releaseDate&select=id,name,series,total,printedTotal,releaseDate,images`
   const data = await fetchWithCache(url)
   const sets = data.data
@@ -294,9 +300,11 @@ export async function getJapaneseSets() {
   const LS_TS = 'rarebox_ja_sets_ts'
   const cached = localStorage.getItem(LS_KEY)
   const ts = localStorage.getItem(LS_TS)
-  if (cached && ts && Date.now() - Number(ts) < 24 * 60 * 60 * 1000) {
-    return JSON.parse(cached)
-  }
+  try {
+    if (cached && ts && Date.now() - Number(ts) < 24 * 60 * 60 * 1000) {
+      return JSON.parse(cached)
+    }
+  } catch { /* corrupt cache — refetch */ }
   const url = 'https://api.tcgdex.net/v2/ja/sets'
   const data = await fetchWithCache(url)
   sortJapaneseSets(data)
@@ -328,9 +336,9 @@ async function getJpPriceMap() {
   if (_jpPrices) return _jpPrices
   try {
     const res = await fetch('/jp-prices.json')
-    _jpPrices = res.ok ? (await res.json()).prices || {} : {}
-  } catch { _jpPrices = {} }
-  return _jpPrices
+    if (res.ok) _jpPrices = (await res.json()).prices || {}
+  } catch { /* leave null — retry next call (first attempt may be offline) */ }
+  return _jpPrices || {}
 }
 
 function jpPriceKey(setId, localId) {

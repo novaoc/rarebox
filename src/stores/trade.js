@@ -9,6 +9,7 @@ import { loadTradeState, saveTradeState } from '../db'
 
 const DEBOUNCE_MS = 3000
 let debounceTimer = null
+let flushRegistered = false
 
 export const useTradeStore = defineStore('trade', () => {
   // State
@@ -47,6 +48,19 @@ export const useTradeStore = defineStore('trade', () => {
     const tradeState = await loadTradeState()
     if (tradeState) {
       applyState(tradeState)
+    }
+    // Flush the debounce when the page goes away — edits made <3s before
+    // closing/backgrounding were silently dropped (portfolio store had
+    // this safety net; trade didn't)
+    if (typeof window !== 'undefined' && !flushRegistered) {
+      flushRegistered = true
+      const flush = () => {
+        if (window.__rareboxImporting) return
+        if (debounceTimer) { clearTimeout(debounceTimer); debounceTimer = null }
+        saveTradeState(getState()).catch(() => {})
+      }
+      window.addEventListener('pagehide', flush)
+      document.addEventListener('visibilitychange', () => { if (document.hidden) flush() })
     }
     initialized.value = true
   }

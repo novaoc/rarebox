@@ -2,6 +2,12 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <!-- CSP: script injection is the threat that matters for an app holding
+         shared booth/QR/import data. script-src allows only our bundle, the
+         hashed theme bootstrap below, and WASM (tesseract OCR). img https:
+         is by design (booth images are arbitrary https URLs); connect https:
+         keeps the six game APIs + future sources working. -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval' 'sha256-g2FAoWAhTfNhpsX5in/GMZUApX8W4ETL6lOpQeEbzTI='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; media-src 'self' blob:; font-src 'self' data:; worker-src 'self' blob:; connect-src 'self' https:; object-src 'none'; base-uri 'none'; form-action 'self'; frame-src 'none'" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="canonical" href="https://rarebox.io/" />
     <script>

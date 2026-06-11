@@ -48,7 +48,8 @@ export async function buildBackupPayload({ includePriceCache = true } = {}) {
 
   try {
     const trade = await loadTradeState()
-    if (trade && (trade.sideA?.length || trade.sideB?.length)) backup.data.trade = trade
+    // Trade sides are { items: [], totalValue: 0 }, not arrays
+    if (trade && (trade.sideA?.items?.length || trade.sideB?.items?.length)) backup.data.trade = trade
   } catch { /* no trade state */ }
 
   if (includePriceCache) {
@@ -113,9 +114,23 @@ export async function importBackup(data) {
   window.__rareboxImporting = true
 
   // Deep-plain the payload: callers may hand us a Vue reactive proxy,
-  // which IndexedDB's structured clone refuses to serialize
-  data = JSON.parse(JSON.stringify(data))
+  // which IndexedDB's structured clone refuses to serialize. The reviver
+  // drops prototype-pollution keys — imports are attacker-suppliable.
+  data = JSON.parse(JSON.stringify(data), (key, value) =>
+    key === '__proto__' || key === 'constructor' || key === 'prototype' ? undefined : value
+  )
 
+  try {
+    return await importBackupInner(data)
+  } catch (e) {
+    // Import failed before the reload — unfreeze persistence, or every
+    // edit for the rest of the session silently never saves.
+    window.__rareboxImporting = false
+    throw e
+  }
+}
+
+async function importBackupInner(data) {
   const result = { portfolios: 0, snapshots: 0, caches: 0, decks: 0 }
 
   // 1. Clear legacy localStorage mirrors + stale price cache
@@ -139,7 +154,7 @@ export async function importBackup(data) {
 
   // Trade: replace with the imported one, or clear so the old device's
   // half-finished trade doesn't haunt the new collection
-  await saveTradeState(data.data.trade || { sideA: [], sideB: [] })
+  await saveTradeState(data.data.trade || { sideA: { items: [], totalValue: 0 }, sideB: { items: [], totalValue: 0 } })
 
   if (data.data.decks) {
     try {
@@ -150,6 +165,10 @@ export async function importBackup(data) {
 
   if (data.data.priceCache) {
     for (const [key, val] of Object.entries(data.data.priceCache)) {
+      // Keys come from the imported file — only restore the price-cache
+      // namespace, never arbitrary localStorage keys (a crafted backup
+      // could otherwise overwrite settings/decks/booths).
+      if (!key.startsWith('ph_cache_')) continue
       localStorage.setItem(key, typeof val === 'string' ? val : JSON.stringify(val))
       result.caches++
     }

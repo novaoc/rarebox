@@ -46,9 +46,11 @@ async function cacheFirst(req, cacheName) {
   const hit = await caches.match(req)
   if (hit) return hit
   const resp = await fetch(req)
-  if (resp.ok) {
+  // Only full 200s: Safari video Range requests yield 206, which
+  // cache.put rejects (unhandled) — and would poison playback anyway
+  if (resp.status === 200) {
     const cache = await caches.open(cacheName)
-    cache.put(req, resp.clone())
+    cache.put(req, resp.clone()).catch(() => {})
   }
   return resp
 }
@@ -88,7 +90,9 @@ async function imageHandler(req) {
         return resp
       }
     } catch {
-      noCorsHosts.add(host)
+      // Only conclude "host blocks CORS" while online — a radio drop or
+      // DNS blip would otherwise stop caching that host for the SW's life
+      if (self.navigator.onLine) noCorsHosts.add(host)
     }
   }
   return fetch(req) // no-CORS fallback, served but not cached

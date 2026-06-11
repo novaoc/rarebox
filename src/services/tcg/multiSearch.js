@@ -393,7 +393,7 @@ async function searchYugioh(query) {
 // ── Card resolve (for deck price refresh) ─────────────────────────────────────
 
 async function resolvePokemonCard(cardId) {
-  const url = `https://api.pokemontcg.io/v2/cards/${cardId}`
+  const url = `https://api.pokemontcg.io/v2/cards/${encodeURIComponent(cardId)}`
   const d = await fetchJson(url)
   if (!d.data) return null
   return {
@@ -410,7 +410,7 @@ async function resolvePokemonCard(cardId) {
 }
 
 async function resolveMtgCard(cardId) {
-  const url = `https://api.scryfall.com/cards/${cardId}`
+  const url = `https://api.scryfall.com/cards/${encodeURIComponent(cardId)}`
   const d = await fetchJson(url)
   const imgs = d.image_uris || d.card_faces?.[0]?.image_uris || {}
   return {
@@ -447,7 +447,7 @@ async function resolveYugiohCard(cardId) {
 }
 
 async function resolveLorcanaCard(cardId) {
-  const url = `https://api.lorcast.com/v0/cards/${cardId}`
+  const url = `https://api.lorcast.com/v0/cards/${encodeURIComponent(cardId)}`
   const d = await fetchJson(url)
   if (!d) return null
   const img = d.image_uris?.digital || {}
@@ -482,7 +482,7 @@ async function resolveOnePieceCard(cardId) {
 }
 
 async function resolveRiftboundCard(cardId) {
-  const url = `https://api.riftcodex.com/cards/${cardId}`
+  const url = `https://api.riftcodex.com/cards/${encodeURIComponent(cardId)}`
   try {
     const d = await fetchJson(url)
     if (!d) return null
@@ -545,9 +545,11 @@ export async function multiSearch(query, { page = 1, pageSize = 20, category = '
   // when the cache has no hits — the cached snapshot can lag behind new sets
   // (and a cache-only miss used to make those cards unfindable entirely).
   const searches = active.map(async k => {
+    let localHit = null
     if (isGameCached(k)) {
       try {
         const cached = searchCache(query, { page: 1, pageSize: 500, providers: [k] })
+        localHit = cached
         // A hit set where NO card has a price means the cache predates the
         // price pass (Pokemon bulk data lands before prices) - the live API
         // returns results WITH prices, so prefer it in that window.
@@ -555,7 +557,11 @@ export async function multiSearch(query, { page = 1, pageSize = 20, category = '
         if (cached.cards.length > 0 && priced >= cached.cards.length * 0.3) return cached
       } catch { /* fall through to live */ }
     }
-    return ALL_PROVIDERS[k](query, page, pageSize).catch(() => ({ cards: [], total: 0 }))
+    // Offline (or live API down): unpriced local hits beat an empty page —
+    // without this, on-device search returns "No cards found" whenever the
+    // price pass hasn't finished before the connection dropped.
+    if (typeof navigator !== 'undefined' && !navigator.onLine && localHit?.cards.length) return localHit
+    return ALL_PROVIDERS[k](query, page, pageSize).catch(() => (localHit?.cards.length ? localHit : { cards: [], total: 0 }))
   })
 
   const results = await Promise.all(searches)

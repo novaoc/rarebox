@@ -53,8 +53,8 @@
           v-for="card in filteredResults"
           :key="card.id"
           class="card-result"
-          @click="selectCard(card)"
-          :class="{ selected: selectedCard?.id === card.id }"
+          @click="tapCard(card)"
+          :class="{ selected: selectedCard?.id === card.id, revealed: revealedCard === card.id }"
         >
           <div class="card-img-wrap">
             <img
@@ -305,6 +305,14 @@ function selectCard(card) {
   selectedCard.value = selectedCard.value?.id === card.id ? null : card
 }
 
+// Tap-to-reveal on touch devices (desktop reveals on hover; taps no-op there)
+const revealedCard = ref(null)
+const _canHover = typeof window !== 'undefined' && window.matchMedia('(hover: hover)').matches
+function tapCard(card) {
+  if (_canHover) { selectCard(card); return } // desktop: click = details, as before
+  revealedCard.value = revealedCard.value === card.id ? null : card.id
+}
+
 function openAddModal(card) {
   if (card.game && card.game !== 'pokemon') {
     // Non-Pokémon card — use tcgCard prop
@@ -434,12 +442,10 @@ function onAdded() {
 }
 .card-result:hover .card-overlay { opacity: 1; }
 
-/* Touch devices: show overlay always at reduced opacity */
+/* Touch: buttons stay hidden until the card is tapped once — art first.
+   A second tap (on a button) acts; tapping the card again hides them. */
+.card-result.revealed .card-overlay { opacity: 1; }
 @media (hover: none) {
-  .card-overlay {
-    opacity: 1;
-    background: color-mix(in srgb, var(--bg-card) 60%, transparent);
-  }
   .card-overlay .btn { font-size: 12px; padding: 6px 12px; }
 }
 

@@ -264,13 +264,18 @@ async function loadSetCards(set) {
   loadingCards.value = true
   cardsError.value = ''
   try {
-    cards.value = await provider.value.getSetCards(set.id, { signal: ac.signal })
+    const result = await provider.value.getSetCards(set.id, { signal: ac.signal })
+    // Provider aborts don't reach the fetch layer, so a slow set A can
+    // resolve after the user opened set B — drop stale responses
+    if (selectedSet.value?.id !== set.id) return
+    cards.value = result
     if (cards.value.length === 0) cardsError.value = 'No cards found for this set.'
   } catch (e) {
+    if (selectedSet.value?.id !== set.id) return
     if (e.name !== 'AbortError') cardsError.value = navigator.onLine ? 'Could not load cards for this set. Please try again.' : 'You\'re offline and this set hasn\'t been opened yet — open it once online and it stays available offline.'
   } finally {
     if (_abort === ac) _abort = null
-    loadingCards.value = false
+    if (selectedSet.value?.id === set.id) loadingCards.value = false
   }
 }
 

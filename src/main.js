@@ -11,8 +11,19 @@ import App from './App.vue'
 import './assets/main.css'
 import { installOfflineArtFallback } from './utils/offlineArt'
 
-// Card images that fail while offline become text-only placeholder mats
+// Offline = no card pictures: cross-origin images swap to generated sleeves
 installOfflineArtFallback()
+
+// A deploy deletes the previous build's hashed chunks from the precache;
+// an already-open tab then fails to lazy-load not-yet-visited routes.
+// Vite signals this precise case — one reload gets the fresh shell.
+window.addEventListener('vite:preloadError', (e) => {
+  e.preventDefault()
+  if (!sessionStorage.getItem('rbx_chunk_reload')) {
+    sessionStorage.setItem('rbx_chunk_reload', '1')
+    location.reload()
+  }
+})
 
 // Global error handler — catches Vue render errors
 const app = createApp(App)

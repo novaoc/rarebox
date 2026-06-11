@@ -60,8 +60,11 @@ export class FrameCollector {
     const u8 = bytes instanceof Uint8Array ? bytes : Uint8Array.from(bytes)
     const seq = u8[4] | (u8[5] << 8)
     const total = u8[6] | (u8[7] << 8)
+    // Validate BEFORE committing total: a corrupt total=0 frame would
+    // otherwise mark the transfer instantly "done" and wedge the collector
+    if (total === 0 || seq >= total) return false
     if (this.total === null) this.total = total
-    if (total !== this.total || seq >= total) return false // different transfer
+    if (total !== this.total) return false // different transfer
     if (this.chunks.has(seq)) return false
     this.chunks.set(seq, u8.subarray(HEADER_SIZE))
     return true
@@ -94,16 +97,18 @@ export class FrameCollector {
 export async function gzip(str) {
   const cs = new CompressionStream('gzip')
   const writer = cs.writable.getWriter()
-  writer.write(new TextEncoder().encode(str))
-  writer.close()
+  // Writer promises reject alongside arrayBuffer() on bad input — swallow
+  // them so malformed payloads throw once, not as unhandled rejections
+  writer.write(new TextEncoder().encode(str)).catch(() => {})
+  writer.close().catch(() => {})
   return new Uint8Array(await new Response(cs.readable).arrayBuffer())
 }
 
 export async function gunzip(bytes) {
   const ds = new DecompressionStream('gzip')
   const writer = ds.writable.getWriter()
-  writer.write(bytes)
-  writer.close()
+  writer.write(bytes).catch(() => {})
+  writer.close().catch(() => {})
   return new TextDecoder().decode(await new Response(ds.readable).arrayBuffer())
 }
 

@@ -561,14 +561,21 @@ async function openBulkAddModal() {
       .map(i => i.cardId)
   )
 
-  // Load all cards
+  // Load all cards — try/finally so a failed fetch can't leave the
+  // "+ Add Set" button wedged at "Loading…" until reload
   let allCards = []
-  if (selectedSet.value._lang === 'ja') {
-    const data = await getJapaneseCardsBySet(selectedSet.value.id, 1, 999)
-    allCards = data.data || []
-  } else {
-    const data = await getCardsBySet(selectedSet.value.id, 1, 200)
-    allCards = data.data || []
+  try {
+    if (selectedSet.value._lang === 'ja') {
+      const data = await getJapaneseCardsBySet(selectedSet.value.id, 1, 999)
+      allCards = data.data || []
+    } else {
+      // 250 covers the largest EN sets (Surging Sparks 252) — 200 cut tails off
+      const data = await getCardsBySet(selectedSet.value.id, 1, 250)
+      allCards = data.data || []
+    }
+  } catch {
+    bulkLoading.value = false
+    return
   }
 
   // Build bulk card list with prices

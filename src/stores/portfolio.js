@@ -109,11 +109,16 @@ export const usePortfolioStore = defineStore('portfolio', () => {
       }
     }
 
-    // Safety: register beforeunload flush (only once)
+    // Safety: flush pending saves when the page goes away. pagehide is
+    // the one that actually fires on iOS Safari (beforeunload often
+    // doesn't), and visibilitychange:hidden covers app-switch on mobile —
+    // the 3s debounce otherwise loses edits made just before backgrounding.
     if (typeof window !== 'undefined' && !beforeunloadRegistered) {
       beforeunloadRegistered = true
-      window.addEventListener('beforeunload', () => {
-        persistNow()
+      window.addEventListener('beforeunload', () => { persistNow() })
+      window.addEventListener('pagehide', () => { persistNow() })
+      document.addEventListener('visibilitychange', () => {
+        if (document.hidden) persistNow()
       })
     }
 
