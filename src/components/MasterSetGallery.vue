@@ -58,24 +58,39 @@
         <button class="btn btn-primary" :disabled="adding" @click="addFound">{{ adding ? 'Adding…' : `Add ${markedCards.length} to shelf` }}</button>
       </div>
 
-    <!-- Card preview lightbox — big enough to show a vendor -->
+    <!-- Card preview lightbox — big enough to show a vendor. Swipe (or
+         arrow keys / chevrons) pages through the rest of the same list,
+         so a vendor can flip through every card you still need -->
     <Teleport to="body">
-      <div v-if="preview" class="msg-preview" @click="preview = null">
+      <div
+        v-if="preview"
+        class="msg-preview"
+        @click="closePreview"
+        @touchstart.passive="onPreviewTouchStart"
+        @touchend.passive="onPreviewTouchEnd"
+      >
+        <button v-if="previewList.length > 1" class="msg-preview-nav msg-preview-nav-prev" @click.stop="previewStep(-1)" aria-label="Previous card">‹</button>
         <div class="msg-preview-inner" @click.stop>
-          <img :src="preview.images?.large || preview.images?.small" :alt="preview.name" class="msg-preview-img" />
+          <transition :name="slideDir < 0 ? 'msg-slide-r' : 'msg-slide-l'" mode="out-in">
+            <img :key="preview.id" :src="preview.images?.large || preview.images?.small" :alt="preview.name" class="msg-preview-img" />
+          </transition>
           <div class="msg-preview-meta">
             <div class="msg-preview-name">{{ preview.name }}</div>
             <div class="msg-preview-sub">{{ preview.set?.name || group.name }} · #{{ preview.number }}</div>
+            <div v-if="previewList.length > 1" class="msg-preview-count">
+              {{ previewIndex + 1 }} / {{ previewList.length }} {{ isOwned(preview) ? 'owned' : 'still needed' }} · swipe for next
+            </div>
           </div>
           <button class="msg-preview-close" @click="preview = null" aria-label="Close">✕</button>
         </div>
+        <button v-if="previewList.length > 1" class="msg-preview-nav msg-preview-nav-next" @click.stop="previewStep(1)" aria-label="Next card">›</button>
       </div>
     </Teleport>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { fetchSetCards, sortByNumber } from '../utils/masterSets'
 
 const props = defineProps({
@@ -138,6 +153,58 @@ function tapCard(card) {
   if (isOwned(card)) { preview.value = card; return }
   emit('toggle-mark', card.id)
 }
+
+// ── Lightbox navigation — vendor flash-card mode ───────────────────────
+// Swiping pages through whichever side the preview opened from: a needed
+// card flips through ALL needed cards (number order, wraps around), an
+// owned card through the owned ones.
+const slideDir = ref(1)
+const previewList = computed(() => {
+  if (!preview.value) return []
+  const side = isOwned(preview.value)
+  return cards.value.filter(c => isOwned(c) === side)
+})
+const previewIndex = computed(() => previewList.value.findIndex(c => c.id === preview.value?.id))
+function previewStep(dir) {
+  const list = previewList.value
+  if (list.length < 2) return
+  slideDir.value = dir
+  const i = previewIndex.value
+  preview.value = list[(i + dir + list.length) % list.length]
+}
+
+let touchX = 0
+let touchY = 0
+let suppressClose = false
+function onPreviewTouchStart(e) {
+  touchX = e.changedTouches[0].clientX
+  touchY = e.changedTouches[0].clientY
+}
+function onPreviewTouchEnd(e) {
+  const dx = e.changedTouches[0].clientX - touchX
+  const dy = e.changedTouches[0].clientY - touchY
+  // Any real movement: it was a swipe, not a tap — don't let the click
+  // that follows close the lightbox mid-browse
+  if (Math.abs(dx) > 10 || Math.abs(dy) > 10) {
+    suppressClose = true
+    setTimeout(() => { suppressClose = false }, 350)
+  }
+  if (Math.abs(dx) > 48 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+    previewStep(dx < 0 ? 1 : -1)
+  }
+}
+function closePreview() {
+  if (suppressClose) return
+  preview.value = null
+}
+function onPreviewKey(e) {
+  if (!preview.value) return
+  if (e.key === 'ArrowRight') previewStep(1)
+  else if (e.key === 'ArrowLeft') previewStep(-1)
+  else if (e.key === 'Escape') preview.value = null
+}
+onMounted(() => window.addEventListener('keydown', onPreviewKey))
+onUnmounted(() => window.removeEventListener('keydown', onPreviewKey))
 
 function addFound() {
   adding.value = true
@@ -339,6 +406,45 @@ onMounted(async () => {
 .msg-preview-meta { text-align: center; color: #fff; }
 .msg-preview-name { font-size: 16px; font-weight: 800; }
 .msg-preview-sub { font-size: 12.5px; opacity: 0.85; font-weight: 600; margin-top: 2px; }
+.msg-preview-count {
+  font-size: 11.5px;
+  font-weight: 700;
+  opacity: 0.7;
+  margin-top: 5px;
+}
+.msg-preview-nav {
+  flex-shrink: 0;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  background: var(--bg-card);
+  border: 2px solid var(--ink);
+  box-shadow: var(--shadow-sm);
+  font-size: 24px;
+  line-height: 1;
+  font-weight: 900;
+  cursor: pointer;
+  color: var(--ink);
+  z-index: 1;
+}
+.msg-preview-nav:active { box-shadow: none; transform: translate(1px, 1px); }
+.msg-preview-nav-prev { margin-right: 10px; }
+.msg-preview-nav-next { margin-left: 10px; }
+/* Phones: float the chevrons over the image edges — side-by-side there's
+   no room, and thumbs reach mid-screen anyway */
+@media (max-width: 640px) {
+  .msg-preview-nav { position: fixed; top: 50%; transform: translateY(-50%); opacity: 0.92; }
+  .msg-preview-nav-prev { left: 8px; margin: 0; }
+  .msg-preview-nav-next { right: 8px; margin: 0; }
+  .msg-preview-nav:active { transform: translateY(-50%) translate(1px, 1px); }
+}
+/* Swipe transitions — card slides out the way the finger moved */
+.msg-slide-l-enter-active, .msg-slide-l-leave-active,
+.msg-slide-r-enter-active, .msg-slide-r-leave-active { transition: transform 0.14s ease, opacity 0.14s ease; }
+.msg-slide-l-enter-from { transform: translateX(28px); opacity: 0; }
+.msg-slide-l-leave-to { transform: translateX(-28px); opacity: 0; }
+.msg-slide-r-enter-from { transform: translateX(-28px); opacity: 0; }
+.msg-slide-r-leave-to { transform: translateX(28px); opacity: 0; }
 .msg-preview-close {
   position: absolute;
   top: -14px;
