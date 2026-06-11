@@ -544,29 +544,70 @@ a:hover { text-decoration: underline; text-decoration-thickness: 2px; text-under
   .stat-tile { padding: 12px 14px; }
 }
 
-/* ── Offline art placeholder (see src/utils/offlineArt.js) ─────────────
+/* ── Offline art sleeves (see src/utils/offlineArt.js) ─────────────────
    Replaces card <img>s that fail to load while offline. Inherits the
-   image's own classes for sizing; these rules add the mat look. */
+   image's own classes for sizing; per-card hue/tilt arrive inline as
+   --oa-h / --oa-tilt, pattern as a oa-* class. */
 .offline-art {
+  --oa-bg: hsl(var(--oa-h) 50% 91%);
+  --oa-ink: hsl(var(--oa-h) 35% 72%);
+  --oa-pop: hsl(var(--oa-h) 65% 82%);
+  --oa-text: hsl(var(--oa-h) 45% 24%);
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 2px;
+  gap: 3px;
   padding: 6px;
   text-align: center;
-  background: var(--bg-secondary);
-  border: 2px dashed var(--text-muted);
+  background-color: var(--oa-bg);
+  border: 2px solid var(--ink);
   border-radius: 10px;
   aspect-ratio: 63 / 88; /* card proportions when the class doesn't set a height */
   overflow: hidden;
   box-sizing: border-box;
 }
-.offline-art-icon { font-size: 15px; line-height: 1; }
+:root[data-theme="dark"] .offline-art {
+  --oa-bg: hsl(var(--oa-h) 25% 20%);
+  --oa-ink: hsl(var(--oa-h) 22% 30%);
+  --oa-pop: hsl(var(--oa-h) 35% 32%);
+  --oa-text: hsl(var(--oa-h) 45% 85%);
+}
+.offline-art.oa-dots {
+  background-image: radial-gradient(var(--oa-ink) 1.2px, transparent 1.3px);
+  background-size: 11px 11px;
+}
+.offline-art.oa-stripes {
+  background-image: repeating-linear-gradient(45deg, var(--oa-ink) 0 2px, transparent 2px 9px);
+}
+.offline-art.oa-cross {
+  background-image:
+    repeating-linear-gradient(45deg, var(--oa-ink) 0 1px, transparent 1px 8px),
+    repeating-linear-gradient(-45deg, var(--oa-ink) 0 1px, transparent 1px 8px);
+}
+.offline-art.oa-checker {
+  background-image: conic-gradient(var(--oa-ink) 25%, transparent 0 50%, var(--oa-ink) 0 75%, transparent 0);
+  background-size: 14px 14px;
+}
+.offline-art-mono {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: var(--oa-pop);
+  border: 2px solid var(--ink);
+  box-shadow: var(--shadow-pressed, 1.5px 1.5px 0 var(--ink));
+  transform: rotate(var(--oa-tilt));
+  font-size: clamp(13px, 1.4vw + 8px, 22px);
+  font-weight: 900;
+  color: var(--oa-text);
+}
 .offline-art-name {
   font-size: 10.5px;
   font-weight: 800;
-  color: var(--text-primary);
+  color: var(--oa-text);
   line-height: 1.25;
   max-width: 100%;
   display: -webkit-box;
@@ -575,8 +616,13 @@ a:hover { text-decoration: underline; text-decoration-thickness: 2px; text-under
   overflow: hidden;
 }
 .offline-art-note {
-  font-size: 9px;
+  font-size: 8.5px;
   font-weight: 700;
-  color: var(--text-muted);
+  font-style: italic;
+  color: var(--oa-text);
+  opacity: 0.65;
   white-space: nowrap;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
