@@ -2,7 +2,7 @@
   <transition name="fade">
     <div v-if="st.running" class="oi-pill" role="status" :title="`Downloading ${gameName} card images`">
       <span class="oi-spinner" aria-hidden="true"></span>
-      🖼 {{ pct }}% · {{ st.done.toLocaleString() }}/{{ st.total.toLocaleString() }}<template v-if="eta"> · {{ eta }}</template>
+      🖼 {{ pct }}% · {{ st.done.toLocaleString() }}/{{ st.total.toLocaleString() }}<template v-if="st.paused"> · paused</template><template v-else-if="eta"> · {{ eta }}</template>
     </div>
   </transition>
 </template>

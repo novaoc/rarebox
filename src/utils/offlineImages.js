@@ -28,10 +28,15 @@ import { getProvider } from '../services/tcg/providers'
 import { getSets as getPokemonSets, getJapaneseSets } from '../services/pokemonApi'
 
 export const BULK_CACHE = 'rarebox-img-bulk'
-// All six image sources are HTTP/2 CDNs (and the relay is Vercel's edge) —
-// they multiplex many streams per connection, so 14-wide is comfortable.
-// Measured: 5-wide ≈ 18 img/s, 14-wide ≈ 45+ img/s on a home connection.
-const CONCURRENCY = 20
+// All six image sources are HTTP/2 CDNs — they multiplex many streams per
+// connection. Desktop runs wide (measured 50-70 img/s); phones run a
+// deliberately gentle profile: sustained max-CPU downloads overheat a
+// passively-cooled phone, so mobile gets fewer lanes, fewer encoder
+// workers, and a duty-cycle breather (~4s work / 1.2s rest).
+const IS_MOBILE = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
+const CONCURRENCY = IS_MOBILE ? 6 : 20
+const BREATHER_WORK_MS = 4000
+const BREATHER_REST_MS = 1200
 const TRANSCODE_MAX_BYTES = 30_000 // smaller than this → store as-is
 const TRANSCODE_QUALITY = 0.72
 
@@ -55,6 +60,7 @@ export const offlineImagesState = reactive({
   bytes: 0,
   ratePerSec: 0,
   etaSec: null,
+  paused: false, // auto-pause while the app is hidden (screen off / other app)
   finishedAt: null,
 })
 
@@ -149,7 +155,7 @@ function getPool() {
   if (_pool) return _pool
   if (typeof OffscreenCanvas === 'undefined' || typeof Worker === 'undefined') return null
   _poolUrl = URL.createObjectURL(new Blob([WORKER_SRC], { type: 'text/javascript' }))
-  const size = Math.min(4, Math.max(2, (navigator.hardwareConcurrency || 4) - 1))
+  const size = IS_MOBILE ? 2 : Math.min(4, Math.max(2, (navigator.hardwareConcurrency || 4) - 1))
   _pool = Array.from({ length: size }, () => {
     const w = new Worker(_poolUrl)
     w.onmessage = (e) => {
@@ -245,8 +251,27 @@ export async function downloadOfflineImages(games) {
     st.total = work.length
 
     const queue = work.slice()
+    const sleep = ms => new Promise(r => setTimeout(r, ms))
+
+    // Hidden app = no downloads. Stops phones from cooking in a pocket;
+    // picks straight back up when the app is visible again.
+    const onVisibility = () => { st.paused = document.hidden }
+    document.addEventListener('visibilitychange', onVisibility)
+    onVisibility()
+
+    let cycleStart = Date.now()
+    async function pace() {
+      while (st.paused && !ac.signal.aborted) { await sleep(500); cycleStart = Date.now() }
+      if (IS_MOBILE && Date.now() - cycleStart > BREATHER_WORK_MS) {
+        await sleep(BREATHER_REST_MS)
+        cycleStart = Date.now()
+      }
+    }
+
     async function worker() {
       while (queue.length && !ac.signal.aborted) {
+        await pace()
+        if (ac.signal.aborted) return
         const { game, url } = queue.shift()
         st.game = game
         try {
@@ -269,7 +294,12 @@ export async function downloadOfflineImages(games) {
       }
     }
     _samples.length = 0
-    await Promise.all(Array.from({ length: CONCURRENCY }, worker))
+    try {
+      await Promise.all(Array.from({ length: CONCURRENCY }, worker))
+    } finally {
+      document.removeEventListener('visibilitychange', onVisibility)
+      st.paused = false
+    }
   } finally {
     st.running = false
     st.game = ''

@@ -114,7 +114,7 @@
         <div>
           <div class="settings-item-label">{{ oiState.running ? `Downloading… ${oiState.done.toLocaleString()} / ${oiState.total.toLocaleString()}` : 'Download images' }}</div>
           <div class="settings-item-sub">
-            <template v-if="oiState.running">{{ fmtBytes(oiState.bytes) }} stored · runs in the background, safe to keep using the app</template>
+            <template v-if="oiState.running">{{ fmtBytes(oiState.bytes) }} stored · pauses while the app is hidden · phones download gently to stay cool</template>
             <template v-else-if="oiCached > 0">{{ oiCached.toLocaleString() }} images stored — re-run any time to top up new sets (already-downloaded cards are skipped)</template>
             <template v-else>Picks up where it left off if interrupted</template>
           </div>
