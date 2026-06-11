@@ -123,6 +123,21 @@
         <button v-else class="btn btn-secondary btn-sm" @click="stopOfflineImages()">Pause</button>
       </div>
 
+      <div class="settings-item">
+        <div>
+          <div class="settings-item-label">Transfer pack between devices</div>
+          <div class="settings-item-sub">
+            <template v-if="oiTransferMsg">{{ oiTransferMsg }}</template>
+            <template v-else>Download on a desktop (fast & cool), export the pack as one file, then import it here — AirDrop, USB, any drive works</template>
+          </div>
+        </div>
+        <div class="oi-transfer-btns">
+          <button v-if="oiCached > 0" class="btn btn-secondary btn-sm" :disabled="oiBusy || oiState.running" @click="exportPack">{{ oiBusy === 'export' ? 'Packing…' : 'Export' }}</button>
+          <button class="btn btn-secondary btn-sm" :disabled="oiBusy || oiState.running" @click="$refs.packFile.click()">{{ oiBusy === 'import' ? 'Importing…' : 'Import' }}</button>
+          <input ref="packFile" type="file" accept=".rbximg,application/octet-stream" style="display:none" @change="importPack" />
+        </div>
+      </div>
+
       <div v-if="oiCached > 0 && !oiState.running" class="settings-item">
         <div>
           <div class="settings-item-label">Remove offline images</div>
@@ -414,7 +429,7 @@ import { exportBackup, validateBackup, importBackup } from '../utils/backup'
 import { parseCollectrFile } from '../utils/collectrImport'
 import { getActiveAlerts, getTriggeredAlerts, removeAlert, clearTriggeredAlerts, clearAllAlerts } from '../utils/alerts'
 import LocalSyncModal from '../components/LocalSyncModal.vue'
-import { offlineImagesState, estimateGames, downloadOfflineImages, stopOfflineImages, bulkCacheCount, clearBulkCache, fmtBytes } from '../utils/offlineImages'
+import { offlineImagesState, estimateGames, downloadOfflineImages, stopOfflineImages, bulkCacheCount, clearBulkCache, fmtBytes, exportImagePack, importImagePack } from '../utils/offlineImages'
 import { getCardCounts, clearCardCache, saveCardDatabaseReady, buildSearchIndex } from '../services/tcg/cardCache'
 import { useTradeStore } from '../stores/trade'
 import { getThemePref, setThemePref } from '../utils/theme'
@@ -442,6 +457,32 @@ async function startOfflineImages() {
   if (!games.length) return
   downloadOfflineImages(games).then(refreshOfflineImages)
 }
+const oiBusy = ref('')
+const oiTransferMsg = ref('')
+async function exportPack() {
+  oiBusy.value = 'export'
+  oiTransferMsg.value = 'Packing images into one file…'
+  try {
+    const { entries, bytes } = await exportImagePack((d, t) => { oiTransferMsg.value = `Packing ${d.toLocaleString()} / ${t.toLocaleString()}…` })
+    oiTransferMsg.value = `Exported ${entries.toLocaleString()} images (${fmtBytes(bytes)}) — move the file to the other device and Import it there.`
+  } catch (e) {
+    oiTransferMsg.value = 'Export failed: ' + (e.message || e)
+  } finally { oiBusy.value = '' }
+}
+async function importPack(ev) {
+  const file = ev.target.files?.[0]
+  ev.target.value = ''
+  if (!file) return
+  oiBusy.value = 'import'
+  try {
+    const count = await importImagePack(file, (c, _t, frac) => { oiTransferMsg.value = `Importing… ${c.toLocaleString()} images (${Math.round(frac * 100)}%)` })
+    oiTransferMsg.value = `Imported ${count.toLocaleString()} images — cards now show offline on this device.`
+    await refreshOfflineImages()
+  } catch (e) {
+    oiTransferMsg.value = 'Import failed: ' + (e.message || e)
+  } finally { oiBusy.value = '' }
+}
+
 async function removeOfflineImages() {
   if (!confirm('Remove all offline card images? Browsing will need internet for pictures again.')) return
   await clearBulkCache()
@@ -889,4 +930,5 @@ function goToDashboard() {
 .oi-game-row input { width: 17px; height: 17px; accent-color: var(--accent); }
 .oi-game-name { font-weight: 700; flex: 1; }
 .oi-game-est { font-size: 12px; color: var(--text-muted); }
+.oi-transfer-btns { display: flex; gap: 8px; flex-shrink: 0; }
 </style>

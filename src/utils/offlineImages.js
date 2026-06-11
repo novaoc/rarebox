@@ -321,6 +321,75 @@ export async function bulkCacheCount() {
   } catch { return 0 }
 }
 
+// ── Pack transfer (desktop → phone without re-downloading) ────────────
+// The whole bulk cache serializes into one .rbximg file: download the
+// pack on a desktop (fast, cool), move the file any way you like
+// (AirDrop, USB, a drive), import it on the phone. Format:
+//   "RBXIMG1" magic, then per entry:
+//   [u32 urlLen][url][u16 typeLen][contentType][u32 dataLen][data]
+// Blob parts reference the cached blobs lazily, so export never holds
+// the whole pack in memory; import slices the File without reading it
+// all at once.
+
+const PACK_MAGIC = 'RBXIMG1'
+
+export async function exportImagePack(onProgress) {
+  const cache = await caches.open(BULK_CACHE)
+  const keys = await cache.keys()
+  const enc = new TextEncoder()
+  const parts = [enc.encode(PACK_MAGIC)]
+  let done = 0
+  for (const req of keys) {
+    const resp = await cache.match(req)
+    if (!resp) continue
+    const blob = await resp.blob()
+    const url = enc.encode(req.url)
+    const type = enc.encode(blob.type || 'image/webp')
+    const head = new DataView(new ArrayBuffer(10))
+    head.setUint32(0, url.length, true)
+    head.setUint16(4, type.length, true)
+    head.setUint32(6, blob.size, true)
+    parts.push(head.buffer, url, type, blob)
+    done++
+    if (done % 250 === 0) onProgress?.(done, keys.length)
+  }
+  const pack = new Blob(parts, { type: 'application/octet-stream' })
+  const a = document.createElement('a')
+  a.href = URL.createObjectURL(pack)
+  a.download = `rarebox-images-${new Date().toISOString().split('T')[0]}.rbximg`
+  a.click()
+  setTimeout(() => URL.revokeObjectURL(a.href), 60_000)
+  return { entries: done, bytes: pack.size }
+}
+
+export async function importImagePack(file, onProgress) {
+  const dec = new TextDecoder()
+  const magic = dec.decode(await file.slice(0, PACK_MAGIC.length).arrayBuffer())
+  if (magic !== PACK_MAGIC) throw new Error('Not a Rarebox image pack')
+  const cache = await caches.open(BULK_CACHE)
+  let offset = PACK_MAGIC.length
+  let count = 0
+  while (offset < file.size) {
+    const head = new DataView(await file.slice(offset, offset + 10).arrayBuffer())
+    const urlLen = head.getUint32(0, true)
+    const typeLen = head.getUint16(4, true)
+    const dataLen = head.getUint32(6, true)
+    offset += 10
+    const url = dec.decode(await file.slice(offset, offset + urlLen).arrayBuffer())
+    offset += urlLen
+    const type = dec.decode(await file.slice(offset, offset + typeLen).arrayBuffer())
+    offset += typeLen
+    const body = file.slice(offset, offset + dataLen, type)
+    offset += dataLen
+    await cache.put(url, new Response(body, {
+      headers: { 'Content-Type': type, 'Content-Length': String(dataLen) },
+    }))
+    count++
+    if (count % 100 === 0) onProgress?.(count, null, offset / file.size)
+  }
+  return count
+}
+
 export async function clearBulkCache() {
   try { await caches.delete(BULK_CACHE) } catch { /* nothing to clear */ }
 }
