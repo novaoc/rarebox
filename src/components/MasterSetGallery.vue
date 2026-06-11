@@ -110,7 +110,6 @@ const filters = computed(() => [
 const visibleCards = computed(() => {
   // Complete set → no filter bar, always show the whole set
   if (!hasUnowned.value) return cards.value
-  if (filter.value === 'owned') return cards.value.filter(c => owned.value.has(c.id))
   if (filter.value === 'need') return cards.value.filter(c => !owned.value.has(c.id))
   return cards.value
 })
@@ -122,9 +121,12 @@ function tapCard(card) {
   emit('toggle-mark', card.id)
 }
 
-async function addFound() {
+function addFound() {
   adding.value = true
   emit('add-found', markedCards.value)
+  // Parent handles the emit synchronously (adds items + clears marks), so
+  // reset here — otherwise the next batch of finds sees a stuck button
+  adding.value = false
 }
 
 onMounted(async () => {
@@ -205,7 +207,6 @@ onMounted(async () => {
   cursor: pointer;
   transition: background 0.12s, box-shadow 0.1s, transform 0.1s;
 }
-.msg-filter-btn:hover { background: var(--bg-hover); }
 .msg-filter-btn:active { box-shadow: none; transform: translate(1px, 1px); }
 .msg-filter-btn.active { background: var(--accent); color: var(--on-accent); }
 .msg-filter-count {
@@ -218,7 +219,7 @@ onMounted(async () => {
 }
 .msg-filter-btn.active .msg-filter-count { background: rgba(20, 20, 20, 0.15); color: var(--on-accent); }
 
-.msg-grid-wrap { overflow-y: auto; padding: 4px 18px 18px; flex: 1; }
+.msg-grid-wrap { overflow-y: auto; overscroll-behavior: contain; padding: 4px 18px 18px; flex: 1; }
 .msg-hint { font-size: 12px; color: var(--text-secondary); font-weight: 600; margin: 0 0 12px; }
 .msg-loading, .msg-error { padding: 40px 0; text-align: center; color: var(--text-secondary); font-weight: 600; font-size: 13.5px; }
 .msg-grid {
@@ -241,8 +242,15 @@ onMounted(async () => {
 /* Missing cards sit in shadow until you find them */
 .msg-card.need .msg-img { filter: grayscale(1) brightness(0.72); opacity: 0.75; }
 .msg-card.need .msg-img-wrap { border-style: dashed; }
-.msg-card.need:hover .msg-img { filter: grayscale(0.6) brightness(0.85); }
 .msg-card.got .msg-img-wrap { border-color: var(--accent-text); box-shadow: 0 0 0 2px var(--accent); }
+
+/* Hover affordances only where hover exists — on touch these stick after a
+   tap and leave cards dimmed inconsistently */
+@media (hover: hover) {
+  .msg-filter-btn:hover { background: var(--bg-hover); }
+  .msg-card.need:hover .msg-img { filter: grayscale(0.6) brightness(0.85); }
+  .msg-enlarge:hover { background: var(--bg-hover); }
+}
 
 .msg-tag {
   position: absolute;
@@ -266,8 +274,8 @@ onMounted(async () => {
 .msg-enlarge {
   margin-top: 6px;
   width: 100%;
-  padding: 5px 8px;
-  font-size: 10.5px;
+  padding: 9px 8px;
+  font-size: 11px;
   font-weight: 800;
   font-family: inherit;
   color: var(--ink);
@@ -277,7 +285,6 @@ onMounted(async () => {
   box-shadow: var(--shadow-pressed);
   cursor: pointer;
 }
-.msg-enlarge:hover { background: var(--bg-hover); }
 .msg-enlarge:active { box-shadow: none; transform: translate(1px, 1px); }
 
 /* Lightbox */
@@ -290,11 +297,14 @@ onMounted(async () => {
   align-items: center;
   justify-content: center;
   padding: 24px;
+  overflow-y: auto;
 }
-.msg-preview-inner { position: relative; display: flex; flex-direction: column; align-items: center; gap: 12px; max-width: 100%; }
+.msg-preview-inner { position: relative; display: flex; flex-direction: column; align-items: center; gap: 12px; max-width: 100%; margin: auto; }
 .msg-preview-img {
   max-width: min(420px, 88vw);
-  max-height: 78vh;
+  /* leave room for the meta lines + overlay padding so the card name stays
+     on-screen on landscape phones */
+  max-height: min(78vh, calc(100vh - 140px));
   border-radius: 14px;
   border: 3px solid var(--ink);
   box-shadow: var(--shadow-lg);

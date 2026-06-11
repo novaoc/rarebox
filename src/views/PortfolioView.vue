@@ -628,7 +628,10 @@ const msGalleryGroup = computed(() => masterSetGroups.value.find(g => g.key === 
 function addFoundCards(cards) {
   const g = msGalleryGroup.value
   if (!g) return
-  const today = new Date().toISOString().slice(0, 10)
+  // Local date, not toISOString (UTC) — an evening find shouldn't be
+  // stamped with tomorrow, and the "found today" tally counts local days
+  const d = new Date()
+  const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
   for (const card of cards) {
     store.addItem(portfolio.value.id, {
       type: 'card', quantity: 1, purchasePrice: 0, purchaseDate: today, notes: '',

@@ -9,8 +9,20 @@ import { getProvider } from '../services/tcg/providers'
 
 export async function fetchSetCards({ game, setId, setName, lang }) {
   if (game === 'pokemon') {
-    const data = lang === 'ja' ? await getJapaneseCardsBySet(setId, 1, 999) : await getCardsBySet(setId, 1, 250)
-    return (data.data || []).map(c => ({
+    let list
+    if (lang === 'ja') {
+      list = (await getJapaneseCardsBySet(setId, 1, 999)).data || []
+    } else {
+      // pokemontcg.io caps pageSize at 250 and a few sets exceed it
+      // (Surging Sparks is 252) — page until the set runs dry
+      list = []
+      for (let page = 1; ; page++) {
+        const batch = (await getCardsBySet(setId, page, 250)).data || []
+        list.push(...batch)
+        if (batch.length < 250) break
+      }
+    }
+    return list.map(c => ({
       id: c.id,
       name: c.name,
       number: c.number,

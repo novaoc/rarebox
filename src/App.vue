@@ -52,7 +52,7 @@
     <main class="main-content">
       <router-view v-slot="{ Component, route }">
         <transition name="fade" :duration="300">
-          <component :is="Component" :key="route?.fullPath" />
+          <component :is="Component" :key="route?.fullPath" @create-portfolio="showNewPortfolioModal = true" />
         </transition>
       </router-view>
       <div class="app-footer">
