@@ -24,6 +24,8 @@
  */
 import { reactive } from 'vue'
 import { getGameCards, getCardCounts, getTcgPrefs } from '../services/tcg/cardCache'
+import { getProvider } from '../services/tcg/providers'
+import { getSets as getPokemonSets, getJapaneseSets } from '../services/pokemonApi'
 
 export const BULK_CACHE = 'rarebox-img-bulk'
 const CONCURRENCY = 5
@@ -58,6 +60,7 @@ let _abort = null
 // allowlisted /api/img relay. Normal browsing still hits the CDN directly.
 const NEEDS_PROXY = new Set([
   'images.ygoprodeck.com', 'cards.lorcast.io', 'optcgapi.com', 'cmsassets.rgpub.io',
+  'den-media.pokellector.com',
 ])
 function fetchUrlFor(url) {
   try {
@@ -118,8 +121,29 @@ export async function downloadOfflineImages(games) {
   try {
     const cache = await caches.open(BULK_CACHE)
 
-    // Collect work first so the pill can show a true total
+    // Collect work first so the pill can show a true total.
+    // Set logos/symbols come first — they're what Browse shows before any
+    // set is opened, and there are only a few hundred of them.
     const work = []
+    for (const game of games) {
+      try {
+        if (game === 'pokemon') {
+          const [en, jp] = await Promise.all([
+            getPokemonSets().catch(() => []),
+            getJapaneseSets().catch(() => []),
+          ])
+          for (const s of [...en, ...jp]) {
+            if (s.images?.logo) work.push({ game, url: s.images.logo })
+            if (s.images?.symbol) work.push({ game, url: s.images.symbol })
+          }
+        } else {
+          const sets = await getProvider(game)?.getSets() || []
+          for (const s of sets) {
+            if (s.logo) work.push({ game, url: s.logo })
+          }
+        }
+      } catch { /* set logos are a bonus — cards still download */ }
+    }
     for (const game of games) {
       const cards = await getGameCards(game)
       for (const c of cards) {

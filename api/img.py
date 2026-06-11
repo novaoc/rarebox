@@ -20,6 +20,7 @@ ALLOWED_HOSTS = {
     "cards.lorcast.io",
     "optcgapi.com",
     "cmsassets.rgpub.io",
+    "den-media.pokellector.com",  # JP Pokémon set logos
 }
 MAX_BYTES = 4_000_000  # card scans are ≤ ~1MB; refuse anything strange
 
