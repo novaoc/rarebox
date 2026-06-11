@@ -594,10 +594,16 @@ Promise.all(Object.values(CARDS).map(c => new Promise(res => {
   i.onload = res; i.onerror = res
   i.src = c.img
 }))).then(() => {
-  // recorders key off this to know t=0 of the animation (image preload
-  // time varies, so wall-clock-from-navigation is not reliable)
-  document.body.dataset.started = '1'
-  scenes[SCENE]()
+  // recorders key off these to know t=0 of the animation (image preload
+  // time varies, so wall-clock-from-navigation is not reliable).
+  // ?manual=1 defers the start until the recorder calls __go() — used by
+  // the virtual-time recorder, which must pause the clock first.
+  document.body.dataset.ready = '1'
+  window.__go = () => {
+    document.body.dataset.started = '1'
+    scenes[SCENE]()
+  }
+  if (!Q.get('manual')) window.__go()
 })
 </script>
 </body>
