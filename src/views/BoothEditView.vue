@@ -39,6 +39,24 @@
         <label>Note for buyers <span class="text-muted">(optional)</span></label>
         <input v-model="booth.note" class="input" placeholder="Trades welcome · cash & QR payments · prices firm" @change="persist" />
       </div>
+      <div class="be-field" v-if="brand">
+        <label>Branding <span class="text-muted">(optional — your colors on every share)</span></label>
+        <div class="be-brand-row">
+          <div class="be-swatches">
+            <button v-for="c in BRAND_COLORS" :key="c" type="button" class="be-swatch"
+                    :class="{ active: brand.color === c }" :style="{ background: c }"
+                    :aria-label="`Booth color ${c}`" @click="setBrandColor(c)"></button>
+          </div>
+          <input v-model="brand.mark" class="input be-mark" placeholder="🔥 or initials" maxlength="12" @change="persist" />
+        </div>
+        <input v-model.trim="brand.logo" class="input be-logo" placeholder="Logo image link (https://…) — optional, monogram works without one" @change="persist" />
+        <p v-if="brand.logo && !/^https:\/\//.test(brand.logo)" class="be-logo-warn">Logo links must start with https:// — it won't be shared otherwise.</p>
+        <div v-if="brand.color || brand.mark || brand.logo" class="be-brand-preview">
+          <img v-if="/^https:\/\//.test(brand.logo || '')" :src="brand.logo" class="be-brand-logo" alt="" @error="$event.target.style.display='none'" />
+          <span v-else class="be-brand-mark" :style="{ background: brand.color || 'var(--accent)', color: markText }">{{ brand.mark || '◆' }}</span>
+          <span class="text-muted" style="font-size:12px">how buyers see your booth header</span>
+        </div>
+      </div>
     </div>
 
     <div class="be-listings-head">
@@ -169,7 +187,7 @@
 </template>
 
 <script setup>
-import { ref, computed, nextTick } from 'vue'
+import { ref, computed, watch, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
 import { usePortfolioStore } from '../stores/portfolio'
 import BoothShareModal from '../components/BoothShareModal.vue'
@@ -186,6 +204,28 @@ const showShare = ref(false)
 
 const total = computed(() => boothTotal(booth.value || {}))
 const atCap = computed(() => (booth.value?.items.length || 0) >= MAX_BOOTH_ITEMS)
+
+// ── Branding ──
+// Tactile-adjacent palette; mark is an emoji or initials. Booths created
+// before branding existed get the object lazily.
+const BRAND_COLORS = ['#ffd23f', '#ff7ab6', '#6cc6ff', '#5fd68a', '#ff9d4d', '#b78cff', '#ff6b6b', '#141414']
+watch(booth, (b) => {
+  if (b && !b.brand) b.brand = { color: '', mark: '', logo: '' }
+}, { immediate: true })
+const brand = computed(() => booth.value?.brand)
+
+function setBrandColor(c) {
+  brand.value.color = brand.value.color === c ? '' : c // tap again to clear
+  persist()
+}
+
+// Dark swatches need light text on the monogram chip
+const markText = computed(() => {
+  const c = brand.value?.color || ''
+  if (!/^#[0-9a-f]{6}$/i.test(c)) return '#141414'
+  const [r, g, b] = [1, 3, 5].map(i => parseInt(c.slice(i, i + 2), 16))
+  return (0.299 * r + 0.587 * g + 0.114 * b) > 140 ? '#141414' : '#ffffff'
+})
 
 const GAME_LABELS = {
   pokemon: 'Pokémon', mtg: 'Magic', yugioh: 'Yu-Gi-Oh!', lorcana: 'Lorcana',
@@ -427,6 +467,26 @@ function clearLoc() {
 .be-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 160px), 1fr)); gap: 12px; }
 .be-field label { display: block; font-size: 12px; font-weight: 800; margin-bottom: 5px; }
 .be-field-table { max-width: 120px; }
+
+.be-brand-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 8px; }
+.be-swatches { display: flex; gap: 6px; flex-wrap: wrap; }
+.be-swatch {
+  width: 30px; height: 30px; border-radius: 9px;
+  border: 2px solid var(--ink); cursor: pointer; padding: 0;
+  box-shadow: var(--shadow-pressed);
+}
+.be-swatch:active { box-shadow: none; transform: translate(1px, 1px); }
+.be-swatch.active { outline: 3px solid var(--accent); outline-offset: 2px; }
+.be-mark { width: 130px; }
+.be-logo-warn { font-size: 11.5px; color: var(--danger); font-weight: 600; margin-top: 4px; }
+.be-brand-preview { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
+.be-brand-mark {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 40px; height: 40px; padding: 0 8px;
+  border: 2px solid var(--ink); border-radius: 11px;
+  font-size: 17px; font-weight: 900;
+}
+.be-brand-logo { height: 40px; max-width: 150px; object-fit: contain; border: 1.5px solid var(--ink); border-radius: 9px; background: #fff; padding: 3px; }
 
 .be-loc-set { display: flex; align-items: center; gap: 6px; }
 .be-loc-chip { font-size: 12.5px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

@@ -85,6 +85,11 @@ function packBooth(booth) {
     ]),
   }
   if (booth.table) packed.table = booth.table
+  // Branding (additive): a few bytes of identity — accent color + monogram
+  // always work offline; a hosted logo URL is optional on top.
+  if (booth.brand?.color) packed.ac = booth.brand.color
+  if (booth.brand?.mark) packed.mk = String(booth.brand.mark).slice(0, 12)
+  if (booth.brand?.logo) packed.lg = booth.brand.logo
   if (booth.loc?.length === 2) {
     // 5 decimals ≈ 1m precision — plenty for "find the venue"
     packed.loc = [+booth.loc[0].toFixed(5), +booth.loc[1].toFixed(5)]
@@ -108,6 +113,10 @@ function imgUrl(v) {
   const s = str(v, 500)
   return /^https:\/\//.test(s) ? s : ''
 }
+function hexColor(v) {
+  const s = str(v, 7).toLowerCase()
+  return /^#[0-9a-f]{6}$/.test(s) ? s : ''
+}
 
 function unpackBooth(packed) {
   if (!packed || packed.v !== SHARE_VERSION || !Array.isArray(packed.items)) {
@@ -120,6 +129,11 @@ function unpackBooth(packed) {
     date: str(packed.date, 40),
     note: str(packed.note, 500),
     table: str(packed.table, 40),
+    brand: {
+      color: hexColor(packed.ac),
+      mark: str(packed.mk, 12),
+      logo: imgUrl(packed.lg),
+    },
     loc: Array.isArray(packed.loc) && packed.loc.length === 2 ? [num(packed.loc[0] + 90, 180) - 90, num(packed.loc[1] + 180, 360) - 180] : null,
     locName: str(packed.locName, 120),
     items: packed.items.slice(0, MAX_BOOTH_ITEMS).map((it) => {

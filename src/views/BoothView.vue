@@ -54,8 +54,12 @@
         <button class="btn btn-ghost btn-icon" aria-label="Dismiss" @click="dismissInvite">✕</button>
       </div>
 
-      <div class="shop-head card">
+      <div class="shop-head card" :style="viewBrand?.color ? { borderTopWidth: '7px', borderTopColor: viewBrand.color } : null">
         <div class="shop-head-main">
+          <div v-if="viewBrand" class="shop-brand">
+            <img v-if="viewBrand.logo" :src="viewBrand.logo" class="shop-brand-logo" alt="" @error="$event.target.style.display='none'" />
+            <span v-else class="shop-brand-mark" :style="{ background: viewBrand.color || 'var(--accent)', color: brandMarkText }">{{ viewBrand.mark || '◆' }}</span>
+          </div>
           <span class="sticker">{{ viewing.booth.name }}</span>
           <div class="shop-meta">
             <span v-if="viewing.booth.venue">📍 {{ viewing.booth.venue }}</span>
@@ -392,6 +396,18 @@ function summaryOf(m) {
 
 const viewingVerdict = computed(() => marketVerdict(viewing.value?.market?.deltaPct))
 
+// ── Branding (decoded shares carry brand; older saved shops may not) ──
+const viewBrand = computed(() => {
+  const b = viewing.value?.booth?.brand
+  return b && (b.color || b.mark || b.logo) ? b : null
+})
+const brandMarkText = computed(() => {
+  const c = viewBrand.value?.color || ''
+  if (!/^#[0-9a-f]{6}$/i.test(c)) return '#141414'
+  const [r, g, b] = [1, 3, 5].map(i => parseInt(c.slice(i, i + 2), 16))
+  return (0.299 * r + 0.587 * g + 0.114 * b) > 140 ? '#141414' : '#ffffff'
+})
+
 // How frozen is this snapshot? Booth shares carry the moment they were
 // encoded (booth.ts, epoch seconds; 0 on pre-ts shares). Past a day, nudge
 // the buyer toward the live QR at the table.
@@ -662,6 +678,15 @@ onBeforeUnmount(() => {
 
 /* shop viewer */
 .shop-head { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; padding: 18px; margin-top: 16px; flex-wrap: wrap; }
+.shop-brand { margin-bottom: 10px; }
+.shop-brand-logo { height: 46px; max-width: 200px; object-fit: contain; border: 1.5px solid var(--ink); border-radius: 10px; background: #fff; padding: 3px; display: block; }
+.shop-brand-mark {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 46px; height: 46px; padding: 0 10px;
+  border: 2px solid var(--ink); border-radius: 12px;
+  font-size: 20px; font-weight: 900;
+  box-shadow: var(--shadow-xs);
+}
 .shop-meta { display: flex; gap: 14px; flex-wrap: wrap; font-size: 13px; color: var(--text-secondary); margin-top: 12px; }
 .shop-note { font-size: 13px; color: var(--text-secondary); margin-top: 8px; max-width: 480px; }
 .shop-age.stale { color: var(--danger); font-weight: 700; }

@@ -205,7 +205,12 @@ async function downloadPoster() {
     ctx.textAlign = 'left'; ctx.textBaseline = 'middle'
     ctx.fillText('rarebox', 188, 118)
 
-    // booth name chip (rotated sticker)
+    // booth name chip (rotated sticker) — painted in the booth's brand
+    // color when one is set, Rarebox yellow otherwise
+    const brandHex = /^#[0-9a-f]{6}$/i.test(props.booth.brand?.color || '') ? props.booth.brand.color : ''
+    const chipBg = brandHex || YELLOW
+    const [cr, cg, cb] = [1, 3, 5].map(i => parseInt(chipBg.slice(i, i + 2), 16))
+    const chipInk = (0.299 * cr + 0.587 * cg + 0.114 * cb) > 140 ? INK : '#ffffff'
     const name = (props.booth.name || 'Card booth').slice(0, 34)
     ctx.font = `900 50px ${FONT}`
     const nameW = ctx.measureText(name).width + 72
@@ -214,10 +219,10 @@ async function downloadPoster() {
     ctx.rotate(-2 * Math.PI / 180)
     ctx.fillStyle = INK
     ctx.beginPath(); ctx.roundRect(-nameW / 2 + 7, -45 + 7, nameW, 90, 18); ctx.fill()
-    ctx.fillStyle = YELLOW
+    ctx.fillStyle = chipBg
     ctx.beginPath(); ctx.roundRect(-nameW / 2, -45, nameW, 90, 18); ctx.fill()
     ctx.lineWidth = 5; ctx.strokeStyle = INK; ctx.stroke()
-    ctx.fillStyle = INK
+    ctx.fillStyle = chipInk
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
     ctx.fillText(name, 0, 2)
     ctx.restore()
