@@ -169,6 +169,7 @@
     <TourModal v-if="showSetsTour" :key="tourKey + theme" :src="`/videos/sets-tour-${theme}.mp4`" storage-key="rarebox_sets_tour_seen" />
     <TourModal v-if="showDecksTour" :key="tourKey + theme" :src="`/videos/decks-tour-${theme}.mp4`" storage-key="rarebox_deck_tour_seen" />
     <TourModal v-if="showTradeTour" :key="tourKey + theme" :src="`/videos/trade-tour-${theme}.mp4`" storage-key="rarebox_trade_tour_seen" />
+    <TourModal v-if="showBoothTour" :key="tourKey + theme" :src="`/videos/booth-tour-${theme}.mp4`" storage-key="rarebox_booth_tour_seen" />
 
     <!-- Background card loading indicator -->
     <CardLoadIndicator v-show="!isBoothRoute" ref="cardLoadIndicator" />
@@ -218,6 +219,7 @@ const newPortfolioColor = ref('#ffd23f')
 const showSetsTour = ref(false)
 const showDecksTour = ref(false)
 const showTradeTour = ref(false)
+const showBoothTour = ref(false)
 const tourKey = ref(0)
 
 // Close the More sheet on navigation
@@ -241,6 +243,7 @@ const tourPages = {
   Decks: { storageKey: 'rarebox_deck_tour_seen',  showRef: showDecksTour },
   TradeLanding:  { storageKey: 'rarebox_trade_tour_seen', showRef: showTradeTour },
   TradeAnalyzer: { storageKey: 'rarebox_trade_tour_seen', showRef: showTradeTour },
+  Booth: { storageKey: 'rarebox_booth_tour_seen', showRef: showBoothTour },
 }
 
 // First visit to a tour page auto-plays its tour once (TourModal marks the

@@ -434,6 +434,109 @@ const scenes = {
     ])
   },
 
+  booth() {
+    // Card Booth: list → price → QR → poster → short link → event directory
+    run([
+      [200, () => $('rb').classList.add('on')],
+      [600, () => $('wm').classList.add('on')],
+      [900, () => headline('Your table, <span class="marker-word">in their pocket<i></i></span>.<div class="subline">Price it. Share it. No servers.</div>')],
+      [1600, markerOn],
+      // booth panel builds on the left
+      [2400, () => {
+        const st = document.createElement('style')
+        st.textContent = '#boothp .listrow{padding:8px 6px} #boothp .listrow img{width:46px;height:64px} #boothp .listrow .nm{font-size:19px}'
+        document.head.appendChild(st)
+        el(`<div class="panel listpanel" id="boothp" style="left:64px;top:312px;width:560px;opacity:0;transform:translateY(28px);transition:all .55s cubic-bezier(.22,1,.36,1)">
+          <div style="display:flex;align-items:center;gap:12px;margin-bottom:4px">
+            <div style="font-weight:900;font-size:25px">Wren's table</div>
+            <div class="chip blue" style="font-size:14px;padding:3px 11px">HALL B · TABLE 42</div>
+          </div>
+          <div id="rows"></div>
+          <div style="display:flex;align-items:center;gap:14px;margin-top:16px">
+            <div style="font-size:14px;font-weight:800;letter-spacing:.05em;color:var(--sub);text-transform:uppercase">Full table</div>
+            <div class="chip green" id="btotal" style="font-size:22px">$0.00</div>
+          </div>
+        </div>`)
+        const p = document.getElementById('boothp')
+        requestAnimationFrame(() => { p.style.opacity = 1; p.style.transform = 'translateY(0)' })
+      }],
+      [3100, () => {
+        const rows = [
+          ['charizard', '$650.00'],
+          ['lugia', '$1,700.00'],
+          ['mewex', '$12.00'],
+        ]
+        rows.forEach(([k, ask], i) => {
+          const c = CARDS[k]
+          setTimeout(() => {
+            const r = document.createElement('div')
+            r.className = 'listrow'
+            r.innerHTML = `<img src="${c.img}"/><div class="nm">${c.name}<div class="meta">${c.sub}</div></div>
+              <div class="meta" style="font-weight:800">Asking</div><div class="chip" style="font-size:15px;padding:3px 11px">${ask}</div>`
+            document.getElementById('rows').appendChild(r)
+            requestAnimationFrame(() => requestAnimationFrame(() => r.classList.add('on')))
+          }, i * 430)
+        })
+      }],
+      [4700, () => countUp(document.getElementById('btotal'), 2362.00, 1300)],
+      // QR mat pops in on the right — the share moment
+      [6200, () => {
+        const mat = el(`<div class="panel" id="qrmat" style="position:absolute;right:84px;top:170px;width:330px;padding:24px;text-align:center;opacity:0;transform:scale(.8) rotate(2deg);transition:all .55s cubic-bezier(.34,1.56,.64,1)">
+          <div id="qrgrid" style="width:230px;height:230px;margin:0 auto;display:grid;grid-template-columns:repeat(21,1fr);grid-template-rows:repeat(21,1fr);background:#fff;border:3px solid var(--ink);border-radius:10px;padding:8px"></div>
+          <div style="font-weight:800;font-size:16px;color:var(--sub);margin-top:12px">Scan to browse this booth</div>
+          <div style="font-weight:900;font-size:19px;margin-top:4px">3 listings · $2,362.00</div>
+        </div>`)
+        // deterministic QR-ish pattern with real finder squares
+        const g = document.getElementById('qrgrid')
+        const finder = (r, c) => (r < 7 && c < 7) || (r < 7 && c > 13) || (r > 13 && c < 7)
+        const inFinderRing = (r, c) => {
+          const zones = [[0, 0], [0, 14], [14, 0]]
+          return zones.some(([zr, zc]) => {
+            const rr = r - zr, cc = c - zc
+            if (rr < 0 || rr > 6 || cc < 0 || cc > 6) return false
+            return rr === 0 || rr === 6 || cc === 0 || cc === 6 || (rr >= 2 && rr <= 4 && cc >= 2 && cc <= 4)
+          })
+        }
+        let seed = 42
+        const rnd = () => (seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff
+        for (let r = 0; r < 21; r++) for (let c = 0; c < 21; c++) {
+          const d = document.createElement('div')
+          const dark = finder(r, c) ? inFinderRing(r, c) : rnd() < 0.45
+          if (dark) d.style.background = '#141414'
+          g.appendChild(d)
+        }
+        requestAnimationFrame(() => { mat.style.opacity = 1; mat.style.transform = 'scale(1) rotate(2deg)' })
+      }],
+      // poster download press
+      [8600, () => {
+        const b = el(`<div class="pressbtn" id="posterbtn" style="position:absolute;right:120px;top:598px;opacity:0;transition:opacity .4s;font-size:19px">Download QR poster</div>`)
+        requestAnimationFrame(() => b.style.opacity = 1)
+      }],
+      [9400, () => moveCursor(1020, 624)],
+      [10300, () => tap(document.getElementById('posterbtn'))],
+      [10750, () => {
+        const s = el(`<div class="bigsticker on" style="right:96px;top:118px;left:auto;opacity:0;font-size:26px">Poster saved ✓</div>`)
+        requestAnimationFrame(() => s.style.opacity = 1)
+        $('cursor').classList.remove('on')
+      }],
+      // shorten for socials
+      [12600, () => {
+        stage.querySelectorAll('.bigsticker, .pressbtn').forEach(n => n.style.opacity = 0)
+        const p = el(`<div style="position:absolute;right:84px;top:560px;width:340px;text-align:center;opacity:0;transform:translateY(20px);transition:all .5s cubic-bezier(.22,1,.36,1)" id="shortp">
+          <div style="font-size:21px;font-weight:900;margin-bottom:10px">Posting it online?</div>
+          <div class="chip pink sticker" id="shortchip" style="font-size:18px;padding:8px 16px">tinyurl.com/wrens-table</div>
+        </div>`)
+        requestAnimationFrame(() => { p.style.opacity = 1; p.style.transform = 'translateY(0)' })
+      }],
+      // event directory finale
+      [15200, () => {
+        const s = el(`<div class="bigsticker yellow on" style="left:200px;top:400px;opacity:0;font-size:30px;transform:rotate(-2deg) scale(.6)">Whole event? One QR — 40 booths.</div>`)
+        requestAnimationFrame(() => { s.style.opacity = 1; s.style.transform = 'rotate(-2deg) scale(1)' })
+      }],
+      ...outro(18400),
+    ])
+  },
+
   hero() {
     run([
       [200, () => $('rb').classList.add('on')],
@@ -490,7 +593,12 @@ Promise.all(Object.values(CARDS).map(c => new Promise(res => {
   const i = new Image()
   i.onload = res; i.onerror = res
   i.src = c.img
-}))).then(() => scenes[SCENE]())
+}))).then(() => {
+  // recorders key off this to know t=0 of the animation (image preload
+  // time varies, so wall-clock-from-navigation is not reliable)
+  document.body.dataset.started = '1'
+  scenes[SCENE]()
+})
 </script>
 </body>
 </html>

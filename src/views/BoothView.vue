@@ -1,7 +1,46 @@
 <template>
   <div class="booth-page container">
+    <!-- ── Incoming directory (a list of booths someone shared) ──────── -->
+    <template v-if="dirViewing">
+      <div class="shop-head card">
+        <div class="shop-head-main">
+          <span class="sticker">{{ dirViewing.title }}</span>
+          <div class="shop-meta">
+            <span>📦 {{ dirViewing.entries.length }} booth{{ dirViewing.entries.length !== 1 ? 's' : '' }}</span>
+          </div>
+          <p class="shop-note">A booth directory — each entry downloads as its own shop, saved for offline.</p>
+        </div>
+      </div>
+
+      <div class="shop-actions">
+        <button class="btn btn-primary" :disabled="dirBusy" @click="addAllFromDirectory">
+          {{ dirBusy ? `Adding booth ${dirDone + 1} / ${dirViewing.entries.length}…` : '⭐ Add all to saved shops' }}
+        </button>
+        <button class="btn btn-secondary" :disabled="dirBusy" @click="dirViewing = null">Back to Booth</button>
+      </div>
+      <div v-if="dirBusy" class="dir-progress">
+        <div class="bar"><i :style="{ width: (dirDone / dirViewing.entries.length * 100) + '%' }"></i></div>
+      </div>
+
+      <div class="booth-grid">
+        <div v-for="(en, i) in dirViewing.entries" :key="i" class="booth-card card">
+          <div class="booth-card-name">{{ en.name }}</div>
+          <div class="booth-card-meta">
+            <span v-if="en.venue">📍 {{ en.venue }}</span>
+            <span>{{ en.count }} listing{{ en.count !== 1 ? 's' : '' }}</span>
+            <span class="text-accent" style="font-weight:800">{{ fmtMoney(en.total) }}</span>
+          </div>
+          <div class="booth-card-sub">
+            <span v-if="en.status === 'ok'" class="badge badge-success">✓ Saved</span>
+            <span v-else-if="en.status === 'err'" class="badge badge-danger">⚠ Couldn't load</span>
+            <span v-else-if="en.status === 'busy'" class="badge badge-info">Downloading…</span>
+          </div>
+        </div>
+      </div>
+    </template>
+
     <!-- ── Incoming / opened shop (read-only) ───────────────────────── -->
-    <template v-if="viewing">
+    <template v-else-if="viewing">
       <div v-if="showInvite" class="booth-invite">
         <span class="booth-invite-mark" aria-hidden="true">RB</span>
         <span class="booth-invite-text">This booth was made with <strong>Rarebox</strong> — track your own collection free. No account, works offline.</span>
@@ -14,21 +53,33 @@
           <span class="sticker">{{ viewing.booth.name }}</span>
           <div class="shop-meta">
             <span v-if="viewing.booth.venue">📍 {{ viewing.booth.venue }}</span>
+            <span v-if="viewing.booth.table">🪧 Table {{ viewing.booth.table }}</span>
             <span v-if="viewing.booth.date">🗓 {{ viewing.booth.date }}</span>
           </div>
           <p v-if="viewing.booth.note" class="shop-note">{{ viewing.booth.note }}</p>
+          <a v-if="viewing.booth.loc" class="btn btn-secondary btn-sm shop-directions" :href="directionsUrl(viewing.booth.loc, viewing.booth.locName || viewing.booth.name)" target="_blank" rel="noopener">
+            🧭 Get directions{{ viewing.booth.locName ? ` — ${viewing.booth.locName}` : '' }}
+          </a>
         </div>
         <div class="shop-total">
           <div class="shop-total-label">Full table</div>
           <div class="shop-total-val">{{ fmtMoney(boothTotal(viewing.booth)) }}</div>
+          <div v-if="viewingVerdict" class="badge shop-verdict" :class="`badge-${viewingVerdict.cls}`">{{ viewingVerdict.label }}</div>
         </div>
       </div>
 
       <div class="shop-actions">
         <button v-if="!viewing.saved" class="btn btn-primary" @click="saveShop">⭐ Save this shop</button>
         <span v-else class="badge badge-success">✓ Saved</span>
+        <button class="btn btn-secondary" :disabled="comparing" @click="compareMarket">
+          {{ comparing ? `Checking prices ${compareDone}/${compareTotal}…` : '📊 Compare to market' }}
+        </button>
         <button class="btn btn-secondary" @click="closeViewer">Back to Booth</button>
       </div>
+      <p v-if="viewing.market" class="shop-compare-note">
+        {{ viewing.market.matched }} of {{ viewing.market.total }} listings matched to live market prices —
+        asking {{ fmtMoney(viewing.market.askTotal) }} vs market {{ fmtMoney(viewing.market.marketTotal) }}.
+      </p>
 
       <div class="shop-grid">
         <div v-for="(it, i) in viewing.booth.items" :key="i" class="shop-item card-sm card">
@@ -42,6 +93,7 @@
             <div class="shop-item-row">
               <span class="badge badge-accent">{{ fmtMoney(it.price) }}</span>
               <span v-if="(it.qty || 1) > 1" class="text-muted shop-qty">×{{ it.qty }}</span>
+              <span v-if="itemDelta(i)" class="shop-mkt" :class="itemDelta(i).cls">{{ itemDelta(i).label }}</span>
             </div>
           </div>
         </div>
@@ -74,6 +126,7 @@
             <div class="booth-card-name">{{ b.name }}</div>
             <div class="booth-card-meta">
               <span v-if="b.venue">📍 {{ b.venue }}</span>
+              <span v-if="b.table">🪧 {{ b.table }}</span>
               <span>{{ b.items.length }} listing{{ b.items.length !== 1 ? 's' : '' }}</span>
               <span class="text-accent" style="font-weight:800">{{ fmtMoney(boothTotal(b)) }}</span>
             </div>
@@ -89,7 +142,10 @@
       <section class="booth-section">
         <div class="booth-section-head">
           <h2>Saved shops</h2>
-          <button class="btn btn-secondary btn-sm" @click="startScan">📷 Scan a booth</button>
+          <div class="booth-head-actions">
+            <button v-if="savedShops.length > 1" class="btn btn-secondary btn-sm" @click="shareListOpen = true">📣 Share list</button>
+            <button class="btn btn-secondary btn-sm" @click="startScan">📷 Scan a booth</button>
+          </div>
         </div>
         <p class="booth-section-sub">Booths other collectors shared with you — open them any time, even offline.</p>
 
@@ -103,19 +159,60 @@
         </div>
         <div v-if="scanError" class="booth-scan-error">{{ scanError }}</div>
 
+        <div v-if="savedShops.length" class="booth-tools">
+          <input v-model="shopFilter" class="input booth-filter" placeholder="🔍 Find a card across every saved shop…" />
+          <select v-model="shopSort" class="select booth-sort" aria-label="Sort saved shops">
+            <option value="newest">Newest first</option>
+            <option value="cheap">Total: low → high</option>
+            <option value="dear">Total: high → low</option>
+            <option value="abc">Name A → Z</option>
+          </select>
+        </div>
+
         <div v-if="!savedShops.length && !scanning" class="empty-state">
           <p>Nothing saved yet. Scan a seller's QR or open their link, then hit <strong>Save this shop</strong>.</p>
         </div>
 
-        <div class="booth-grid">
-          <div v-for="s in savedShops" :key="s.id" class="booth-card card">
+        <!-- Cross-shop card search results -->
+        <template v-if="shopFilter.trim()">
+          <p class="booth-filter-note">
+            {{ filterHits.reduce((s, h) => s + h.items.length, 0) }} match{{ filterHits.reduce((s, h) => s + h.items.length, 0) !== 1 ? 'es' : '' }}
+            across {{ filterHits.length }} shop{{ filterHits.length !== 1 ? 's' : '' }}
+          </p>
+          <div class="booth-grid">
+            <div v-for="h in filterHits" :key="h.shop.id" class="booth-card card">
+              <div class="booth-card-name">{{ h.shop.booth.name }}</div>
+              <div class="booth-card-meta">
+                <span v-if="h.shop.booth.venue">📍 {{ h.shop.booth.venue }}</span>
+                <span v-if="h.shop.booth.table">🪧 {{ h.shop.booth.table }}</span>
+              </div>
+              <div class="booth-hit" v-for="(it, i) in h.items.slice(0, 6)" :key="i">
+                <span class="booth-hit-name">{{ it.name }}</span>
+                <span class="badge badge-accent booth-hit-price">{{ fmtMoney(it.price) }}</span>
+              </div>
+              <div v-if="h.items.length > 6" class="booth-card-sub">+ {{ h.items.length - 6 }} more</div>
+              <div class="booth-card-actions">
+                <button class="btn btn-primary btn-sm" @click="openSaved(h.shop)">Open shop</button>
+              </div>
+            </div>
+          </div>
+          <div v-if="!filterHits.length" class="empty-state"><p>No saved shop lists that card.</p></div>
+        </template>
+
+        <!-- Normal saved-shop cards -->
+        <div v-else class="booth-grid">
+          <div v-for="s in sortedShops" :key="s.id" class="booth-card card">
             <div class="booth-card-name">{{ s.booth.name }}</div>
             <div class="booth-card-meta">
               <span v-if="s.booth.venue">📍 {{ s.booth.venue }}</span>
+              <span v-if="s.booth.table">🪧 {{ s.booth.table }}</span>
               <span>{{ s.booth.items.length }} listing{{ s.booth.items.length !== 1 ? 's' : '' }}</span>
               <span class="text-accent" style="font-weight:800">{{ fmtMoney(boothTotal(s.booth)) }}</span>
             </div>
-            <div class="booth-card-sub">Saved {{ fmtDate(s.savedAt) }}</div>
+            <div class="booth-card-sub">
+              Saved {{ fmtDate(s.savedAt) }}
+              <span v-if="shopVerdict(s)" class="badge booth-card-verdict" :class="`badge-${shopVerdict(s).cls}`">{{ shopVerdict(s).label }}</span>
+            </div>
             <div class="booth-card-actions">
               <button class="btn btn-primary btn-sm" @click="openSaved(s)">Open</button>
               <button class="btn btn-ghost btn-sm" @click="removeSaved(s.id)">Remove</button>
@@ -126,25 +223,34 @@
     </template>
 
     <BoothShareModal v-if="shareBooth" :booth="shareBooth" @close="shareBooth = null" />
+    <BoothShareListModal v-if="shareListOpen" :shops="savedShops" @close="shareListOpen = false" />
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import jsQR from 'jsqr'
 import BoothShareModal from '../components/BoothShareModal.vue'
+import BoothShareListModal from '../components/BoothShareListModal.vue'
 import {
   loadBooths, saveBooths, loadSavedShops, saveSavedShops,
-  boothFromLocation, decodeBoothBytes, boothTotal, generateBoothId,
+  boothFromLocation, directoryFromLocation, boothFromDirectoryRef,
+  decodeBoothBytes, decodeDirectoryBytes, boothTotal, generateBoothId,
+  directionsUrl,
 } from '../utils/booth'
+import { compareBoothToMarket, marketVerdict } from '../utils/boothMarket'
 import { FrameCollector, isFrame } from '../utils/qrTransfer'
 
 const router = useRouter()
 const booths = ref(loadBooths())
 const savedShops = ref(loadSavedShops())
 const shareBooth = ref(null)
-const viewing = ref(null) // { booth, saved }
+const shareListOpen = ref(false)
+const viewing = ref(null) // { booth, saved, savedId?, market? }
+const dirViewing = ref(null) // { title, entries: [{name, venue, count, total, ref, status}] }
+const dirBusy = ref(false)
+const dirDone = ref(0)
 
 // Invite newcomers (no TCG prefs = never onboarded), dismissibly
 const INVITE_KEY = 'rarebox_booth_invite_dismissed'
@@ -166,7 +272,7 @@ function fmtDate(iso) {
 
 // ── My booths ──
 function createBooth() {
-  const booth = { id: generateBoothId(), name: 'My booth', venue: '', date: '', note: '', items: [], createdAt: new Date().toISOString() }
+  const booth = { id: generateBoothId(), name: 'My booth', venue: '', table: '', date: '', note: '', loc: null, locName: '', items: [], createdAt: new Date().toISOString() }
   booths.value.unshift(booth)
   saveBooths(booths.value)
   router.push(`/booth/${booth.id}`)
@@ -178,9 +284,15 @@ function deleteBooth(id) {
   saveBooths(booths.value)
 }
 
-// ── Incoming shares (link with #b=...) ──
+// ── Incoming shares (link with #b=... or directory #d=...) ──
 async function checkIncoming() {
   try {
+    const dir = await directoryFromLocation(window.location.hash)
+    if (dir) {
+      dirViewing.value = { ...dir, entries: dir.entries.map(e => ({ ...e, status: '' })) }
+      history.replaceState(null, '', window.location.pathname)
+      return
+    }
     const booth = await boothFromLocation(window.location.hash)
     if (booth) {
       viewing.value = { booth, saved: false }
@@ -194,13 +306,17 @@ async function checkIncoming() {
 
 function saveShop() {
   if (!viewing.value) return
-  savedShops.value.unshift({ id: generateBoothId(), savedAt: new Date().toISOString(), booth: viewing.value.booth })
+  const rec = { id: generateBoothId(), savedAt: new Date().toISOString(), booth: viewing.value.booth }
+  if (viewing.value.market) rec.market = summaryOf(viewing.value.market)
+  savedShops.value.unshift(rec)
   saveSavedShops(savedShops.value)
   viewing.value.saved = true
+  viewing.value.savedId = rec.id
 }
 
 function openSaved(s) {
-  viewing.value = { booth: s.booth, saved: true }
+  shopFilter.value = ''
+  viewing.value = { booth: s.booth, saved: true, savedId: s.id, market: s.market || null }
 }
 
 function removeSaved(id) {
@@ -212,7 +328,104 @@ function closeViewer() {
   viewing.value = null
 }
 
-// ── Scanner (handles both URL QRs and animated RBX2 booths) ──
+// ── Market comparison ──
+const comparing = ref(false)
+const compareDone = ref(0)
+const compareTotal = ref(0)
+
+function summaryOf(m) {
+  // perItem is per-view detail; the saved record keeps just the summary
+  const { perItem, ...summary } = m
+  return summary
+}
+
+const viewingVerdict = computed(() => marketVerdict(viewing.value?.market?.deltaPct))
+
+function itemDelta(i) {
+  const m = viewing.value?.market
+  const it = viewing.value?.booth.items[i]
+  if (!m?.perItem || m.perItem[i] == null || !(it?.price > 0)) return null
+  const diff = it.price - m.perItem[i]
+  if (Math.abs(diff) < 0.5 || Math.abs(diff) / m.perItem[i] < 0.03) return { cls: 'flat', label: `mkt ${fmtMoney(m.perItem[i])}` }
+  return diff < 0
+    ? { cls: 'under', label: `${fmtMoney(Math.abs(diff))} under` }
+    : { cls: 'over', label: `${fmtMoney(diff)} over` }
+}
+
+async function compareMarket() {
+  if (!viewing.value || comparing.value) return
+  comparing.value = true
+  compareDone.value = 0
+  compareTotal.value = 0
+  try {
+    const result = await compareBoothToMarket(viewing.value.booth, (d, t) => {
+      compareDone.value = d
+      compareTotal.value = t
+    })
+    viewing.value.market = result
+    // persist the summary on the saved record so the list shows the verdict
+    if (viewing.value.savedId) {
+      const rec = savedShops.value.find(s => s.id === viewing.value.savedId)
+      if (rec) { rec.market = summaryOf(result); saveSavedShops(savedShops.value) }
+    }
+  } finally {
+    comparing.value = false
+  }
+}
+
+function shopVerdict(s) {
+  return marketVerdict(s.market?.deltaPct)
+}
+
+// ── Saved-shop sorting & cross-shop filtering ──
+const shopSort = ref('newest')
+const shopFilter = ref('')
+
+const sortedShops = computed(() => {
+  const shops = [...savedShops.value]
+  if (shopSort.value === 'cheap') shops.sort((a, b) => boothTotal(a.booth) - boothTotal(b.booth))
+  else if (shopSort.value === 'dear') shops.sort((a, b) => boothTotal(b.booth) - boothTotal(a.booth))
+  else if (shopSort.value === 'abc') shops.sort((a, b) => (a.booth.name || '').localeCompare(b.booth.name || ''))
+  else shops.sort((a, b) => (b.savedAt || '').localeCompare(a.savedAt || ''))
+  return shops
+})
+
+const filterHits = computed(() => {
+  const q = shopFilter.value.trim().toLowerCase()
+  if (!q) return []
+  const hits = []
+  for (const s of sortedShops.value) {
+    const items = (s.booth.items || []).filter(it =>
+      (it.name || '').toLowerCase().includes(q) || (it.setName || '').toLowerCase().includes(q))
+    if (items.length) hits.push({ shop: s, items })
+  }
+  // cheapest matching item first — that's what you're hunting for
+  hits.sort((a, b) => Math.min(...a.items.map(i => i.price || Infinity)) - Math.min(...b.items.map(i => i.price || Infinity)))
+  return hits
+})
+
+// ── Directory import ──
+async function addAllFromDirectory() {
+  if (!dirViewing.value || dirBusy.value) return
+  dirBusy.value = true
+  dirDone.value = 0
+  for (const en of dirViewing.value.entries) {
+    if (en.status === 'ok') { dirDone.value++; continue }
+    en.status = 'busy'
+    try {
+      const booth = await boothFromDirectoryRef(en.ref)
+      savedShops.value.unshift({ id: generateBoothId(), savedAt: new Date().toISOString(), booth })
+      en.status = 'ok'
+    } catch {
+      en.status = 'err'
+    }
+    dirDone.value++
+  }
+  saveSavedShops(savedShops.value)
+  dirBusy.value = false
+}
+
+// ── Scanner (handles URL QRs, directory QRs, and animated RBX2 booths) ──
 const scanning = ref(false)
 const scanError = ref('')
 const scanGot = ref(0)
@@ -252,22 +465,36 @@ async function scanTick() {
   const code = jsQR(img.data, scanCanvas.width, scanCanvas.height, { inversionAttempts: 'dontInvert' })
   if (!code) return
 
-  // Plain URL QR (small booths — also scannable by native cameras)
+  // Plain URL QR — single booth or a directory (also scannable by native cameras)
   if (code.data && code.data.includes('/booth#b=')) {
     stopScan()
     try { viewing.value = { booth: await boothFromLocation(code.data), saved: false } }
     catch { scanError.value = "Couldn't read that booth code." }
     return
   }
-  // Animated RBX2 frames (big booths)
+  if (code.data && code.data.includes('/booth#d=')) {
+    stopScan()
+    try {
+      const dir = await directoryFromLocation(code.data)
+      dirViewing.value = { ...dir, entries: dir.entries.map(e => ({ ...e, status: '' })) }
+    } catch { scanError.value = "Couldn't read that directory code." }
+    return
+  }
+  // Animated RBX2 frames (big booths / big directories)
   if (code.binaryData?.length) {
     const bytes = Uint8Array.from(code.binaryData)
     if (isFrame(bytes)) {
       if (collector.feed(bytes)) { scanGot.value = collector.received; scanTotal.value = collector.total }
       if (collector.done) {
         stopScan()
-        try { viewing.value = { booth: await decodeBoothBytes(collector.assemble()), saved: false } }
-        catch { scanError.value = 'Transfer corrupted — try scanning again.' }
+        const payload = collector.assemble()
+        try { viewing.value = { booth: await decodeBoothBytes(payload), saved: false } }
+        catch {
+          try {
+            const dir = await decodeDirectoryBytes(payload)
+            dirViewing.value = { ...dir, entries: dir.entries.map(e => ({ ...e, status: '' })) }
+          } catch { scanError.value = 'Transfer corrupted — try scanning again.' }
+        }
       }
     }
   }
@@ -279,8 +506,16 @@ function stopScan() {
   scanning.value = false
 }
 
-onMounted(checkIncoming)
-onBeforeUnmount(stopScan)
+onMounted(() => {
+  checkIncoming()
+  // opening a booth/directory link while already on /booth only changes
+  // the hash — no remount, so watch for it
+  window.addEventListener('hashchange', checkIncoming)
+})
+onBeforeUnmount(() => {
+  stopScan()
+  window.removeEventListener('hashchange', checkIncoming)
+})
 </script>
 
 <style scoped>
@@ -294,21 +529,41 @@ onBeforeUnmount(stopScan)
 .booth-section-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 6px; }
 .booth-section-head h2 { font-size: 19px; font-weight: 900; letter-spacing: -0.01em; }
 .booth-section-sub { font-size: 13px; color: var(--text-secondary); margin-bottom: 12px; }
+.booth-head-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+.booth-tools { display: flex; gap: 10px; margin: 4px 0 6px; flex-wrap: wrap; }
+.booth-filter { flex: 1; min-width: 200px; }
+.booth-sort { width: auto; }
+.booth-filter-note { font-size: 12.5px; color: var(--text-secondary); margin: 8px 0 4px; font-weight: 700; }
 
 .booth-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 250px), 1fr)); gap: 14px; margin-top: 12px; }
 .booth-card { padding: 16px; }
 .booth-card-name { font-weight: 900; font-size: 16px; margin-bottom: 6px; }
 .booth-card-meta { display: flex; flex-wrap: wrap; gap: 10px; font-size: 12.5px; color: var(--text-secondary); margin-bottom: 4px; }
-.booth-card-sub { font-size: 11.5px; color: var(--text-muted); margin-bottom: 6px; }
+.booth-card-sub { font-size: 11.5px; color: var(--text-muted); margin-bottom: 6px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.booth-card-verdict { font-size: 10.5px; }
 .booth-card-actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+
+.booth-hit { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 5px 0; border-bottom: 1.5px solid var(--border-subtle); }
+.booth-hit:last-of-type { border-bottom: none; }
+.booth-hit-name { font-size: 12.5px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.booth-hit-price { font-size: 11px; flex-shrink: 0; }
+
+/* directory import */
+.dir-progress { margin: -4px 0 12px; }
+.bar { height: 14px; border: 2px solid var(--ink); border-radius: 8px; background: var(--bg-secondary); overflow: hidden; }
+.bar i { display: block; height: 100%; background: var(--success); transition: width .3s ease; }
 
 /* shop viewer */
 .shop-head { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; padding: 18px; margin-top: 16px; flex-wrap: wrap; }
 .shop-meta { display: flex; gap: 14px; flex-wrap: wrap; font-size: 13px; color: var(--text-secondary); margin-top: 12px; }
 .shop-note { font-size: 13px; color: var(--text-secondary); margin-top: 8px; max-width: 480px; }
+.shop-directions { margin-top: 12px; }
 .shop-total-label { font-size: 11.5px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-secondary); }
 .shop-total-val { font-size: 26px; font-weight: 900; }
-.shop-actions { display: flex; gap: 10px; align-items: center; margin: 14px 0; }
+.shop-verdict { margin-top: 6px; }
+.shop-actions { display: flex; gap: 10px; align-items: center; margin: 14px 0; flex-wrap: wrap; }
+.shop-compare-note { font-size: 12.5px; color: var(--text-secondary); margin: -6px 0 12px; }
 .shop-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 160px), 1fr)); gap: 12px; }
 .shop-item { padding: 10px; display: flex; flex-direction: column; gap: 8px; }
 /* Uniform mats: every listing gets the same white frame regardless of the
@@ -329,6 +584,11 @@ onBeforeUnmount(stopScan)
 .shop-item-noimg { font-size: 34px; opacity: 0.35; }
 .shop-item-body { display: flex; flex-direction: column; flex: 1; }
 .shop-item-body .shop-item-row { margin-top: auto; padding-top: 6px; }
+
+.shop-mkt { font-size: 10.5px; font-weight: 800; white-space: nowrap; }
+.shop-mkt.under { color: var(--text-success, #1e9e5a); }
+.shop-mkt.over { color: var(--danger); }
+.shop-mkt.flat { color: var(--text-muted); }
 
 .booth-invite {
   display: flex;
@@ -354,7 +614,7 @@ onBeforeUnmount(stopScan)
 .booth-invite-text { flex: 1; font-size: 12.5px; line-height: 1.45; }
 .shop-item-name { font-weight: 800; font-size: 13.5px; line-height: 1.3; }
 .shop-item-sub { font-size: 11.5px; color: var(--text-secondary); margin-top: 2px; }
-.shop-item-row { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+.shop-item-row { display: flex; align-items: center; gap: 8px; margin-top: 6px; flex-wrap: wrap; }
 .shop-qty { font-size: 12px; font-weight: 700; }
 
 /* scanner */

@@ -222,8 +222,8 @@ async function downloadPoster() {
     ctx.fillText(name, 0, 2)
     ctx.restore()
 
-    // venue / date
-    const meta = [props.booth.venue, props.booth.date].filter(Boolean).join('  ·  ')
+    // venue / table / date
+    const meta = [props.booth.venue, props.booth.table && `Table ${props.booth.table}`, props.booth.date].filter(Boolean).join('  ·  ')
     if (meta) {
       ctx.fillStyle = '#5f5a51'
       ctx.font = `700 34px ${FONT}`
