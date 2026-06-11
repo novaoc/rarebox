@@ -20,7 +20,7 @@ STAGE = (REPO / 'scripts' / 'tour-stage.html').as_uri()
 OUT = REPO / 'public' / 'videos'
 TMP = Path('/tmp/tourrec')
 
-SCENES = {'sets': 17.5, 'decks': 15.5, 'trade': 20.5, 'booth': 20.5, 'hero': 9.6}
+SCENES = {'sets': 17.5, 'decks': 15.5, 'trade': 20.5, 'booth': 24.0, 'hero': 9.6}
 FPS = 30
 chosen = sys.argv[1:] or list(SCENES)
 

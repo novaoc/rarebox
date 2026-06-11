@@ -435,7 +435,46 @@ const scenes = {
   },
 
   booth() {
-    // Card Booth: list → price → QR → poster → short link → event directory
+    // Card Booth v2: list → price → QR → buyer's wantlist lights up →
+    // table mode (sold in two taps) → the live QR that never goes stale
+    const paintQR = (g, seedStart) => {
+      // deterministic QR-ish pattern with real finder squares
+      g.innerHTML = ''
+      const finder = (r, c) => (r < 7 && c < 7) || (r < 7 && c > 13) || (r > 13 && c < 7)
+      const inFinderRing = (r, c) => {
+        const zones = [[0, 0], [0, 14], [14, 0]]
+        return zones.some(([zr, zc]) => {
+          const rr = r - zr, cc = c - zc
+          if (rr < 0 || rr > 6 || cc < 0 || cc > 6) return false
+          return rr === 0 || rr === 6 || cc === 0 || cc === 6 || (rr >= 2 && rr <= 4 && cc >= 2 && cc <= 4)
+        })
+      }
+      let seed = seedStart
+      const rnd = () => (seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff
+      for (let r = 0; r < 21; r++) for (let c = 0; c < 21; c++) {
+        const d = document.createElement('div')
+        const dark = finder(r, c) ? inFinderRing(r, c) : rnd() < 0.45
+        if (dark) d.style.background = '#141414'
+        g.appendChild(d)
+      }
+    }
+    const boothRow = (k, ask, extra = '') => {
+      const c = CARDS[k]
+      const r = document.createElement('div')
+      r.className = 'listrow'
+      r.innerHTML = `<img src="${c.img}"/><div class="nm">${c.name}<div class="meta">${c.sub}</div></div>${extra}
+        <div class="meta" style="font-weight:800">Asking</div><div class="chip" style="font-size:15px;padding:3px 11px">${ask}</div>`
+      return r
+    }
+    const wipe = fn => {
+      $('veil').classList.add('on')
+      setTimeout(() => {
+        $('veil').classList.remove('on')
+        stage.innerHTML = ''
+        headlineReset()
+        fn()
+      }, 600)
+    }
     run([
       [200, () => $('rb').classList.add('on')],
       [600, () => $('wm').classList.add('on')],
@@ -444,12 +483,13 @@ const scenes = {
       // booth panel builds on the left
       [2400, () => {
         const st = document.createElement('style')
-        st.textContent = '#boothp .listrow{padding:7px 6px} #boothp .listrow img{width:42px;height:58px} #boothp .listrow .nm{font-size:19px}'
+        st.textContent = '.listrow{padding:7px 6px} .listrow img{width:42px;height:58px} .listrow .nm{font-size:19px} .wantrow{outline:4px solid var(--accent);outline-offset:-2px;border-radius:12px}'
         document.head.appendChild(st)
         // bottom of the panel must clear the marquee band (top edge 668)
         // with visible paper between them — keep total height ≤ ~340px
         el(`<div class="panel listpanel" id="boothp" style="left:64px;top:304px;width:560px;padding:20px 26px;opacity:0;transform:translateY(28px);transition:all .55s cubic-bezier(.22,1,.36,1)">
           <div style="display:flex;align-items:center;gap:12px;margin-bottom:4px">
+            <div style="width:34px;height:34px;border-radius:9px;border:3px solid var(--ink);background:var(--info);display:flex;align-items:center;justify-content:center;font-weight:900;font-size:15px;color:#fff">WT</div>
             <div style="font-weight:900;font-size:25px">Wren's table</div>
             <div class="chip blue" style="font-size:14px;padding:3px 11px">HALL B · TABLE 42</div>
           </div>
@@ -469,73 +509,121 @@ const scenes = {
           ['mewex', '$12.00'],
         ]
         rows.forEach(([k, ask], i) => {
-          const c = CARDS[k]
           setTimeout(() => {
-            const r = document.createElement('div')
-            r.className = 'listrow'
-            r.innerHTML = `<img src="${c.img}"/><div class="nm">${c.name}<div class="meta">${c.sub}</div></div>
-              <div class="meta" style="font-weight:800">Asking</div><div class="chip" style="font-size:15px;padding:3px 11px">${ask}</div>`
+            const r = boothRow(k, ask)
             document.getElementById('rows').appendChild(r)
             requestAnimationFrame(() => requestAnimationFrame(() => r.classList.add('on')))
           }, i * 430)
         })
       }],
-      [4700, () => countUp(document.getElementById('btotal'), 2362.00, 1300)],
+      [4500, () => countUp(document.getElementById('btotal'), 2362.00, 1200)],
       // QR mat pops in on the right — the share moment
-      [6200, () => {
-        const mat = el(`<div class="panel" id="qrmat" style="position:absolute;right:84px;top:170px;width:330px;padding:24px;text-align:center;opacity:0;transform:scale(.8) rotate(2deg);transition:all .55s cubic-bezier(.34,1.56,.64,1)">
+      [5900, () => {
+        const mat = el(`<div class="panel" id="qrmat" style="position:absolute;right:84px;top:200px;width:330px;padding:24px;text-align:center;opacity:0;transform:scale(.8) rotate(2deg);transition:all .55s cubic-bezier(.34,1.56,.64,1)">
           <div id="qrgrid" style="width:230px;height:230px;margin:0 auto;display:grid;grid-template-columns:repeat(21,1fr);grid-template-rows:repeat(21,1fr);background:#fff;border:3px solid var(--ink);border-radius:10px;padding:8px"></div>
           <div style="font-weight:800;font-size:16px;color:var(--sub);margin-top:12px">Scan to browse this booth</div>
           <div style="font-weight:900;font-size:19px;margin-top:4px">3 listings · $2,362.00</div>
         </div>`)
-        // deterministic QR-ish pattern with real finder squares
-        const g = document.getElementById('qrgrid')
-        const finder = (r, c) => (r < 7 && c < 7) || (r < 7 && c > 13) || (r > 13 && c < 7)
-        const inFinderRing = (r, c) => {
-          const zones = [[0, 0], [0, 14], [14, 0]]
-          return zones.some(([zr, zc]) => {
-            const rr = r - zr, cc = c - zc
-            if (rr < 0 || rr > 6 || cc < 0 || cc > 6) return false
-            return rr === 0 || rr === 6 || cc === 0 || cc === 6 || (rr >= 2 && rr <= 4 && cc >= 2 && cc <= 4)
-          })
-        }
-        let seed = 42
-        const rnd = () => (seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff
-        for (let r = 0; r < 21; r++) for (let c = 0; c < 21; c++) {
-          const d = document.createElement('div')
-          const dark = finder(r, c) ? inFinderRing(r, c) : rnd() < 0.45
-          if (dark) d.style.background = '#141414'
-          g.appendChild(d)
-        }
+        paintQR(document.getElementById('qrgrid'), 42)
         requestAnimationFrame(() => { mat.style.opacity = 1; mat.style.transform = 'scale(1) rotate(2deg)' })
       }],
-      // poster download press
-      [8600, () => {
-        const b = el(`<div class="pressbtn" id="posterbtn" style="position:absolute;right:120px;top:598px;opacity:0;transition:opacity .4s;font-size:19px">Download QR poster</div>`)
-        requestAnimationFrame(() => b.style.opacity = 1)
-      }],
-      [9400, () => moveCursor(1020, 624)],
-      [10300, () => tap(document.getElementById('posterbtn'))],
-      [10750, () => {
-        const s = el(`<div class="bigsticker on" style="right:96px;top:118px;left:auto;opacity:0;font-size:26px">Poster saved ✓</div>`)
-        requestAnimationFrame(() => s.style.opacity = 1)
-        $('cursor').classList.remove('on')
-      }],
-      // shorten for socials
-      [12600, () => {
-        stage.querySelectorAll('.bigsticker, .pressbtn').forEach(n => n.style.opacity = 0)
-        const p = el(`<div style="position:absolute;right:84px;top:560px;width:340px;text-align:center;opacity:0;transform:translateY(20px);transition:all .5s cubic-bezier(.22,1,.36,1)" id="shortp">
-          <div style="font-size:21px;font-weight:900;margin-bottom:10px">Posting it online?</div>
-          <div class="chip pink sticker" id="shortchip" style="font-size:18px;padding:8px 16px">tinyurl.com/wrens-table</div>
+      // ── beat 2: the buyer scans, their wantlist answers ──
+      [8300, () => wipe(() => {
+        headline('Buyers scan. Their <span class="marker-word">wantlist<i></i></span> answers.<div class="subline">Even for the binder under the table.</div>')
+        setTimeout(markerOn, 600)
+        el(`<div class="panel listpanel" id="buyerp" style="left:64px;top:330px;width:600px;padding:20px 26px;opacity:0;transform:translateY(28px);transition:all .55s cubic-bezier(.22,1,.36,1)">
+          <div style="font-weight:900;font-size:23px;margin-bottom:4px">Wren's table</div>
+          <div id="rows"></div>
         </div>`)
+        const p = document.getElementById('buyerp')
         requestAnimationFrame(() => { p.style.opacity = 1; p.style.transform = 'translateY(0)' })
+        ;[['charizard', '$650.00'], ['lugia', '$1,700.00'], ['mewex', '$12.00']].forEach(([k, ask], i) => {
+          setTimeout(() => {
+            const r = boothRow(k, ask)
+            r.id = 'brow' + i
+            document.getElementById('rows').appendChild(r)
+            requestAnimationFrame(() => requestAnimationFrame(() => r.classList.add('on')))
+          }, 300 + i * 280)
+        })
+        // wants light up
+        setTimeout(() => {
+          ;[0, 2].forEach(i => {
+            const r = document.getElementById('brow' + i)
+            r.classList.add('wantrow')
+            const tag = document.createElement('div')
+            tag.className = 'chip sticker'
+            tag.style.cssText = 'font-size:13px;padding:2px 10px;transform:rotate(-3deg) scale(0);transition:transform .45s cubic-bezier(.34,1.56,.64,1)'
+            tag.textContent = '🎯 ON YOUR LIST'
+            r.insertBefore(tag, r.children[2])
+            requestAnimationFrame(() => tag.style.transform = 'rotate(-3deg) scale(1)')
+          })
+        }, 1700)
+        setTimeout(() => {
+          const s = el(`<div class="bigsticker yellow on" style="right:80px;top:330px;left:auto;opacity:0;font-size:28px">2 of your wants are HERE</div>`)
+          requestAnimationFrame(() => s.style.opacity = 1)
+        }, 2400)
+      })],
+      // ── beat 3: table mode — sold in two taps ──
+      [12500, () => wipe(() => {
+        headline('Five deals deep? <span class="marker-word">Two taps<i></i></span>.<div class="subline">Table mode keeps the booth honest.</div>')
+        setTimeout(markerOn, 600)
+        el(`<div class="panel listpanel" id="tablep" style="left:64px;top:330px;width:640px;padding:20px 26px;opacity:0;transform:translateY(28px);transition:all .55s cubic-bezier(.22,1,.36,1)">
+          <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px">
+            <div style="font-weight:900;font-size:21px;flex:1">🔥 Table mode</div>
+            <div class="chip green" id="daychip" style="font-size:16px;padding:4px 13px">💵 $0.00 today</div>
+          </div>
+          <div id="rows"></div>
+        </div>`)
+        const p = document.getElementById('tablep')
+        requestAnimationFrame(() => { p.style.opacity = 1; p.style.transform = 'translateY(0)' })
+        setTimeout(() => {
+          const c = CARDS.charizard
+          const r = document.createElement('div')
+          r.className = 'listrow'
+          r.id = 'sellrow'
+          r.innerHTML = `<img src="${c.img}"/><div class="nm">${c.name}<div class="meta">${c.sub} · asking $650.00</div></div>
+            <div class="pressbtn" id="soldbtn" style="font-size:17px;padding:9px 18px">💵 Sold</div>
+            <div class="pressbtn" style="font-size:17px;padding:9px 18px;background:var(--card)">🔁 Trade</div>`
+          document.getElementById('rows').appendChild(r)
+          requestAnimationFrame(() => requestAnimationFrame(() => r.classList.add('on')))
+        }, 400)
+      })],
+      [14500, () => moveCursor(520, 470)],
+      [15400, () => tap(document.getElementById('soldbtn'))],
+      [15850, () => {
+        $('cursor').classList.remove('on')
+        const row = document.getElementById('sellrow')
+        if (row) { row.style.opacity = .35; row.style.filter = 'grayscale(1)' }
+        countUp(document.getElementById('daychip'), 650.00, 900, '💵 $')
+        setTimeout(() => {
+          const s = el(`<div class="bigsticker on" style="left:380px;top:560px;opacity:0;font-size:25px">Day log updated ✓ (undo if you fat-finger)</div>`)
+          requestAnimationFrame(() => s.style.opacity = 1)
+        }, 700)
       }],
-      // event directory finale
-      [15200, () => {
-        const s = el(`<div class="bigsticker yellow on" style="left:200px;top:400px;opacity:0;font-size:30px;transform:rotate(-2deg) scale(.6)">Whole event? One QR — 40 booths.</div>`)
-        requestAnimationFrame(() => { s.style.opacity = 1; s.style.transform = 'rotate(-2deg) scale(1)' })
-      }],
-      ...outro(18400),
+      // ── beat 4: the live QR — never goes stale ──
+      [18300, () => wipe(() => {
+        headline('The QR on your stand? <span class="marker-word">Always current<i></i></span>.<div class="subline">Sell a card — the code updates itself.</div>')
+        setTimeout(markerOn, 600)
+        const mat = el(`<div class="panel" id="livemat" style="position:absolute;right:110px;top:300px;width:310px;padding:22px;text-align:center;opacity:0;transform:scale(.8);transition:all .55s cubic-bezier(.34,1.56,.64,1)">
+          <div class="chip red sticker" style="font-size:14px;padding:3px 12px;margin-bottom:10px">● LIVE</div>
+          <div id="liveqr" style="width:212px;height:212px;margin:0 auto;display:grid;grid-template-columns:repeat(21,1fr);grid-template-rows:repeat(21,1fr);background:#fff;border:3px solid var(--ink);border-radius:10px;padding:8px"></div>
+          <div style="font-weight:800;font-size:15px;color:var(--sub);margin-top:10px" id="livecount">3 listings · updates live</div>
+        </div>`)
+        paintQR(document.getElementById('liveqr'), 42)
+        requestAnimationFrame(() => { mat.style.opacity = 1; mat.style.transform = 'scale(1)' })
+        // a sale happens → the code re-encodes before your eyes
+        setTimeout(() => {
+          const s = el(`<div class="chip green sticker" style="position:absolute;left:120px;top:420px;font-size:22px;padding:9px 18px;opacity:0;transition:opacity .4s">💵 Charizard sold</div>`)
+          requestAnimationFrame(() => s.style.opacity = 1)
+        }, 1400)
+        setTimeout(() => {
+          paintQR(document.getElementById('liveqr'), 1337)
+          document.getElementById('livecount').textContent = '2 listings · updates live'
+          const s = el(`<div class="chip sticker" style="position:absolute;left:120px;top:500px;font-size:22px;padding:9px 18px;opacity:0;transition:opacity .4s">QR re-encoded ✓ — no stale menus</div>`)
+          requestAnimationFrame(() => s.style.opacity = 1)
+        }, 2300)
+      })],
+      ...outro(22000),
     ])
   },
 

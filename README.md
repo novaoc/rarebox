@@ -89,17 +89,22 @@ Built by [Nova](https://github.com/novaoc).
 
 ### Card Booth (IRL selling)
 - Set up a booth for a card show or store table: pick items from your shelves, put your asking price on them — or **search the card database** to list things you haven't tracked
+- **Sealed products are first-class listings**: search booster boxes, ETBs, decks, and tins across all six games (plus Japanese Pokémon) from a daily-built TCGplayer index of 8,500+ sealed products — canonical product ids, so the same box always matches no matter what anyone calls it
+- **ISO wantlist**: keep a list of the cards & sealed you're hunting (add by search, or one tap turns a master set's missing cards into wants). Scan any booth QR and matches light up instantly — **including stock that's in a binder under the table** — with a "show matches only" toggle, per-shop 🎯 badges on saved shops, and qty / max-price per want
+- **Table mode** (`Booth → 🔥 Table`): a one-thumb live-inventory screen for mid-show chaos — filter-as-you-type, big **💵 Sold / 🔁 Trade** buttons (quantity decrements, undo toast), add cards you just bought, and a **day journal** with live cash-taken / traded-out recap chips. No spreadsheet later, no catching up from photos
+- **Live kiosk QR**: table mode can show a full-screen QR that **re-encodes itself every time your inventory changes** (screen stays awake) — prop a phone on a stand and every scan is current. Shares also carry a timestamp, so buyers see "snapshot 2h ago" and get a re-scan nudge on stale links
+- **Booth branding**: accent color + emoji/initials monogram (a few bytes in the share, works offline) with an optional hosted logo — buyers see your colors, and the QR poster paints in them too
 - Booth details with almost no typing: store/event name, table #, and a **location picker** (search the venue via OpenStreetMap or one-tap GPS) — buyers get a **Get directions** button that opens their maps app
 - Share as a link or QR — the **entire booth travels inside the link** (URL fragment), so nothing is uploaded or hosted anywhere
 - Small booths: one QR scannable by any phone camera; big booths: animated multi-frame QR (scanned from Booth → Scan); 250-listing cap keeps every share path comfortable
 - Buyers see a read-only booth with your prices and a table total, and can **save shops** to revisit later — even offline
 - **Compare to market**: any saved shop's asking prices checked against live Rarebox-tracked prices — per-item over/under deltas and a verdict badge ("12% under market")
-- Saved shops sort by total or name, and a **cross-shop search** finds a card across every booth you've saved — built for big events
+- Saved shops sort by total or name, and a **cross-shop search** finds a card across every booth you've saved — with game and max-price filters ("everything under $20 at every table" needs no search text). Built for big events
 - **Booth directories**: bundle saved shops into one QR/link (entries are tiny da.gd short links — a 40-booth hall fits a single camera-scannable QR); recipients tap "Add all" and every booth downloads to their device with a progress bar. Perfect for event organizers
 - In-app tutorial video on the Booth page (auto-plays once, replay via the ⓘ icon)
 - Visitor-friendly by design: shared booths show no database prompts or download popups — first-timers get a small dismissible invite to try Rarebox instead
 - Uniform listing mats: card scans, booster boxes, and tins all frame to the same size
-- Booths and saved shops are included in backups and device transfer
+- Booths, saved shops, the wantlist, and the day journal are included in backups and device transfer
 
 ### Trade Analyzer
 - Side-by-side trade comparison — add cards to Side A and Side B via search or camera scan
