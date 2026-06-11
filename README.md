@@ -147,11 +147,6 @@ Built by [Nova](https://github.com/novaoc).
   offline chip tells you when those need a connection
 - **Browse works offline** — set lists and card pages persist on-device
   after one online visit (stale beats blank when the network is gone)
-- **Offline image packs** (Settings → Offline Card Images): download every
-  card picture for your games, recompressed on-device to WebP (~10× smaller
-  than the source scans — a full Pokémon pack is ~350MB, not 3.2GB), with
-  per-game size estimates, a data warning, pause/resume, and a tiny
-  background progress pill
 - Deploys still land instantly: navigations are network-first, the cache
   is only a fallback
 
