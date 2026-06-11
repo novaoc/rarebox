@@ -16,8 +16,8 @@
 
       <!-- Filters -->
       <div class="msg-filters">
-        <button v-for="f in filters" :key="f.id" class="filter-tab" :class="{ active: filter === f.id }" @click="filter = f.id">
-          {{ f.label }} <span class="filter-count">{{ f.count }}</span>
+        <button v-for="f in filters" :key="f.id" class="msg-filter-btn" :class="{ active: filter === f.id }" @click="filter = f.id">
+          {{ f.label }} <span class="msg-filter-count">{{ f.count }}</span>
         </button>
       </div>
 
@@ -81,10 +81,10 @@ const foundToday = computed(() => {
   return Object.values(props.marks).filter(ts => ts >= dayStart.getTime()).length
 })
 
+// Owned tab dropped — the header already shows "N/M owned"
 const filters = computed(() => [
   { id: 'need', label: 'Not owned', count: needCount.value + markedCards.value.length },
   { id: 'all', label: 'All cards', count: cards.value.length },
-  { id: 'owned', label: 'Owned', count: ownedCount.value },
 ])
 
 const visibleCards = computed(() => {
@@ -165,7 +165,35 @@ onMounted(async () => {
 .msg-head-actions { display: flex; align-items: center; gap: 10px; }
 .msg-today { font-size: 10.5px; }
 
-.msg-filters { display: flex; gap: 6px; padding: 0 18px 12px; }
+.msg-filters { display: flex; gap: 8px; padding: 0 18px 12px; }
+.msg-filter-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 14px;
+  font-size: 12.5px;
+  font-weight: 700;
+  font-family: inherit;
+  color: var(--ink);
+  background: var(--bg-card);
+  border: var(--bw) solid var(--ink);
+  border-radius: 99px;
+  box-shadow: var(--shadow-pressed);
+  cursor: pointer;
+  transition: background 0.12s, box-shadow 0.1s, transform 0.1s;
+}
+.msg-filter-btn:hover { background: var(--bg-hover); }
+.msg-filter-btn:active { box-shadow: none; transform: translate(1px, 1px); }
+.msg-filter-btn.active { background: var(--accent); color: var(--on-accent); }
+.msg-filter-count {
+  font-size: 11px;
+  font-weight: 800;
+  padding: 1px 7px;
+  border-radius: 99px;
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+}
+.msg-filter-btn.active .msg-filter-count { background: rgba(20, 20, 20, 0.15); color: var(--on-accent); }
 
 .msg-grid-wrap { overflow-y: auto; padding: 4px 18px 18px; flex: 1; }
 .msg-hint { font-size: 12px; color: var(--text-secondary); font-weight: 600; margin: 0 0 12px; }
