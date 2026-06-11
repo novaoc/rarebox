@@ -96,6 +96,14 @@
         images are recompressed on your device to a fraction of their original size.
       </p>
 
+      <div v-if="oiIsMobile" class="oi-warning">
+        📵 Downloading full packs runs hot on phones and tablets, so it's
+        <strong>desktop-only</strong>: open rarebox.io on a computer, download there,
+        hit <strong>Export</strong>, move the file here, and <strong>Import</strong> below —
+        done in about a minute, cool to the touch.
+      </div>
+
+      <template v-if="!oiIsMobile">
       <div class="oi-warning">
         ⚠ This can use <strong>{{ fmtBytes(oiSelectedBytes) }}</strong> of storage and the same in
         data — use Wi-Fi. Your browser may evict it if the device runs low on space.
@@ -122,13 +130,14 @@
         <button v-if="!oiState.running" class="btn btn-primary btn-sm" :disabled="!oiGames.some(g => g.selected)" @click="startOfflineImages">{{ oiCached > 0 ? 'Top up' : 'Download' }}</button>
         <button v-else class="btn btn-secondary btn-sm" @click="stopOfflineImages()">Pause</button>
       </div>
+      </template>
 
       <div class="settings-item">
         <div>
           <div class="settings-item-label">Transfer pack between devices</div>
           <div class="settings-item-sub">
             <template v-if="oiTransferMsg">{{ oiTransferMsg }}</template>
-            <template v-else>Download on a desktop (fast & cool), export the pack as one file, then import it here — AirDrop, USB, any drive works</template>
+            <template v-else>{{ oiIsMobile ? 'Import the pack file you exported on your computer — AirDrop, USB, any drive works' : 'Export the pack as one file to move it to your phone (it imports there in about a minute)' }}</template>
           </div>
         </div>
         <div class="oi-transfer-btns">
@@ -429,7 +438,7 @@ import { exportBackup, validateBackup, importBackup } from '../utils/backup'
 import { parseCollectrFile } from '../utils/collectrImport'
 import { getActiveAlerts, getTriggeredAlerts, removeAlert, clearTriggeredAlerts, clearAllAlerts } from '../utils/alerts'
 import LocalSyncModal from '../components/LocalSyncModal.vue'
-import { offlineImagesState, estimateGames, downloadOfflineImages, stopOfflineImages, bulkCacheCount, clearBulkCache, fmtBytes, exportImagePack, importImagePack } from '../utils/offlineImages'
+import { offlineImagesState, estimateGames, downloadOfflineImages, stopOfflineImages, bulkCacheCount, clearBulkCache, fmtBytes, exportImagePack, importImagePack, IS_MOBILE } from '../utils/offlineImages'
 import { getCardCounts, clearCardCache, saveCardDatabaseReady, buildSearchIndex } from '../services/tcg/cardCache'
 import { useTradeStore } from '../stores/trade'
 import { getThemePref, setThemePref } from '../utils/theme'
@@ -447,6 +456,7 @@ const appVersion = __APP_VERSION__ // injected by Vite from package.json
 const oiGames = ref([])
 const oiCached = ref(0)
 const oiState = offlineImagesState
+const oiIsMobile = IS_MOBILE
 async function refreshOfflineImages() {
   oiGames.value = await estimateGames()
   oiCached.value = await bulkCacheCount()

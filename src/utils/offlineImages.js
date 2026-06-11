@@ -33,7 +33,13 @@ export const BULK_CACHE = 'rarebox-img-bulk'
 // deliberately gentle profile: sustained max-CPU downloads overheat a
 // passively-cooled phone, so mobile gets fewer lanes, fewer encoder
 // workers, and a duty-cycle breather (~4s work / 1.2s rest).
-const IS_MOBILE = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
+// Handheld = phone OR tablet. Bulk downloads are desktop-ONLY: handhelds
+// are passively cooled and overheat. iPadOS reports a Mac UA, so the UA
+// check alone misses it — a "Mac" with multitouch is an iPad, and a
+// coarse-pointer primary input catches Android tablets in desktop mode.
+export const IS_MOBILE = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
+  || (navigator.maxTouchPoints > 1 && /Macintosh/.test(navigator.userAgent))
+  || (typeof matchMedia !== 'undefined' && matchMedia('(hover: none) and (pointer: coarse)').matches)
 const CONCURRENCY = IS_MOBILE ? 6 : 20
 const BREATHER_WORK_MS = 4000
 const BREATHER_REST_MS = 1200
