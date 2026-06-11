@@ -91,12 +91,19 @@
     <!-- Price Data Sources -->
     <div class="settings-section card mb-4">
       <h3 class="settings-section-title">Price Data Sources</h3>
-      <p class="settings-desc">All price data is fetched directly in your browser. No API keys or accounts required.</p>
+      <p class="settings-desc">All price data is fetched directly in your browser — from each game's public API, or from price files Rarebox pre-builds daily and ships as static assets. No API keys or accounts required.</p>
 
       <div class="settings-item">
         <div>
           <div class="settings-item-label">Card Prices</div>
-          <div class="settings-item-sub">Live market prices from pokemontcg.io</div>
+          <div class="settings-item-sub">Live market prices from each game's public API (pokemontcg.io, Scryfall, YGOPRODeck, Lorcast, optcgapi)</div>
+        </div>
+        <span class="badge badge-success">Active</span>
+      </div>
+      <div class="settings-item">
+        <div>
+          <div class="settings-item-label">Riftbound &amp; Japanese Pokémon</div>
+          <div class="settings-item-sub">TCGplayer market prices, refreshed daily and served as static files</div>
         </div>
         <span class="badge badge-success">Active</span>
       </div>
@@ -264,7 +271,7 @@
       <div class="settings-notes mt-3">
         <div class="note">
           <span>📊</span>
-          <p>Live prices come from each game's public database — <strong>pokemontcg.io</strong> (Pokémon), <strong>Scryfall</strong> (Magic), <strong>YGOPRODeck</strong> (Yu-Gi-Oh!), <strong>Lorcast</strong> (Lorcana), and <strong>PriceCharting</strong> (One Piece, Riftbound, sealed &amp; graded). Pokémon price history comes from the <strong>tcgdex/price-history</strong> repository (TCGPlayer data, Nov 2022+).</p>
+          <p>Live prices come from each game's public database — <strong>pokemontcg.io</strong> (Pokémon), <strong>Scryfall</strong> (Magic), <strong>YGOPRODeck</strong> (Yu-Gi-Oh!), <strong>Lorcast</strong> (Lorcana), and <strong>optcgapi</strong> (One Piece). <strong>Riftbound</strong> and <strong>Japanese Pokémon</strong> prices are TCGplayer market data, pre-built daily by Rarebox's automated refresh and served as static files. <strong>PriceCharting</strong> covers sealed &amp; graded. Pokémon price history comes from the <strong>tcgdex/price-history</strong> repository (TCGPlayer data, Nov 2022+).</p>
         </div>
         <div class="note">
           <span>📡</span>
