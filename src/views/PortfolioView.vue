@@ -23,6 +23,7 @@
         <div class="portfolio-header-actions">
           <router-link to="/search" class="btn btn-primary btn-sm">+ Add Card</router-link>
           <button class="btn btn-secondary btn-sm" @click="showAddSealed = true">+ Sealed</button>
+          <button class="btn btn-secondary btn-sm" @click="openMasterSetModal">★ Master Set</button>
           
           <!-- Dropdown for secondary actions on mobile -->
           <div class="action-dropdown" v-if="isMobile">
@@ -96,6 +97,29 @@
           </div>
         </div>
         <PortfolioChart :portfolios="[portfolio]" :height="280" :label="portfolio.name" />
+      </div>
+
+      <!-- Master set suggestion — appears when a set crosses 80% owned -->
+      <div v-if="msSuggestion" class="ms-suggest">
+        <span class="ms-suggest-text">
+          <template v-if="msSuggestion.owned >= msSuggestion.total">🎉 Your <strong>{{ msSuggestion.name }}</strong> set is complete — showcase it as a master set?</template>
+          <template v-else>You're <strong>{{ msSuggestion.total - msSuggestion.owned }} card{{ msSuggestion.total - msSuggestion.owned === 1 ? '' : 's' }}</strong> from a <strong>{{ msSuggestion.name }}</strong> master set ({{ msSuggestion.owned }}/{{ msSuggestion.total }}) — showcase the stack?</template>
+        </span>
+        <div class="ms-suggest-actions">
+          <button class="btn btn-primary btn-sm" @click="showcaseSuggestion">Showcase</button>
+          <button class="btn btn-ghost btn-sm" @click="store.dismissMasterSetSuggestion(portfolio.id, msSuggestion.key)">Not now</button>
+        </div>
+      </div>
+
+      <!-- Master sets showcase -->
+      <div v-if="masterSetGroups.length" class="ms-showcase">
+        <MasterSetStack
+          v-for="g in masterSetGroups"
+          :key="g.key"
+          :group="g"
+          @toggle-expand="toggleMsExpand(g.key)"
+          @unshowcase="store.unshowcaseMasterSet(portfolio.id, g.key)"
+        />
       </div>
 
       <!-- Items view -->
@@ -350,6 +374,40 @@
       <AddItemModal v-if="showAddSealed" :card="null" :defaultPortfolioId="portfolio.id" defaultType="sealed" @close="showAddSealed = false" />
     </transition>
 
+    <!-- Add master set modal -->
+    <transition name="fade">
+      <div v-if="showMasterSetModal" class="modal-overlay" @click.self="!msForm.busy && (showMasterSetModal = false)">
+        <div class="modal">
+          <div class="modal-header">
+            <h3>★ Add a Master Set</h3>
+            <button class="btn btn-ghost btn-icon" :disabled="msForm.busy" @click="showMasterSetModal = false">✕</button>
+          </div>
+          <div class="modal-body">
+            <p class="ms-modal-hint">Adds every card of a set to this shelf in one go and showcases it as a binder stack — no trip to Browse. Cards you already own are skipped.</p>
+            <div class="form-group">
+              <label class="form-label">Game</label>
+              <select v-model="msForm.game" class="input" :disabled="msForm.busy" @change="loadMsFormSets">
+                <option v-for="g in msGameOptions" :key="g.value" :value="g.value">{{ g.label }}</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Set</label>
+              <select v-model="msForm.setKey" class="input" :disabled="msForm.busy || !msForm.sets.length">
+                <option value="" disabled>{{ msForm.sets.length ? 'Pick a set…' : 'Loading sets…' }}</option>
+                <option v-for="s in msForm.sets" :key="s.id" :value="s.id">{{ s.name }}{{ s.total ? ` · ${s.total} cards` : '' }}</option>
+              </select>
+            </div>
+            <div v-if="msForm.progress" class="ms-modal-progress">{{ msForm.progress }}</div>
+            <div v-if="msForm.error" class="ms-modal-error">{{ msForm.error }}</div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-secondary" :disabled="msForm.busy" @click="showMasterSetModal = false">Cancel</button>
+            <button class="btn btn-primary" :disabled="msForm.busy || !msForm.setKey" @click="confirmAddMasterSet">{{ msForm.busy ? 'Adding…' : 'Add & Showcase' }}</button>
+          </div>
+        </div>
+      </div>
+    </transition>
+
     <!-- Edit item modal -->
     <transition name="fade">
       <div v-if="editingItem" class="modal-overlay" @click.self="editingItem = null">
@@ -437,6 +495,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { usePortfolioStore } from '../stores/portfolio'
 import { exportPortfolioToExcel } from '../utils/excel'
 import { getCard, getMarketPrice } from '../services/pokemonApi'
+// (master-set helpers from pokemonApi/providers/cardCache imported below)
 import { fetchPrice } from '../services/priceServer'
 import { getPrice as getTcgPrice } from '../services/priceFeedService'
 import { checkAlerts, notifyTriggered } from '../utils/alerts'
@@ -444,6 +503,213 @@ import PriceChart from '../components/PriceChart.vue'
 import PortfolioChart from '../components/PortfolioChart.vue'
 import AddItemModal from '../components/AddItemModal.vue'
 import BulkImportModal from '../components/BulkImportModal.vue'
+import MasterSetStack from '../components/MasterSetStack.vue'
+import { getSets as getPokemonSets, getJapaneseSets, getCardsBySet, getJapaneseCardsBySet } from '../services/pokemonApi'
+import { getProvider } from '../services/tcg/providers'
+import { getTcgPrefs } from '../services/tcg/cardCache'
+
+// ── Master sets ────────────────────────────────────────────────────────
+// A master set collapses every single from one set into a binder-stack
+// showcase with combined value + completion. Grouping is view-layer only.
+
+const MS_GAME_LABELS = { pokemon: 'Pokémon', mtg: 'Magic', yugioh: 'Yu-Gi-Oh!', lorcana: 'Lorcana', 'one-piece': 'One Piece', riftbound: 'Riftbound' }
+
+function msItemKey(item) {
+  if (item.type !== 'card') return null
+  const setId = item.cardData?.set?.id || item.cardData?.set?.name || item.setName
+  if (!setId) return null
+  return `${item.game || 'pokemon'}:${String(setId).toLowerCase()}`
+}
+
+// Set totals + logos, filled lazily from the cached set lists (no extra
+// network beyond what Browse already caches)
+const msSetMeta = ref({})
+async function loadMsSetMeta() {
+  const meta = {}
+  const games = new Set(['pokemon'])
+  for (const g of getTcgPrefs() || []) games.add(g)
+  for (const item of portfolio.value?.items || []) if (item.game) games.add(item.game)
+  await Promise.allSettled([...games].map(async (g) => {
+    if (g === 'pokemon') {
+      const [en, jp] = await Promise.allSettled([getPokemonSets(), getJapaneseSets()])
+      for (const list of [en, jp]) {
+        if (list.status !== 'fulfilled') continue
+        for (const s of list.value || []) {
+          meta[`pokemon:${String(s.id).toLowerCase()}`] = { total: s.total || s.printedTotal || null, logo: s.images?.logo || '', name: s.name, _lang: s._lang }
+        }
+      }
+    } else {
+      const sets = await getProvider(g)?.getSets() || []
+      for (const s of sets) {
+        const m = { total: s.total || null, logo: s.logo || '', name: s.name }
+        meta[`${g}:${String(s.id).toLowerCase()}`] = m
+        meta[`${g}:${String(s.name).toLowerCase()}`] = m
+      }
+    }
+  }))
+  msSetMeta.value = meta
+}
+onMounted(loadMsSetMeta)
+
+const msExpanded = ref(new Set())
+function toggleMsExpand(key) {
+  const next = new Set(msExpanded.value)
+  next.has(key) ? next.delete(key) : next.add(key)
+  msExpanded.value = next
+}
+
+const msGroups = computed(() => {
+  const groups = new Map()
+  for (const item of portfolio.value?.items || []) {
+    const key = msItemKey(item)
+    if (!key) continue
+    let g = groups.get(key)
+    if (!g) {
+      g = { key, game: item.game || 'pokemon', name: item.cardData?.set?.name || item.setName || '', items: [], ids: new Set(), value: 0, count: 0 }
+      groups.set(key, g)
+    }
+    g.items.push(item)
+    if (item.cardId) g.ids.add(item.cardId)
+    g.value += getCurrentValue(item) * (item.quantity || 1)
+    g.count += item.quantity || 1
+  }
+  for (const g of groups.values()) {
+    g.owned = g.ids.size || g.items.length
+    const meta = msSetMeta.value[g.key]
+    g.total = meta?.total || null
+    g.logo = meta?.logo || ''
+    if (!g.name && meta?.name) g.name = meta.name
+  }
+  return groups
+})
+
+const masterSetGroups = computed(() => {
+  const showcased = portfolio.value?.masterSets || {}
+  const out = []
+  for (const key of Object.keys(showcased)) {
+    const g = msGroups.value.get(key)
+    const saved = showcased[key]
+    if (!g) continue
+    out.push({
+      ...g,
+      name: g.name || saved.name,
+      total: g.total || saved.total || null,
+      logo: g.logo || saved.logo || '',
+      gameLabel: MS_GAME_LABELS[g.game] || g.game,
+      complete: !!(g.total && g.owned >= g.total),
+      expanded: msExpanded.value.has(key),
+    })
+  }
+  return out.sort((a, b) => b.value - a.value)
+})
+
+const collapsedMsKeys = computed(() => {
+  const keys = new Set(Object.keys(portfolio.value?.masterSets || {}))
+  for (const k of msExpanded.value) keys.delete(k)
+  return keys
+})
+
+const msSuggestion = computed(() => {
+  const showcased = portfolio.value?.masterSets || {}
+  const dismissed = new Set(portfolio.value?.masterSetsDismissed || [])
+  let best = null
+  for (const g of msGroups.value.values()) {
+    if (showcased[g.key] || dismissed.has(g.key)) continue
+    if (!g.total || g.total < 10) continue // tiny "sets" make silly trophies
+    if (g.owned / g.total < 0.8) continue
+    if (!best || g.owned / g.total > best.owned / best.total) best = g
+  }
+  return best
+})
+
+function showcaseSuggestion() {
+  const s = msSuggestion.value
+  if (!s) return
+  store.showcaseMasterSet(portfolio.value.id, s.key, { name: s.name, game: s.game, total: s.total, logo: s.logo })
+}
+
+// ── Add Master Set from the shelf (no Browse round-trip) ───────────────
+const showMasterSetModal = ref(false)
+const msForm = reactive({ game: 'pokemon', setKey: '', busy: false, progress: '', error: '', sets: [] })
+
+function openMasterSetModal() {
+  showMasterSetModal.value = true
+  msForm.error = ''
+  msForm.progress = ''
+  loadMsFormSets()
+}
+
+const msGameOptions = computed(() => {
+  const games = new Set(['pokemon', ...(getTcgPrefs() || [])])
+  return [...games].map(g => ({ value: g, label: MS_GAME_LABELS[g] || g }))
+})
+
+async function loadMsFormSets() {
+  msForm.sets = []
+  msForm.setKey = ''
+  try {
+    if (msForm.game === 'pokemon') {
+      const [en, jp] = await Promise.allSettled([getPokemonSets(), getJapaneseSets()])
+      const sets = []
+      if (en.status === 'fulfilled') sets.push(...(en.value || []).map(s => ({ ...s, _lang: 'en' })))
+      if (jp.status === 'fulfilled') sets.push(...(jp.value || []).map(s => ({ ...s, _lang: 'ja' })))
+      msForm.sets = sets.map(s => ({ id: s.id, name: s.name + (s._lang === 'ja' ? ' (JP)' : ''), total: s.total || s.printedTotal || null, logo: s.images?.logo || '', _lang: s._lang }))
+    } else {
+      const sets = await getProvider(msForm.game)?.getSets() || []
+      msForm.sets = sets.map(s => ({ id: s.id, name: s.name, total: s.total || null, logo: s.logo || '' }))
+    }
+  } catch (e) {
+    msForm.error = 'Could not load sets — check your connection.'
+  }
+}
+
+async function confirmAddMasterSet() {
+  const set = msForm.sets.find(s => s.id === msForm.setKey)
+  if (!set || msForm.busy) return
+  msForm.busy = true
+  msForm.error = ''
+  msForm.progress = 'Fetching set list…'
+  try {
+    let cards = []
+    if (msForm.game === 'pokemon') {
+      const data = set._lang === 'ja' ? await getJapaneseCardsBySet(set.id, 1, 999) : await getCardsBySet(set.id, 1, 250)
+      cards = (data.data || []).map(c => ({
+        id: c.id, name: c.name, number: c.number, images: c.images, rarity: c.rarity,
+        supertype: c.supertype, set: { id: c.set?.id || set.id, name: c.set?.name || set.name },
+        price: (() => { const r = getMarketPrice(c); return r?.price || r || 0 })(),
+        _lang: set._lang === 'ja' ? 'ja' : null, game: 'pokemon',
+      }))
+    } else {
+      const raw = await getProvider(msForm.game)?.getSetCards(set.id) || []
+      cards = raw.map(c => ({
+        id: c.id, name: c.name, number: c.number, images: { small: c.image }, rarity: c.rarity,
+        set: { id: set.id, name: set.name }, price: c.price || 0, game: msForm.game,
+      }))
+    }
+    if (!cards.length) throw new Error('Set has no cards')
+
+    const key = `${msForm.game}:${String(set.id).toLowerCase()}`
+    const owned = new Set((msGroups.value.get(key)?.items || []).map(i => i.cardId))
+    const toAdd = cards.filter(c => !owned.has(c.id))
+    msForm.progress = `Adding ${toAdd.length} of ${cards.length} cards (you own ${cards.length - toAdd.length})…`
+    for (const card of toAdd) {
+      store.addItem(portfolio.value.id, {
+        type: 'card', quantity: 1, purchasePrice: 0, purchaseDate: '', notes: '',
+        cardId: card.id,
+        game: card.game === 'pokemon' ? undefined : card.game,
+        _lang: card._lang || null,
+        cardData: { name: card.name, number: card.number, images: card.images, set: card.set, rarity: card.rarity, supertype: card.supertype, _lang: card._lang },
+        priceVariant: '', currentMarketPrice: card.price,
+      })
+    }
+    store.showcaseMasterSet(portfolio.value.id, key, { name: set.name, game: msForm.game, total: set.total || cards.length, logo: set.logo })
+    msForm.progress = `Done — ${set.name} is on the shelf as a master set ✓`
+    setTimeout(() => { showMasterSetModal.value = false; msForm.busy = false; msForm.progress = '' }, 1400)
+  } catch (e) {
+    msForm.error = navigator.onLine ? 'Could not fetch that set — try again.' : 'You\'re offline — adding a full set needs a connection.'
+    msForm.busy = false
+  }
+}
 import PullToRefresh from '../components/PullToRefresh.vue'
 
 const route = useRoute()
@@ -545,6 +811,10 @@ const filters = [
 const filteredItems = computed(() => {
   if (!portfolio.value) return []
   let items = portfolio.value.items
+  // Singles inside a collapsed master set live in the showcase stack, not
+  // the table; expanding the stack brings them back
+  const hidden = collapsedMsKeys.value
+  if (hidden.size) items = items.filter(i => !hidden.has(msItemKey(i)))
   if (activeFilter.value !== 'all') items = items.filter(i => i.type === activeFilter.value)
   if (itemSearch.value) {
     const q = itemSearch.value.toLowerCase()
@@ -702,6 +972,27 @@ function deletePortfolio() { store.deletePortfolio(portfolio.value.id); router.p
 .portfolio-view { max-width: 1200px; margin: 0 auto; padding-bottom: 80px; }
 
 .portfolio-header { display: flex; flex-direction: column; gap: 16px; margin-bottom: 24px; position: relative; }
+
+/* ── Master sets ── */
+.ms-suggest {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  background: var(--accent-dim);
+  border: var(--bw) solid var(--ink);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-xs);
+}
+.ms-suggest-text { font-size: 13px; line-height: 1.45; }
+.ms-suggest-actions { display: flex; gap: 8px; flex-shrink: 0; }
+.ms-showcase { display: flex; flex-direction: column; gap: 12px; margin-bottom: 16px; }
+.ms-modal-hint { font-size: 12.5px; color: var(--text-secondary); margin-bottom: 14px; line-height: 1.5; }
+.ms-modal-progress { font-size: 12.5px; font-weight: 700; color: var(--success-text); margin-top: 4px; }
+.ms-modal-error { font-size: 12.5px; font-weight: 700; color: var(--danger-text); margin-top: 4px; }
 .portfolio-title-row { display: flex; align-items: flex-start; gap: 14px; }
 .portfolio-dot-lg { width: 14px; height: 14px; border-radius: 50%; flex-shrink: 0; margin-top: 6px; }
 .portfolio-name { font-size: 24px; font-weight: 800; letter-spacing: -0.01em; cursor: pointer; }

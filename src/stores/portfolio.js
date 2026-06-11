@@ -216,6 +216,36 @@ export const usePortfolioStore = defineStore('portfolio', () => {
 
   // ── Item CRUD ────────────────────────────────────────────────────────
 
+  // ── Master sets ─────────────────────────────────────────────────────
+  // A master set is a showcased grouping of every card item from one set:
+  // the shelf collapses those singles into a single binder-stack card with
+  // combined value and completion. Pure view-layer grouping — items are
+  // untouched, so un-showcasing restores the individual rows.
+  // Keys: `${game}:${setId}` (game defaults to 'pokemon').
+
+  function showcaseMasterSet(portfolioId, key, meta) {
+    const portfolio = portfolios.value.find(p => p.id === portfolioId)
+    if (!portfolio) return
+    if (!portfolio.masterSets) portfolio.masterSets = {}
+    portfolio.masterSets[key] = { name: '', game: 'pokemon', total: null, ...meta }
+    persist()
+  }
+
+  function unshowcaseMasterSet(portfolioId, key) {
+    const portfolio = portfolios.value.find(p => p.id === portfolioId)
+    if (!portfolio?.masterSets) return
+    delete portfolio.masterSets[key]
+    persist()
+  }
+
+  function dismissMasterSetSuggestion(portfolioId, key) {
+    const portfolio = portfolios.value.find(p => p.id === portfolioId)
+    if (!portfolio) return
+    if (!portfolio.masterSetsDismissed) portfolio.masterSetsDismissed = []
+    if (!portfolio.masterSetsDismissed.includes(key)) portfolio.masterSetsDismissed.push(key)
+    persist()
+  }
+
   function addItem(portfolioId, item) {
     const portfolio = portfolios.value.find(p => p.id === portfolioId)
     if (!portfolio) return null
@@ -792,6 +822,9 @@ export const usePortfolioStore = defineStore('portfolio', () => {
     deletePortfolio,
     setActivePortfolio,
     addItem,
+    showcaseMasterSet,
+    unshowcaseMasterSet,
+    dismissMasterSetSuggestion,
     updateItem,
     removeItem,
     removeItems,
