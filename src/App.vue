@@ -30,7 +30,7 @@
         <router-link to="/booth" class="topnav-link" :class="{ active: isTab('booth') }">Booth</router-link>
       </nav>
 
-      <div class="topbar-page" aria-hidden="true">
+      <div class="topbar-page">
         {{ currentPageTitle }}
         <button v-if="currentTour" class="tour-info-btn" @click="replayTour" title="Watch tour video" aria-label="Watch tour video">i</button>
       </div>
@@ -293,21 +293,12 @@ const portfolioColors = [
 ]
 
 const currentPageTitle = computed(() => {
-  if (route.name === 'Dashboard') return 'Dashboard'
-  if (route.name === 'Search') return 'Search Cards'
-  if (route.name === 'Browse') return 'Browse Sets'
-  if (route.name === 'Sets') return 'Pokémon Sets'
-  if (route.name === 'TcgSets') return 'Browse Sets'
-  if (route.name === 'Booth') return 'Card Booth'
-  if (route.name === 'BoothEdit') return 'Edit Booth'
-  if (route.name === 'Settings') return 'Settings'
-  if (route.name === 'Terms') return 'Terms & Conditions'
-  if (route.name === 'TradeAnalyzer' || route.name === 'TradeLanding') return 'Trade Analyzer'
   if (route.name === 'Portfolio') {
     const p = store.portfolios.find(p => p.id === route.params.id)
     return p?.name || 'Shelf'
   }
-  return 'Rarebox'
+  // Fallback to router meta title, then default
+  return route.meta?.title || 'Rarebox'
 })
 
 function hardRefresh() {
@@ -318,7 +309,7 @@ function createPortfolio() {
   if (!newPortfolioName.value.trim()) return
   const p = store.createPortfolio(newPortfolioName.value.trim(), newPortfolioColor.value)
   newPortfolioName.value = ''
-  showNewPortfolioModal.value = false
+  showNewPortfolioModal = false
   router.push(`/portfolio/${p.id}`)
 }
 
