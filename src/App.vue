@@ -185,7 +185,7 @@ import InstallPrompt from './components/InstallPrompt.vue'
 import TourModal from './components/TourModal.vue'
 import CardDatabaseLoader from './components/CardDatabaseLoader.vue'
 import CardLoadIndicator from './components/CardLoadIndicator.vue'
-import { isCardDatabaseReady, buildSearchIndex, saveCardDatabaseReady, getTcgPrefs } from './services/tcg/cardCache.js'
+import { isCardDatabaseReady, buildSearchIndex, saveCardDatabaseReady, getTcgPrefs, saveTcgPrefs } from './services/tcg/cardCache.js'
 import { preloadGames } from './services/tcg/cardPreloader.js'
 import { applyTheme, setThemePref, getThemePref, resolvedTheme } from './utils/theme.js'
 
@@ -210,6 +210,15 @@ const online = ref(navigator.onLine)
 window.addEventListener('online', () => { online.value = true })
 window.addEventListener('offline', () => { online.value = false })
 const cardLoadIndicator = ref(null)
+// Arriving through a booth share (#b=/#d=) means the visitor came for the
+// listings, not for setup decisions: select every game silently so the card
+// database downloads in the background — they'll need all of it to browse
+// booths anyway, and the picker would just be in the way.
+const isBoothShareArrival = window.location.pathname.startsWith('/booth') && /[#&][bd]=/.test(window.location.hash)
+if (isBoothShareArrival && !getTcgPrefs()) {
+  saveTcgPrefs(['pokemon', 'mtg', 'lorcana', 'one-piece', 'yugioh', 'riftbound'])
+}
+
 const showLoader = ref(!isCardDatabaseReady() && !getTcgPrefs())
 // Booth pages stay popup-free: someone opening a shared booth (or hopping
 // between scanned booths) shouldn't be asked to download card databases
@@ -252,7 +261,12 @@ const tourPages = {
 // storage key seen). The ⓘ next to the page title replays it any time.
 watch(() => route.name, (name) => {
   const tour = tourPages[name]
-  if (tour && !localStorage.getItem(tour.storageKey)) {
+  if (!tour) return
+  // Booth tour belongs to the hub ("Your table, in their pocket") only —
+  // someone opening a shared booth or directory came to see the listings,
+  // not a tutorial about a feature they don't use yet
+  if (name === 'Booth' && /[#&][bd]=/.test(window.location.hash)) return
+  if (!localStorage.getItem(tour.storageKey)) {
     tourKey.value++
     tour.showRef.value = true
   }
