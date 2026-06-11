@@ -262,7 +262,15 @@
           <div class="bulk-controls">
             <select v-model="bulkAddPortfolioId" class="input input-sm" style="width:160px">
               <option v-for="p in store.portfolios" :key="p.id" :value="p.id">{{ p.name }}</option>
+              <option value="__new__">＋ New shelf…</option>
             </select>
+            <input
+              v-if="bulkAddPortfolioId === '__new__'"
+              v-model="newShelfName"
+              class="input input-sm"
+              style="width:180px"
+              :placeholder="selectedSet?.name || 'Shelf name'"
+            />
             <div class="bulk-filter-tabs">
               <button class="bulk-tab" :class="{ active: bulkAddFilter === 'all' }" @click="bulkAddFilter = 'all'">
                 All ({{ bulkAddCards.length }})
@@ -329,6 +337,7 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { tokenMatch } from '../utils/search.js'
 import { getSets, getCardsBySet, getMarketPrice, formatVariantLabel, getJapaneseSets, getJapaneseCardsBySet, getJapaneseCardDetail } from '../services/pokemonApi'
+import { sortByNumber } from '../utils/masterSets'
 import { usePortfolioStore } from '../stores/portfolio'
 import PriceChart from '../components/PriceChart.vue'
 import AddItemModal from '../components/AddItemModal.vue'
@@ -387,6 +396,7 @@ const modalCard = ref(null)
 const showBulkAddModal = ref(false)
 const bulkAddCards = ref([])
 const bulkAddPortfolioId = ref('')
+const newShelfName = ref('')
 const bulkAddFilter = ref('all') // 'all' | 'needed'
 const bulkAdding = ref(false)
 const bulkAddDone = ref(false)
@@ -548,10 +558,11 @@ async function openBulkAddModal() {
   bulkAddDone.value = false
   bulkAddFilter.value = 'all'
 
-  // Default to first portfolio
-  if (!bulkAddPortfolioId.value && store.portfolios.length) {
-    bulkAddPortfolioId.value = store.portfolios[0].id
+  // Default to first portfolio — or to creating one when none exist yet
+  if (!bulkAddPortfolioId.value) {
+    bulkAddPortfolioId.value = store.portfolios[0]?.id || '__new__'
   }
+  newShelfName.value = ''
 
   // Get already-owned card IDs for this set in the selected portfolio
   const portfolio = store.portfolios.find(p => p.id === bulkAddPortfolioId.value)
@@ -569,9 +580,13 @@ async function openBulkAddModal() {
       const data = await getJapaneseCardsBySet(selectedSet.value.id, 1, 999)
       allCards = data.data || []
     } else {
-      // 250 covers the largest EN sets (Surging Sparks 252) — 200 cut tails off
-      const data = await getCardsBySet(selectedSet.value.id, 1, 250)
-      allCards = data.data || []
+      // pokemontcg.io caps pageSize at 250 and a few sets exceed it
+      // (Surging Sparks is 252) — page until the set runs dry
+      for (let page = 1; ; page++) {
+        const batch = (await getCardsBySet(selectedSet.value.id, page, 250)).data || []
+        allCards.push(...batch)
+        if (batch.length < 250) break
+      }
     }
   } catch {
     bulkLoading.value = false
@@ -579,7 +594,7 @@ async function openBulkAddModal() {
   }
 
   // Build bulk card list with prices
-  bulkAddCards.value = allCards.map(card => {
+  bulkAddCards.value = sortByNumber(allCards).map(card => {
     let price = 0
     if (selectedSet.value._lang === 'ja') {
       // JP cards: use tcgplayer prices if available (from detail fetch)
@@ -619,9 +634,17 @@ async function confirmBulkAdd() {
   if (bulkAdding.value || !bulkAddPortfolioId.value) return
   bulkAdding.value = true
 
+  let targetId = bulkAddPortfolioId.value
+  if (targetId === '__new__') {
+    // Empty input falls back to the placeholder — the set's own name
+    const p = store.createPortfolio(newShelfName.value.trim() || selectedSet.value?.name || 'New Shelf')
+    targetId = p.id
+    bulkAddPortfolioId.value = p.id
+  }
+
   const toAdd = bulkAddCards.value.filter(c => c.checked)
   for (const card of toAdd) {
-    store.addItem(bulkAddPortfolioId.value, {
+    store.addItem(targetId, {
       type: 'card',
       quantity: 1,
       purchasePrice: 0,

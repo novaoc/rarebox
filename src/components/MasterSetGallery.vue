@@ -33,20 +33,20 @@
             v-for="card in visibleCards"
             :key="card.id"
             class="msg-card"
-            :class="{ need: !owned.has(card.id) && !marks[card.id], got: marks[card.id] }"
+            :class="{ need: !isOwned(card) && !marks[card.id], got: marks[card.id] }"
             @click="tapCard(card)"
           >
             <div class="msg-img-wrap">
               <img v-if="card.images?.small" :src="card.images.small" :alt="card.name" loading="lazy" class="msg-img" />
               <div v-else class="msg-img-ph">{{ card.number }}</div>
-              <span v-if="!owned.has(card.id) && !marks[card.id]" class="msg-tag msg-tag-need">NOT OWNED</span>
+              <span v-if="!isOwned(card) && !marks[card.id]" class="msg-tag msg-tag-need">NOT OWNED</span>
               <span v-else-if="marks[card.id]" class="msg-tag msg-tag-got">FOUND ✓</span>
             </div>
             <div class="msg-card-name">{{ card.name }}</div>
             <div class="msg-card-num">#{{ card.number }}</div>
             <!-- Owned cards enlarge on tap; not-owned tap marks found, so
                  they get an explicit button to show the card to a vendor -->
-            <button v-if="!owned.has(card.id)" class="msg-enlarge" @click.stop="preview = card">🔍 Show bigger</button>
+            <button v-if="!isOwned(card)" class="msg-enlarge" @click.stop="preview = card">🔍 Show bigger</button>
           </div>
           </div>
         </template>
@@ -82,7 +82,7 @@ const props = defineProps({
   group: { type: Object, required: true }, // { key, name, game, gameLabel, setId, lang, items, hunt }
   marks: { type: Object, default: () => ({}) }, // { cardId: ts }
 })
-const emit = defineEmits(['close', 'toggle-mark', 'add-found'])
+const emit = defineEmits(['close', 'toggle-mark', 'add-found', 'loaded'])
 
 const cards = ref([])
 const loading = ref(true)
@@ -91,11 +91,29 @@ const filter = ref('all')
 const adding = ref(false)
 const preview = ref(null)
 
-const owned = computed(() => new Set((props.group.items || []).map(i => i.cardId)))
-const ownedCount = computed(() => cards.value.filter(c => owned.value.has(c.id)).length)
-const needCount = computed(() => cards.value.filter(c => !owned.value.has(c.id) && !props.marks[c.id]).length)
+// Owned matching: cardId when the item has one, otherwise name|number
+// (items added before Browse stored cardIds), otherwise bare name (items
+// added before card numbers were stored)
+const ownedIds = computed(() => new Set((props.group.items || []).map(i => i.cardId).filter(Boolean)))
+const ownedKeys = computed(() => {
+  const s = new Set()
+  for (const i of props.group.items || []) {
+    const name = (i.cardData?.name || '').toLowerCase()
+    if (!name) continue
+    const num = String(i.cardData?.number || '')
+    s.add(num ? `${name}|${num}` : name)
+  }
+  return s
+})
+function isOwned(card) {
+  if (ownedIds.value.has(card.id)) return true
+  const name = (card.name || '').toLowerCase()
+  return ownedKeys.value.has(`${name}|${String(card.number || '')}`) || ownedKeys.value.has(name)
+}
+const ownedCount = computed(() => cards.value.filter(c => isOwned(c)).length)
+const needCount = computed(() => cards.value.filter(c => !isOwned(c) && !props.marks[c.id]).length)
 const markedCards = computed(() => cards.value.filter(c => props.marks[c.id]))
-const hasUnowned = computed(() => cards.value.some(c => !owned.value.has(c.id)))
+const hasUnowned = computed(() => cards.value.some(c => !isOwned(c)))
 const foundToday = computed(() => {
   const dayStart = new Date(); dayStart.setHours(0, 0, 0, 0)
   return Object.values(props.marks).filter(ts => ts >= dayStart.getTime()).length
@@ -110,14 +128,14 @@ const filters = computed(() => [
 const visibleCards = computed(() => {
   // Complete set → no filter bar, always show the whole set
   if (!hasUnowned.value) return cards.value
-  if (filter.value === 'need') return cards.value.filter(c => !owned.value.has(c.id))
+  if (filter.value === 'need') return cards.value.filter(c => !isOwned(c))
   return cards.value
 })
 
 function tapCard(card) {
   // Owned cards enlarge for admiring; missing ones toggle the found mark
   // (they enlarge via the explicit "Show bigger" button instead)
-  if (owned.value.has(card.id)) { preview.value = card; return }
+  if (isOwned(card)) { preview.value = card; return }
   emit('toggle-mark', card.id)
 }
 
@@ -130,6 +148,13 @@ function addFound() {
 }
 
 onMounted(async () => {
+  // No resolvable set id → bail. Fetching with an empty id used to return
+  // an unfiltered card dump (the Riftbound "different set" bug).
+  if (!props.group.setId) {
+    error.value = 'Could not work out which set this is — try re-adding a card from Browse.'
+    loading.value = false
+    return
+  }
   try {
     const list = await fetchSetCards({
       game: props.group.game,
@@ -139,9 +164,10 @@ onMounted(async () => {
     })
     cards.value = sortByNumber(list)
     if (!cards.value.length) error.value = 'No card list available for this set.'
+    else emit('loaded', cards.value.length)
     // Incomplete sets open straight to the cards you DON'T own — that's
     // the hunting list. Complete sets open on All (nothing to hunt).
-    if (cards.value.some(c => !owned.value.has(c.id))) filter.value = 'need'
+    if (cards.value.some(c => !isOwned(c))) filter.value = 'need'
   } catch {
     error.value = navigator.onLine
       ? 'Could not load the set list — try again.'

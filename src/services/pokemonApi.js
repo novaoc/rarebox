@@ -121,7 +121,11 @@ export async function getSets() {
 }
 
 export async function getCardsBySet(setId, page = 1, pageSize = 36) {
-  const url = `${BASE_URL}/cards?q=set.id:${setId}&page=${page}&pageSize=${pageSize}&orderBy=number&select=id,name,number,set,supertype,rarity,tcgplayer,images`
+  // orderBy=id, NOT number: the API's number sort is unstable across pages —
+  // page 2 of a >250-card set overlaps page 1 and silently drops the tail
+  // (verified on me2pt5: number→250 unique of 295, id→295). Ids embed the
+  // collector number, so display order is unchanged.
+  const url = `${BASE_URL}/cards?q=set.id:${setId}&page=${page}&pageSize=${pageSize}&orderBy=id&select=id,name,number,set,supertype,rarity,tcgplayer,images`
   const data = await fetchWithCache(url)
   return data
 }

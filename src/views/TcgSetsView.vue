@@ -153,7 +153,14 @@
               <label class="form-label">Shelf</label>
               <select v-model="bulkPortfolioId" class="select">
                 <option v-for="p in store.portfolios" :key="p.id" :value="p.id">{{ p.name }}</option>
+                <option value="__new__">＋ New shelf…</option>
               </select>
+              <input
+                v-if="bulkPortfolioId === '__new__'"
+                v-model="newShelfName"
+                class="input mt-2"
+                :placeholder="bulkSetName || 'Shelf name'"
+              />
             </div>
             <div class="bulk-list">
               <div v-for="(card, idx) in filteredBulkCards" :key="card.id || idx" class="bulk-card-row" @click="toggleBulkCard(idx)">
@@ -288,19 +295,24 @@ function closeSet() {
 function addCard(card) {
   addingCard.value = {
     game: gameId.value,
+    id: card.id,
     name: card.name,
     set: selectedSet.value?.name || '',
+    setId: selectedSet.value?.id || '',
     number: card.number,
     image: card.image,
     price: card.price,
+    rarity: card.rarity,
   }
 }
 
 // ── Bulk add set ─────────────────────────────────────────────────────────────
 const showBulkModal = ref(false)
 const bulkSetName = ref('')
+const bulkSetId = ref('')
 const bulkCards = ref([])
 const bulkPortfolioId = ref('')
+const newShelfName = ref('')
 const bulkAdding = ref(false)
 const bulkDone = ref(false)
 const bulkLoading = ref(false)
@@ -316,7 +328,9 @@ async function startBulkAdd(set) {
   bulkLoading.value = true
   bulkDone.value = false
   bulkSetName.value = set.name
-  bulkPortfolioId.value = store.portfolios[0]?.id || ''
+  bulkSetId.value = set.id
+  bulkPortfolioId.value = store.portfolios[0]?.id || '__new__'
+  newShelfName.value = ''
   bulkCards.value = []
   try {
     const allCards = await provider.value.getSetCards(set.id)
@@ -352,20 +366,31 @@ function bulkDeselectAll() { bulkCards.value.forEach(c => { c.checked = false })
 async function confirmBulkAdd() {
   if (bulkAdding.value || !bulkPortfolioId.value) return
   bulkAdding.value = true
+  let targetId = bulkPortfolioId.value
+  if (targetId === '__new__') {
+    // Empty input falls back to the placeholder — the set's own name
+    const p = store.createPortfolio(newShelfName.value.trim() || bulkSetName.value || 'New Shelf')
+    targetId = p.id
+    bulkPortfolioId.value = p.id
+  }
   const toAdd = bulkCards.value.filter(c => c.checked)
   for (const card of toAdd) {
-    store.addItem(bulkPortfolioId.value, {
+    store.addItem(targetId, {
       type: 'card',
       quantity: 1,
       purchasePrice: 0,
       purchaseDate: '',
       notes: '',
       game: gameId.value,
+      // cardId + set.id are what master-set detection and the Hunt gallery
+      // match on — without them grouping never finds these items
+      cardId: card.id,
       cardData: {
         name: card.name,
         number: card.number,
-        set: { name: card.set },
+        set: { id: bulkSetId.value, name: bulkSetName.value },
         images: { small: card.image },
+        rarity: card.rarity,
       },
       pcUrl: '',
       currentMarketPrice: card.price,

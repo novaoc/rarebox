@@ -126,7 +126,9 @@ const mtg = {
       let url = `${SCRY}/cards/search?q=${encodeURIComponent(`set:${setId} game:paper`)}&unique=prints&order=set`
       const cards = []
       let guard = 0
-      while (url && guard < 12) {
+      // 40 × 175/page = 7000 — "The List" alone is 5120 cards; the old
+      // 12-page guard silently truncated it at 2100
+      while (url && guard < 40) {
         guard++
         const d = await getJson(url, { signal })
         for (const c of (d.data || [])) {
@@ -201,7 +203,7 @@ async function fetchAllOptCards(signal) {
 
 const OPT_SET_ORDER = [
   'OP-01','OP-02','OP-03','OP-04','OP-05','OP-06','OP-07','OP-08','OP-09','OP-10',
-  'OP-11','OP-12','OP-13','OP-15-EB04','OP14-EB04','EB-01','EB-02','EB-03','PRB-01','PRB-02',
+  'OP-11','OP-12','OP-13','OP14-EB04','OP15-EB04','EB-01','EB-02','EB-03','PRB-01','PRB-02',
 ]
 
 const onePiece = {
@@ -233,14 +235,19 @@ const onePiece = {
       const allCards = await fetchAllOptCards(signal)
       return allCards
         .filter(c => c.set_id === setId)
-        .map(c => ({
-          id: c.card_set_id,
-          name: c.card_name,
-          number: c.card_set_id,
-          image: c.card_image || '',
-          price: c.market_price || c.inventory_price || null,
-          rarity: c.rarity || '',
-        }))
+        .map(c => {
+          // Alt arts / box toppers share the base card's card_set_id —
+          // suffix the variant so ids stay unique (Vue keys, owned-matching)
+          const variant = (String(c.card_name || '').match(/\(([^)]+)\)\s*$/) || [])[1] || ''
+          return {
+            id: variant ? `${c.card_set_id}#${variant.toLowerCase().replace(/\s+/g, '-')}` : c.card_set_id,
+            name: c.card_name,
+            number: c.card_set_id,
+            image: c.card_image || '',
+            price: c.market_price || c.inventory_price || null,
+            rarity: c.rarity || '',
+          }
+        })
     })
   },
 }

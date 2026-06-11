@@ -102,7 +102,8 @@
       <!-- Master set suggestion — appears when a set crosses 80% owned -->
       <div v-if="msSuggestion" class="ms-suggest">
         <span class="ms-suggest-text">
-          <template v-if="msSuggestion.owned >= msSuggestion.total">🎉 Your <strong>{{ msSuggestion.name }}</strong> set is complete — showcase it as a master set?</template>
+          <template v-if="!msSuggestion.total">You have <strong>{{ msSuggestion.owned }} cards</strong> from <strong>{{ msSuggestion.name }}</strong> — showcase the stack as a master set?</template>
+          <template v-else-if="msSuggestion.owned >= msSuggestion.total">🎉 Your <strong>{{ msSuggestion.name }}</strong> set is complete — showcase it as a master set?</template>
           <template v-else>You're <strong>{{ msSuggestion.total - msSuggestion.owned }} card{{ msSuggestion.total - msSuggestion.owned === 1 ? '' : 's' }}</strong> from a <strong>{{ msSuggestion.name }}</strong> master set ({{ msSuggestion.owned }}/{{ msSuggestion.total }}) — showcase the stack?</template>
         </span>
         <div class="ms-suggest-actions">
@@ -128,6 +129,7 @@
             @close="msGalleryKey = null"
             @toggle-mark="(cardId) => store.toggleHuntMark(portfolio.id, g.key, cardId)"
             @add-found="addFoundCards"
+            @loaded="(n) => msGalleryLoaded(g, n)"
           />
         </div>
       </div>
@@ -530,7 +532,23 @@ function msItemKey(item) {
   if (item.type !== 'card') return null
   const setId = item.cardData?.set?.id || item.cardData?.set?.name || item.setName
   if (!setId) return null
-  return `${item.game || 'pokemon'}:${String(setId).toLowerCase()}`
+  // JP Pokémon set ids collide with EN ones once lowercased (EN sv3 =
+  // Obsidian Flames, JP SV3 = Ruler of the Black Flame) — qualify them
+  const lang = item._lang === 'ja' ? 'ja:' : ''
+  return `${item.game || 'pokemon'}:${lang}${String(setId).toLowerCase()}`
+}
+
+// Items added before set ids were stored group by set NAME; normalize to
+// the real set id (via the meta map) so old and new items land in one group
+function msCanonicalKey(item) {
+  const key = msItemKey(item)
+  if (!key) return null
+  const meta = msSetMeta.value[key]
+  if (meta?.id) {
+    const lang = item._lang === 'ja' ? 'ja:' : ''
+    return `${item.game || 'pokemon'}:${lang}${String(meta.id).toLowerCase()}`
+  }
+  return key
 }
 
 // Set totals + logos, filled lazily from the cached set lists (no extra
@@ -544,29 +562,60 @@ async function loadMsSetMeta() {
   await Promise.allSettled([...games].map(async (g) => {
     if (g === 'pokemon') {
       const [en, jp] = await Promise.allSettled([getPokemonSets(), getJapaneseSets()])
-      for (const list of [en, jp]) {
-        if (list.status !== 'fulfilled') continue
-        for (const s of list.value || []) {
-          meta[`pokemon:${String(s.id).toLowerCase()}`] = { total: s.total || s.printedTotal || null, logo: s.images?.logo || '', name: s.name, _lang: s._lang }
+      // EN and JP keyed separately — lowercased ids collide (sv3 ≠ SV3)
+      // and merged keys gave EN sets JP logos and totals
+      if (en.status === 'fulfilled') {
+        for (const s of en.value || []) {
+          meta[`pokemon:${String(s.id).toLowerCase()}`] = { id: s.id, total: s.total || s.printedTotal || null, logo: s.images?.logo || '', name: s.name }
+        }
+      }
+      if (jp.status === 'fulfilled') {
+        for (const s of jp.value || []) {
+          meta[`pokemon:ja:${String(s.id).toLowerCase()}`] = { id: s.id, total: s.total || s.printedTotal || null, logo: s.images?.logo || '', name: s.name, _lang: 'ja' }
         }
       }
     } else {
       const sets = await getProvider(g)?.getSets() || []
       for (const s of sets) {
-        const m = { total: s.total || null, logo: s.logo || '', name: s.name }
+        // YGOPRODeck's num_of_cards counts rarity printings (Metal Raiders:
+        // 432 vs 144 real cards) — an inflated denominator makes the 80%
+        // suggestion unreachable. Treat as unknown; the gallery backfills
+        // the true count the first time the set list is fetched.
+        const total = g === 'yugioh' ? null : (s.total || null)
+        const m = { id: s.id, total, logo: s.logo || '', name: s.name }
         meta[`${g}:${String(s.id).toLowerCase()}`] = m
         meta[`${g}:${String(s.name).toLowerCase()}`] = m
       }
     }
   }))
   msSetMeta.value = meta
+  migrateMasterSetKeys()
 }
 onMounted(loadMsSetMeta)
+
+// Showcases saved before set-id keys existed are stored under name-based
+// keys ("riftbound:origins"); move them to the canonical id key so they
+// keep matching their (now id-grouped) items
+function migrateMasterSetKeys() {
+  const ms = portfolio.value?.masterSets
+  if (!ms) return
+  for (const key of Object.keys(ms)) {
+    const meta = msSetMeta.value[key]
+    if (!meta?.id) continue
+    const [game] = key.split(':')
+    const lang = meta._lang === 'ja' ? 'ja:' : ''
+    const canon = `${game}:${lang}${String(meta.id).toLowerCase()}`
+    if (canon !== key && !ms[canon]) {
+      store.showcaseMasterSet(portfolio.value.id, canon, { ...ms[key], setId: meta.id })
+      store.unshowcaseMasterSet(portfolio.value.id, key)
+    }
+  }
+}
 
 const msGroups = computed(() => {
   const groups = new Map()
   for (const item of portfolio.value?.items || []) {
-    const key = msItemKey(item)
+    const key = msCanonicalKey(item)
     if (!key) continue
     let g = groups.get(key)
     if (!g) {
@@ -574,14 +623,15 @@ const msGroups = computed(() => {
         key,
         game: item.game || 'pokemon',
         name: item.cardData?.set?.name || item.setName || '',
-        setId: item.cardData?.set?.id || item.setName || '',
+        setId: item.cardData?.set?.id || '',
         lang: item._lang === 'ja' ? 'ja' : null,
         items: [], ids: new Set(), value: 0, count: 0,
       }
       groups.set(key, g)
     }
     g.items.push(item)
-    if (item.cardId) g.ids.add(item.cardId)
+    // Unique-card tally: cardId when stored, name|number for older items
+    g.ids.add(item.cardId || `${(item.cardData?.name || '').toLowerCase()}|${item.cardData?.number || ''}`)
     g.value += getCurrentValue(item) * (item.quantity || 1)
     g.count += item.quantity || 1
   }
@@ -591,6 +641,10 @@ const msGroups = computed(() => {
     g.total = meta?.total || null
     g.logo = meta?.logo || ''
     if (!g.name && meta?.name) g.name = meta.name
+    // Items grouped by set name carry no usable set id — the gallery would
+    // fetch getSetCards('') and show a stranger's card list (the Riftbound
+    // "wrong set" bug). The meta map knows the real id.
+    if (!g.setId && meta?.id) g.setId = meta.id
   }
   return groups
 })
@@ -605,7 +659,10 @@ const masterSetGroups = computed(() => {
     out.push({
       ...g,
       name: g.name || saved.name,
-      total: g.total || saved.total || null,
+      // saved.total is the exact fetched-list length (backfilled when the
+      // gallery loads) — beats API totals that are null (Lorcast) or count
+      // rarity printings instead of cards (YGOPRODeck)
+      total: saved.total || g.total || null,
       logo: g.logo || saved.logo || '',
       setId: g.setId || saved.setId || '',
       lang: g.lang || saved.lang || null,
@@ -648,12 +705,19 @@ function addFoundCards(cards) {
 const msSuggestion = computed(() => {
   const showcased = portfolio.value?.masterSets || {}
   const dismissed = new Set(portfolio.value?.masterSetsDismissed || [])
+  // Sets with a known total qualify at 80% owned; sets whose API has no
+  // card counts (Lorcast) qualify on sheer bulk instead of never
+  const score = (g) => g.total ? 1 + g.owned / g.total : g.owned / 1000
   let best = null
   for (const g of msGroups.value.values()) {
     if (showcased[g.key] || dismissed.has(g.key)) continue
-    if (!g.total || g.total < 10) continue // tiny "sets" make silly trophies
-    if (g.owned / g.total < 0.8) continue
-    if (!best || g.owned / g.total > best.owned / best.total) best = g
+    if (g.total) {
+      if (g.total < 10) continue // tiny "sets" make silly trophies
+      if (g.owned / g.total < 0.8) continue
+    } else if (g.owned < 30) {
+      continue
+    }
+    if (!best || score(g) > score(best)) best = g
   }
   return best
 })
@@ -662,6 +726,14 @@ function showcaseSuggestion() {
   const s = msSuggestion.value
   if (!s) return
   store.showcaseMasterSet(portfolio.value.id, s.key, { name: s.name, game: s.game, total: s.total, logo: s.logo, setId: s.setId, lang: s.lang })
+}
+
+// The gallery just fetched the set's real card list — its length is the
+// truest completion denominator we'll ever get, so save it
+function msGalleryLoaded(g, count) {
+  const saved = portfolio.value?.masterSets?.[g.key]
+  if (!saved || !count || saved.total === count) return
+  store.showcaseMasterSet(portfolio.value.id, g.key, { ...saved, total: count })
 }
 
 // ── Add Master Set from the shelf (no Browse round-trip) ───────────────
@@ -709,7 +781,7 @@ async function confirmAddMasterSet() {
     const cards = await fetchSetCards({ game: msForm.game, setId: set.id, setName: set.name, lang: set._lang })
     if (!cards.length) throw new Error('Set has no cards')
 
-    const key = `${msForm.game}:${String(set.id).toLowerCase()}`
+    const key = `${msForm.game}:${set._lang === 'ja' ? 'ja:' : ''}${String(set.id).toLowerCase()}`
     const owned = new Set((msGroups.value.get(key)?.items || []).map(i => i.cardId))
     const toAdd = cards.filter(c => !owned.has(c.id))
     msForm.progress = `Adding ${toAdd.length} of ${cards.length} cards (you own ${cards.length - toAdd.length})…`
@@ -723,7 +795,7 @@ async function confirmAddMasterSet() {
         priceVariant: '', currentMarketPrice: card.price,
       })
     }
-    store.showcaseMasterSet(portfolio.value.id, key, { name: set.name, game: msForm.game, total: set.total || cards.length, logo: set.logo, setId: set.id, lang: set._lang || null })
+    store.showcaseMasterSet(portfolio.value.id, key, { name: set.name, game: msForm.game, total: cards.length || set.total, logo: set.logo, setId: set.id, lang: set._lang || null })
     msForm.progress = `Done — ${set.name} is on the shelf as a master set ✓`
     setTimeout(() => { showMasterSetModal.value = false; msForm.busy = false; msForm.progress = '' }, 1400)
   } catch (e) {
@@ -835,7 +907,7 @@ const filteredItems = computed(() => {
   // Singles inside a collapsed master set live in the showcase stack, not
   // the table; expanding the stack brings them back
   const hidden = collapsedMsKeys.value
-  if (hidden.size) items = items.filter(i => !hidden.has(msItemKey(i)))
+  if (hidden.size) items = items.filter(i => !hidden.has(msCanonicalKey(i)))
   if (activeFilter.value !== 'all') items = items.filter(i => i.type === activeFilter.value)
   if (itemSearch.value) {
     const q = itemSearch.value.toLowerCase()
