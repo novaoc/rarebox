@@ -24,22 +24,55 @@ const PRECACHE = __PRECACHE__
 const IMG_MAX_ENTRIES = 1500
 const noCorsHosts = new Set() // hosts that rejected a CORS fetch this session
 
+const META = 'rarebox-meta'
+
 self.addEventListener('install', (e) => {
-  e.waitUntil(
-    caches.open(SHELL).then((c) => c.addAll(PRECACHE)).then(() => self.skipWaiting())
-  )
+  e.waitUntil((async () => {
+    const c = await caches.open(SHELL)
+    // Tolerant precache: addAll is atomic, so ONE 404 (deploy skew, an
+    // ad-blocked file) would block the new SW from ever installing.
+    // Fetch each file individually; only the app itself is critical.
+    const results = await Promise.allSettled(PRECACHE.map((u) => c.add(u)))
+    const failedCritical = PRECACHE.filter((u, i) =>
+      results[i].status === 'rejected' && (u === '/' || u === '/index.html' || u.startsWith('/assets/'))
+    )
+    if (failedCritical.length) throw new Error('precache failed: ' + failedCritical.join(','))
+    // Record this shell generation so activate can keep the previous one
+    const meta = await caches.open(META)
+    await meta.put('/shells/' + SHELL, new Response(String(Date.now())))
+    await self.skipWaiting()
+  })())
 })
 
 self.addEventListener('activate', (e) => {
-  e.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(
-        keys
-          .filter((k) => k.startsWith('rarebox-') && ![SHELL, RUNTIME, IMAGES].includes(k))
-          .map((k) => caches.delete(k))
-      )
-    ).then(() => self.clients.claim())
-  )
+  e.waitUntil((async () => {
+    // Keep the current shell AND the most recent previous one: skipWaiting
+    // + claim means tabs running the previous build are still alive, and
+    // their lazy-loaded route chunks only exist in the previous shell cache
+    // (the server already replaced them). One spare generation keeps those
+    // tabs working; vite:preloadError in the app reloads as a last resort.
+    const meta = await caches.open(META)
+    const shellEntries = []
+    for (const req of await meta.keys()) {
+      const url = new URL(req.url)
+      if (!url.pathname.startsWith('/shells/')) continue
+      const name = url.pathname.slice('/shells/'.length)
+      const ts = Number(await (await meta.match(req)).text()) || 0
+      shellEntries.push({ name, ts, req })
+    }
+    shellEntries.sort((a, b) => b.ts - a.ts)
+    const keepShells = new Set([SHELL, ...shellEntries.slice(0, 2).map(s => s.name)])
+    for (const s of shellEntries) {
+      if (!keepShells.has(s.name)) await meta.delete(s.req)
+    }
+    const keys = await caches.keys()
+    await Promise.all(
+      keys
+        .filter((k) => k.startsWith('rarebox-') && k !== RUNTIME && k !== IMAGES && k !== META && !keepShells.has(k))
+        .map((k) => caches.delete(k))
+    )
+    await self.clients.claim()
+  })())
 })
 
 async function cacheFirst(req, cacheName) {

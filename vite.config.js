@@ -21,7 +21,15 @@ function rareboxServiceWorker() {
         if (/\.(js|css|svg|woff2?)$/.test(file)) precache.push('/' + file)
       }
       const template = readFileSync(resolve(import.meta.dirname, 'scripts/sw-template.js'), 'utf8')
-      const version = createHash('sha256').update(precache.join('|')).digest('hex').slice(0, 12)
+      // VERSION must change when CONTENT changes, not just the path list:
+      // unhashed files (favicon, manifest, icons) keep their names across
+      // edits, and a byte-identical sw.js means the browser never updates —
+      // stale copies would be precached forever. Hash their bytes too.
+      const hash = createHash('sha256').update(precache.join('|'))
+      for (const f of ['favicon.svg', 'manifest.webmanifest', 'icons.svg']) {
+        try { hash.update(readFileSync(resolve(import.meta.dirname, 'public', f))) } catch { /* optional */ }
+      }
+      const version = hash.digest('hex').slice(0, 12)
       const sw = template
         .replace('__VERSION__', version)
         .replace('__PRECACHE__', JSON.stringify(precache))

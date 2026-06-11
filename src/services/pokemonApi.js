@@ -74,7 +74,7 @@ async function fromDurableUrl(url) {
   try { return (await db.state.get('browse:url:' + url))?.value ?? null } catch { return null }
 }
 function toDurableUrl(url, data) {
-  db.state.put({ key: 'browse:url:' + url, value: JSON.parse(JSON.stringify(data)) }).catch(() => {})
+  db.state.put({ key: 'browse:url:' + url, value: JSON.parse(JSON.stringify(data)), ts: Date.now() }).catch(() => {})
 }
 
 export async function searchCards(query, page = 1, pageSize = 20) {

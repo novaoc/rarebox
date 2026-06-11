@@ -524,9 +524,12 @@ export async function resolveCard(cardId, game) {
 // ── Main search ─────────────────────────────────────────────────────────────
 // Searches all TCGs in parallel, merges + sorts by relevance (name match first).
 
+// serverPaged: the API itself returns page N — those results must NOT be
+// sliced again locally. Full-list providers (and cache hits) return every
+// match, so the local page slice is correct for them.
 const ALL_PROVIDERS = {
-  pokemon: (q, p, ps) => searchPokemon(q, p, ps),
-  mtg: (q, p, ps) => searchMtg(q, p, ps),
+  pokemon: (q, p, ps) => searchPokemon(q, p, ps).then(r => ({ ...r, serverPaged: true })),
+  mtg: (q, p, ps) => searchMtg(q, p, ps).then(r => ({ ...r, serverPaged: true })),
   lorcana: (q) => searchLorcana(q),
   'one-piece': (q) => searchOnePiece(q),
   riftbound: (q) => searchRiftbound(q),
@@ -565,11 +568,10 @@ export async function multiSearch(query, { page = 1, pageSize = 20, category = '
   })
 
   const results = await Promise.all(searches)
-  const allCards = results.flatMap(r => r.cards || [])
   const totalCount = results.reduce((sum, r) => sum + (r.totalCount || r.total || 0), 0)
 
   const q = query.toLowerCase()
-  allCards.sort((a, b) => {
+  const rank = (a, b) => {
     const aExact = a.name.toLowerCase() === q ? 0 : 1
     const bExact = b.name.toLowerCase() === q ? 0 : 1
     if (aExact !== bExact) return aExact - bExact
@@ -577,10 +579,15 @@ export async function multiSearch(query, { page = 1, pageSize = 20, category = '
     const bStarts = b.name.toLowerCase().startsWith(q) ? 0 : 1
     if (aStarts !== bStarts) return aStarts - bStarts
     return a.name.localeCompare(b.name)
-  })
+  }
 
+  // Server-paged results are already page N — slicing them again would
+  // drop their head and repeat items across pages. Only full result sets
+  // get the local page slice; the two groups then merge for display.
+  const serverPagedCards = results.filter(r => r.serverPaged).flatMap(r => r.cards || [])
+  const fullCards = results.filter(r => !r.serverPaged).flatMap(r => r.cards || []).sort(rank)
   const start = (page - 1) * pageSize
-  const paged = allCards.slice(start, start + pageSize)
+  const paged = [...fullCards.slice(start, start + pageSize), ...serverPagedCards].sort(rank)
 
   return { cards: paged, totalCount }
 }

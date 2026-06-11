@@ -36,19 +36,38 @@ async function fromDurable(key) {
   try { return (await db.state.get('browse:' + key))?.value ?? null } catch { return null }
 }
 function toDurable(key, val) {
-  db.state.put({ key: 'browse:' + key, value: JSON.parse(JSON.stringify(val)) }).catch(() => {})
+  db.state.put({ key: 'browse:' + key, value: JSON.parse(JSON.stringify(val)), ts: Date.now() }).catch(() => {})
 }
+
+/** Cap the durable browse cache. Rows carry `ts` since 2026-06-11; older
+ *  rows (no ts) are evicted first. Called from App startup, post-idle. */
+export async function sweepBrowseCache(max = 400) {
+  try {
+    const rows = await db.state.where('key').startsWith('browse:').toArray()
+    if (rows.length <= max) return
+    rows.sort((a, b) => (a.ts || 0) - (b.ts || 0))
+    const evict = rows.slice(0, rows.length - max).map(r => r.key)
+    await db.state.bulkDelete(evict)
+  } catch { /* sweep is best-effort */ }
+}
+
+const _inflight = new Map()
 
 function cached(key, ttlMs, fn, { signal } = {}) {
   const hit = _cache.get(key)
   if (hit && Date.now() - hit.ts < ttlMs) return Promise.resolve(hit.val)
-  // fn receives an AbortSignal so it can cancel in-flight fetches.
-  // If the caller provides a signal, use AbortSignal.any() to combine it
-  // with an internal timeout so navigation-abort and timeout both work.
+  // In-flight dedup: concurrent callers for the same key share one fetch
+  // (MTG's getSets is up to 12 paginated requests — doubling it hurts).
+  const pending = _inflight.get(key)
+  if (pending) return pending
+  // fn receives an AbortSignal so it can cancel in-flight fetches —
+  // ac.signal is always armed so p.abort() actually works. Caller
+  // signals are deliberately NOT merged: the run is shared (dedup), and
+  // one navigating view must not cancel the fetch everyone else awaits —
+  // a completed fetch fills the cache either way. Views drop stale
+  // responses themselves (see TcgSetsView loadSetCards).
   const ac = new AbortController()
-  const merged = signal
-    ? AbortSignal.any([signal, ac.signal, AbortSignal.timeout(30000)])
-    : AbortSignal.timeout(30000)
+  const merged = AbortSignal.any([ac.signal, AbortSignal.timeout(30000)])
   const p = (async () => {
     if (typeof navigator !== 'undefined' && !navigator.onLine) {
       const stale = hit?.val ?? await fromDurable(key)
@@ -63,9 +82,12 @@ function cached(key, ttlMs, fn, { signal } = {}) {
       const stale = hit?.val ?? await fromDurable(key)
       if (stale) return stale
       throw e
+    } finally {
+      _inflight.delete(key)
     }
   })()
   p.abort = () => ac.abort()
+  _inflight.set(key, p)
   return p
 }
 
@@ -168,9 +190,11 @@ const OPT = 'https://optcgapi.com/api'
 // The /allSetCards/ endpoint returns ALL cards in one call (~3300 cards).
 // We cache aggressively because the data changes infrequently.
 let _allCards = null
-async function fetchAllOptCards() {
+async function fetchAllOptCards(signal) {
   if (_allCards) return _allCards
-  const d = await getJson(`${OPT}/allSetCards/`)
+  // signal comes from cached()'s merged controller — the ~3,300-card
+  // download now respects the 30s timeout instead of running unbounded
+  const d = await getJson(`${OPT}/allSetCards/`, { signal })
   _allCards = Array.isArray(d) ? d : []
   return _allCards
 }
@@ -187,7 +211,7 @@ const onePiece = {
       const d = await getJson(`${OPT}/allSets/`, { signal })
       const sets = Array.isArray(d) ? d : []
       // Count cards per set from the full card list
-      const allCards = await fetchAllOptCards()
+      const allCards = await fetchAllOptCards(signal)
       const counts = {}
       for (const c of allCards) {
         const sid = c.set_id
@@ -206,7 +230,7 @@ const onePiece = {
   },
   async getSetCards(setId, opts) {
     return cached(`opt:cards:${setId}`, 600_000, async (signal) => {
-      const allCards = await fetchAllOptCards()
+      const allCards = await fetchAllOptCards(signal)
       return allCards
         .filter(c => c.set_id === setId)
         .map(c => ({

@@ -14,6 +14,12 @@ import { installOfflineArtFallback } from './utils/offlineArt'
 // Offline = no card pictures: cross-origin images swap to generated sleeves
 installOfflineArtFallback()
 
+// The durable browse cache (IndexedDB) grew without bound before — cap it
+// once per session, after startup work has settled
+setTimeout(() => {
+  import('./services/tcg/providers').then(m => m.sweepBrowseCache()).catch(() => {})
+}, 15_000)
+
 // A deploy deletes the previous build's hashed chunks from the precache;
 // an already-open tab then fails to lazy-load not-yet-visited routes.
 // Vite signals this precise case — one reload gets the fresh shell.
