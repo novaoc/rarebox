@@ -271,7 +271,7 @@
       <div class="settings-notes mt-3">
         <div class="note">
           <span>📊</span>
-          <p>Live prices come from each game's public database — <strong>pokemontcg.io</strong> (Pokémon), <strong>Scryfall</strong> (Magic), <strong>YGOPRODeck</strong> (Yu-Gi-Oh!), <strong>Lorcast</strong> (Lorcana), and <strong>optcgapi</strong> (One Piece). <strong>Riftbound</strong> and <strong>Japanese Pokémon</strong> prices are TCGplayer market data, pre-built daily by Rarebox's automated refresh and served as static files. <strong>PriceCharting</strong> covers sealed &amp; graded. Pokémon price history comes from the <strong>tcgdex/price-history</strong> repository (TCGPlayer data, Nov 2022+).</p>
+          <p>Live prices come from each game's public database — <strong>pokemontcg.io</strong> (Pokémon), <strong>Scryfall</strong> (Magic), <strong>YGOPRODeck</strong> (Yu-Gi-Oh!), <strong>Lorcast</strong> (Lorcana), and <strong>optcgapi</strong> (One Piece). <strong>Riftbound</strong> and <strong>Japanese Pokémon</strong> prices are TCGplayer market data, pre-built daily by Rarebox's automated refresh and served as static files. <strong>PriceCharting</strong> covers sealed &amp; graded. Price history for every game comes from the <strong>rarebox-price-history</strong> dataset — TCGplayer market data archived daily (via tcgcsv) since Feb 2024, with EN Pokémon reaching back to Nov 2022 via tcgdex's frozen archive.</p>
         </div>
         <div class="note">
           <span>📡</span>

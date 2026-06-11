@@ -67,7 +67,9 @@ import { ref, watch, computed, onMounted, onBeforeUnmount } from 'vue'
 import { fetchPriceHistory, buildChartSeries, getVariantLabel } from '../services/priceHistory'
 
 const props = defineProps({
-  cardId: { type: String, required: true },
+  cardId: { type: String, default: '' },
+  // Full card reference for non-Pokémon games / JP: { game, setId, setName, number, cardId, lang, tcgplayerId }
+  cardRef: { type: Object, default: null },
   currentPrice: { type: Number, default: null },
   height: { type: Number, default: 280 },
   compact: { type: Boolean, default: false }
@@ -197,7 +199,7 @@ async function load() {
   loading.value = true
   noData.value = false
   try {
-    rawHistory.value = await fetchPriceHistory(props.cardId)
+    rawHistory.value = await fetchPriceHistory(props.cardRef || props.cardId)
     if (rawHistory.value) {
       availableVariants.value = Object.keys(rawHistory.value.variants)
       selectedVariant.value = selectedVariant.value || availableVariants.value[0]
@@ -292,7 +294,7 @@ function applyRange(allSeries) {
   }
 }
 
-watch(() => props.cardId, load, { immediate: false })
+watch(() => [props.cardId, props.cardRef], load, { immediate: false })
 onMounted(() => {
   load()
   window.addEventListener('rarebox-theme', applyTheme)

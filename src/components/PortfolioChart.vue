@@ -41,7 +41,7 @@
 
 <script setup>
 import { ref, watch, onMounted, onBeforeUnmount, computed } from 'vue'
-import { fetchPriceHistory, buildChartSeries } from '../services/priceHistory'
+import { fetchPriceHistory, buildChartSeries, itemHistoryRef } from '../services/priceHistory'
 import { usePortfolioStore } from '../stores/portfolio'
 
 const store = usePortfolioStore()
@@ -188,17 +188,18 @@ async function buildPortfolioHistory() {
     return
   }
 
-  const cardItems = allItems.filter(i => i.type === 'card' && i.cardId)
+  const cardItems = allItems.filter(i => i.type === 'card')
   const historyMap = {}
 
-  // Batched — max 5 concurrent to avoid hammering GitHub
+  // Batched — max 5 concurrent; set files are shared & cached, so a shelf
+  // with 200 cards from 4 sets costs ~4 fetches, not 200
   for (let i = 0; i < cardItems.length; i += 5) {
     const batch = cardItems.slice(i, i + 5)
     await Promise.allSettled(
       batch.map(async item => {
         try {
-          const hist = await fetchPriceHistory(item.cardId)
-          if (hist) historyMap[item.cardId] = hist
+          const hist = await fetchPriceHistory(itemHistoryRef(item))
+          if (hist) historyMap[item.id] = hist
         } catch {}
       })
     )
@@ -211,9 +212,8 @@ async function buildPortfolioHistory() {
     const portfolio = portfolioForItem(item.id)
     const portfolioId = portfolio?.id
 
-    if (item.type === 'card' && historyMap[item.cardId]) {
-      // Use tcgdex historical data
-      const result = buildChartSeries(historyMap[item.cardId], item.currentMarketPrice || item.purchasePrice)
+    if (item.type === 'card' && historyMap[item.id]) {
+      const result = buildChartSeries(historyMap[item.id], item.currentMarketPrice || item.purchasePrice)
       const series = Array.isArray(result) ? result : (result?.series || [])
       if (series.length > 0) {
         itemSeriesMap[item.id] = series.slice().sort((a, b) => a.x - b.x)

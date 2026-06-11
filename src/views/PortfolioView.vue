@@ -371,7 +371,7 @@
 
         <div v-if="selectedItem.type === 'card' && selectedItem.cardId" class="panel-chart-section">
           <div class="section-title mb-3 px-mobile">Price History</div>
-          <PriceChart :cardId="selectedItem.cardId" :currentPrice="selectedItem.currentMarketPrice" :height="220" />
+          <PriceChart :cardId="selectedItem.cardId || ''" :cardRef="itemHistoryRef(selectedItem)" :currentPrice="selectedItem.currentMarketPrice" :height="220" />
         </div>
       </div>
     </transition>
@@ -509,6 +509,7 @@ import { exportPortfolioToExcel } from '../utils/excel'
 import { getCard, getMarketPrice } from '../services/pokemonApi'
 // (master-set helpers from pokemonApi/providers/cardCache imported below)
 import { fetchPrice } from '../services/priceServer'
+import { itemHistoryRef } from '../services/priceHistory'
 import { getPrice as getTcgPrice } from '../services/priceFeedService'
 import { checkAlerts, notifyTriggered } from '../utils/alerts'
 import PriceChart from '../components/PriceChart.vue'

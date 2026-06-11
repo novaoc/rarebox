@@ -166,6 +166,7 @@
             <div class="section-title mb-3">Price History</div>
             <PriceChart
               :cardId="selectedCard.id"
+              :cardRef="{ game: 'pokemon', setId: selectedCard.set?.id, number: selectedCard.number, cardId: selectedCard.id, lang: selectedCard._lang }"
               :currentPrice="getPrice(selectedCard)"
               :height="240"
             />

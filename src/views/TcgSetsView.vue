@@ -97,6 +97,7 @@
               </div>
               <div class="card-overlay">
                 <button class="btn btn-primary btn-sm" @click.stop="addCard(card)">+ Add</button>
+                <button class="btn btn-secondary btn-sm" @click.stop="detailCard = card">Details</button>
               </div>
             </div>
             <div class="card-meta">
@@ -120,6 +121,32 @@
       @close="addingCard = null"
       @added="addingCard = null"
     />
+
+    <!-- Card detail: price history chart -->
+    <transition name="fade">
+      <div v-if="detailCard" class="modal-overlay" @click.self="detailCard = null">
+        <div class="modal" style="max-width:560px">
+          <div class="modal-header">
+            <h3>{{ detailCard.name }}</h3>
+            <button class="btn btn-ghost btn-icon" @click="detailCard = null" aria-label="Close">✕</button>
+          </div>
+          <div class="modal-body">
+            <div class="detail-sub text-muted">
+              {{ selectedSet?.name }} · #{{ detailCard.number }}<template v-if="detailCard.rarity"> · {{ detailCard.rarity }}</template>
+            </div>
+            <PriceChart
+              :cardRef="{ game: gameId, setId: selectedSet?.id, setName: selectedSet?.name, number: detailCard.number, cardId: detailCard.id, tcgplayerId: detailCard.tcgplayerId }"
+              :currentPrice="detailCard.price"
+              :height="240"
+            />
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-secondary" @click="detailCard = null">Close</button>
+            <button class="btn btn-primary" @click="addCard(detailCard); detailCard = null">+ Add to Shelf</button>
+          </div>
+        </div>
+      </div>
+    </transition>
 
     <!-- Bulk Add Set Modal -->
     <div v-if="showBulkModal" class="modal-overlay" @click.self="showBulkModal = false">
@@ -195,6 +222,7 @@ import { useRoute } from 'vue-router'
 import { getProvider, TCGS } from '../services/tcg/providers'
 import { usePortfolioStore } from '../stores/portfolio'
 import AddItemModal from '../components/AddItemModal.vue'
+import PriceChart from '../components/PriceChart.vue'
 
 const store = usePortfolioStore()
 
@@ -215,6 +243,7 @@ const cardsError = ref('')
 const cardFilter = ref('')
 
 const addingCard = ref(null)
+const detailCard = ref(null)
 
 // Abort in-flight API calls when navigating away
 let _abort = null

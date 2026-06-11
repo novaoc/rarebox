@@ -47,7 +47,9 @@
             build fetches tcgcsv.com's public TCGplayer dump and ships the result as
             static files alongside the app, so your browser never contacts tcgcsv
             (PriceCharting serves as the Riftbound fallback). Card price history is
-            fetched from tcgdex and PriceCharting's public JSON API. The only
+            fetched as static JSON from Rarebox's own price-history dataset
+            (TCGplayer market data archived daily via tcgcsv since Feb 2024, plus
+            tcgdex's frozen 2022-2024 Pokémon archive). The only
             server-side code Rarebox runs is a single stateless function that renders
             link-preview banner images for chat apps' crawlers — the app itself never
             calls it, and it holds no user data.</li>
