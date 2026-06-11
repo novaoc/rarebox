@@ -63,6 +63,11 @@ export function saveSavedShops(shops) {
 function packBooth(booth) {
   const packed = {
     v: SHARE_VERSION,
+    // Snapshot stamp (epoch seconds, additive on v1): shares are frozen the
+    // moment they're encoded, so the buyer side can say HOW frozen — a QR
+    // printed Friday reads as days old by Sunday, while the table-mode
+    // kiosk QR re-encodes on every change and always reads fresh.
+    ts: Math.floor(Date.now() / 1000),
     n: booth.name || 'Card booth',
     venue: booth.venue || '',
     date: booth.date || '',
@@ -109,6 +114,7 @@ function unpackBooth(packed) {
     throw new Error('Not a Rarebox booth')
   }
   return {
+    ts: num(packed.ts, 4102444800) || 0, // epoch seconds, 0 = pre-ts share
     name: str(packed.n, 80),
     venue: str(packed.venue, 120),
     date: str(packed.date, 40),

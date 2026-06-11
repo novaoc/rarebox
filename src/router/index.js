@@ -12,6 +12,8 @@ const routes = [
   { path: '/decks/:id', name: 'DeckBuilder', component: () => import('../views/DeckBuilderView.vue'), meta: { title: 'Deck Builder', description: 'Build your deck, track card ownership, and calculate costs.' } },
   { path: '/booth', name: 'Booth', component: () => import('../views/BoothView.vue'), meta: { title: 'Card Booth', description: 'Set up your booth for a card show: list what you sell with your prices and share it as a QR or link — no servers, your data stays yours.' } },
   { path: '/booth/:id', name: 'BoothEdit', component: () => import('../views/BoothEditView.vue'), meta: { title: 'Edit Booth', description: 'Edit your booth listings and prices.' } },
+  // bare: between deals you want zero chrome to mis-tap — the view carries its own exit
+  { path: '/booth/:id/table', name: 'BoothTable', component: () => import('../views/BoothTableView.vue'), meta: { bare: true, title: 'Table Mode', description: 'Run your booth live: mark cash sales and trades in two taps, keep a day log, show a live QR.' } },
   { path: '/settings', name: 'Settings', component: () => import('../views/SettingsView.vue'), meta: { title: 'Settings', description: 'Export data, manage backups, transfer to device, and configure alerts.' } },
   { path: '/trade', name: 'TradeLanding', component: () => import('../views/TradeLanding.vue'), meta: { title: 'Trade Analyzer', description: 'Compare card values and analyze trades side-by-side. Add cards by searching or scanning.' } },
   { path: '/trade/analyzer', name: 'TradeAnalyzer', component: () => import('../views/TradeAnalyzerView.vue'), meta: { title: 'Trade Analyzer', description: 'Compare cards side-by-side. Scan or add cards to each side and see the price difference instantly.' } },

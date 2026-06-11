@@ -61,7 +61,11 @@
             <span v-if="viewing.booth.venue">📍 {{ viewing.booth.venue }}</span>
             <span v-if="viewing.booth.table">🪧 Table {{ viewing.booth.table }}</span>
             <span v-if="viewing.booth.date">🗓 {{ fmtBoothDate(viewing.booth.date) }}</span>
+            <span v-if="snapshotAge" class="shop-age" :class="{ stale: snapshotAge.stale }">⏱ snapshot {{ snapshotAge.label }}</span>
           </div>
+          <p v-if="snapshotAge?.stale" class="shop-stale-note">
+            Shared a while back — inventory at a table turns over fast. If you're at the show, re-scan the booth's live QR for the current list.
+          </p>
           <p v-if="viewing.booth.note" class="shop-note">{{ viewing.booth.note }}</p>
           <a v-if="viewing.booth.loc" class="btn btn-secondary btn-sm shop-directions" :href="directionsUrl(viewing.booth.loc, viewing.booth.locName || viewing.booth.name)" target="_blank" rel="noopener">
             🧭 Get directions{{ viewing.booth.locName ? ` — ${viewing.booth.locName}` : '' }}
@@ -151,6 +155,7 @@
             </div>
             <div class="booth-card-actions">
               <router-link :to="`/booth/${b.id}`" class="btn btn-secondary btn-sm">Edit</router-link>
+              <router-link v-if="b.items.length" :to="`/booth/${b.id}/table`" class="btn btn-secondary btn-sm">🔥 Table</router-link>
               <button class="btn btn-primary btn-sm" :disabled="!b.items.length" @click="shareBooth = b">Share</button>
               <button class="btn btn-ghost btn-sm" @click="deleteBooth(b.id)">Delete</button>
             </div>
@@ -386,6 +391,21 @@ function summaryOf(m) {
 }
 
 const viewingVerdict = computed(() => marketVerdict(viewing.value?.market?.deltaPct))
+
+// How frozen is this snapshot? Booth shares carry the moment they were
+// encoded (booth.ts, epoch seconds; 0 on pre-ts shares). Past a day, nudge
+// the buyer toward the live QR at the table.
+const snapshotAge = computed(() => {
+  const ts = viewing.value?.booth?.ts
+  if (!ts) return null
+  const mins = Math.max(0, Math.round((Date.now() / 1000 - ts) / 60))
+  const label =
+    mins < 2 ? 'just now'
+    : mins < 60 ? `${mins} min ago`
+    : mins < 48 * 60 ? `${Math.round(mins / 60)}h ago`
+    : `${Math.round(mins / 1440)} days ago`
+  return { label, stale: mins >= 24 * 60 }
+})
 
 function itemDelta(i) {
   const m = viewing.value?.market
@@ -644,6 +664,8 @@ onBeforeUnmount(() => {
 .shop-head { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; padding: 18px; margin-top: 16px; flex-wrap: wrap; }
 .shop-meta { display: flex; gap: 14px; flex-wrap: wrap; font-size: 13px; color: var(--text-secondary); margin-top: 12px; }
 .shop-note { font-size: 13px; color: var(--text-secondary); margin-top: 8px; max-width: 480px; }
+.shop-age.stale { color: var(--danger); font-weight: 700; }
+.shop-stale-note { font-size: 12px; color: var(--text-secondary); margin-top: 8px; max-width: 480px; font-weight: 600; }
 .shop-directions { margin-top: 12px; }
 .shop-total-label { font-size: 11.5px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-secondary); }
 .shop-total-val { font-size: 26px; font-weight: 900; }

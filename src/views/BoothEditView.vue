@@ -2,7 +2,10 @@
   <div class="be-page container" v-if="booth">
     <div class="be-head">
       <router-link to="/booth" class="btn btn-ghost btn-sm">← Booths</router-link>
-      <button class="btn btn-primary btn-sm" :disabled="!booth.items.length" @click="showShare = true">📣 Share</button>
+      <div class="be-head-actions">
+        <router-link :to="`/booth/${booth.id}/table`" class="btn btn-secondary btn-sm" :class="{ disabled: !booth.items.length }">🔥 Table mode</router-link>
+        <button class="btn btn-primary btn-sm" :disabled="!booth.items.length" @click="showShare = true">📣 Share</button>
+      </div>
     </div>
 
     <div class="card be-form">
@@ -418,6 +421,7 @@ function clearLoc() {
 <style scoped>
 .be-page { padding-bottom: 32px; }
 .be-head { display: flex; justify-content: space-between; align-items: center; margin: 14px 0; }
+.be-head-actions { display: flex; gap: 8px; }
 
 .be-form { padding: 16px; display: flex; flex-direction: column; gap: 12px; }
 .be-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 160px), 1fr)); gap: 12px; }
