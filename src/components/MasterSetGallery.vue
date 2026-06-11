@@ -44,6 +44,9 @@
             </div>
             <div class="msg-card-name">{{ card.name }}</div>
             <div class="msg-card-num">#{{ card.number }}</div>
+            <!-- Owned cards enlarge on tap; not-owned tap marks found, so
+                 they get an explicit button to show the card to a vendor -->
+            <button v-if="!owned.has(card.id)" class="msg-enlarge" @click.stop="preview = card">🔍 Show bigger</button>
           </div>
           </div>
         </template>
@@ -54,6 +57,20 @@
         <span class="msg-footer-note">{{ markedCards.length }} found — adding sets today's date as the purchase date</span>
         <button class="btn btn-primary" :disabled="adding" @click="addFound">{{ adding ? 'Adding…' : `Add ${markedCards.length} to shelf` }}</button>
       </div>
+
+    <!-- Card preview lightbox — big enough to show a vendor -->
+    <Teleport to="body">
+      <div v-if="preview" class="msg-preview" @click="preview = null">
+        <div class="msg-preview-inner" @click.stop>
+          <img :src="preview.images?.large || preview.images?.small" :alt="preview.name" class="msg-preview-img" />
+          <div class="msg-preview-meta">
+            <div class="msg-preview-name">{{ preview.name }}</div>
+            <div class="msg-preview-sub">{{ preview.set?.name || group.name }} · #{{ preview.number }}</div>
+          </div>
+          <button class="msg-preview-close" @click="preview = null" aria-label="Close">✕</button>
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>
 
@@ -72,6 +89,7 @@ const loading = ref(true)
 const error = ref('')
 const filter = ref('all')
 const adding = ref(false)
+const preview = ref(null)
 
 const owned = computed(() => new Set((props.group.items || []).map(i => i.cardId)))
 const ownedCount = computed(() => cards.value.filter(c => owned.value.has(c.id)).length)
@@ -98,8 +116,9 @@ const visibleCards = computed(() => {
 })
 
 function tapCard(card) {
-  // Owned cards are for admiring; missing ones toggle the GOT IT mark
-  if (owned.value.has(card.id)) return
+  // Owned cards enlarge for admiring; missing ones toggle the found mark
+  // (they enlarge via the explicit "Show bigger" button instead)
+  if (owned.value.has(card.id)) { preview.value = card; return }
   emit('toggle-mark', card.id)
 }
 
@@ -207,8 +226,7 @@ onMounted(async () => {
   grid-template-columns: repeat(auto-fill, minmax(118px, 1fr));
   gap: 12px;
 }
-.msg-card { cursor: default; }
-.msg-card.need, .msg-card.got { cursor: pointer; }
+.msg-card { cursor: pointer; }
 .msg-img-wrap {
   position: relative;
   border: 2px solid var(--ink);
@@ -245,6 +263,61 @@ onMounted(async () => {
 
 .msg-card-name { font-size: 10.5px; font-weight: 700; margin-top: 5px; line-height: 1.25; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
 .msg-card-num { font-size: 9.5px; color: var(--text-muted); font-weight: 700; }
+.msg-enlarge {
+  margin-top: 6px;
+  width: 100%;
+  padding: 5px 8px;
+  font-size: 10.5px;
+  font-weight: 800;
+  font-family: inherit;
+  color: var(--ink);
+  background: var(--bg-card);
+  border: 1.5px solid var(--ink);
+  border-radius: 8px;
+  box-shadow: var(--shadow-pressed);
+  cursor: pointer;
+}
+.msg-enlarge:hover { background: var(--bg-hover); }
+.msg-enlarge:active { box-shadow: none; transform: translate(1px, 1px); }
+
+/* Lightbox */
+.msg-preview {
+  position: fixed;
+  inset: 0;
+  z-index: 400;
+  background: rgba(20, 18, 12, 0.78);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+.msg-preview-inner { position: relative; display: flex; flex-direction: column; align-items: center; gap: 12px; max-width: 100%; }
+.msg-preview-img {
+  max-width: min(420px, 88vw);
+  max-height: 78vh;
+  border-radius: 14px;
+  border: 3px solid var(--ink);
+  box-shadow: var(--shadow-lg);
+  background: var(--bg-card);
+}
+.msg-preview-meta { text-align: center; color: #fff; }
+.msg-preview-name { font-size: 16px; font-weight: 800; }
+.msg-preview-sub { font-size: 12.5px; opacity: 0.85; font-weight: 600; margin-top: 2px; }
+.msg-preview-close {
+  position: absolute;
+  top: -14px;
+  right: -14px;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--bg-card);
+  border: 2px solid var(--ink);
+  box-shadow: var(--shadow-sm);
+  font-size: 15px;
+  font-weight: 900;
+  cursor: pointer;
+  color: var(--ink);
+}
 
 .msg-footer {
   display: flex;
