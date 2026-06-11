@@ -31,7 +31,7 @@ export const BULK_CACHE = 'rarebox-img-bulk'
 // All six image sources are HTTP/2 CDNs (and the relay is Vercel's edge) —
 // they multiplex many streams per connection, so 14-wide is comfortable.
 // Measured: 5-wide ≈ 18 img/s, 14-wide ≈ 45+ img/s on a home connection.
-const CONCURRENCY = 14
+const CONCURRENCY = 20
 const TRANSCODE_MAX_BYTES = 30_000 // smaller than this → store as-is
 const TRANSCODE_QUALITY = 0.72
 
@@ -119,25 +119,87 @@ export async function estimateGames() {
     }))
 }
 
-async function transcode(blob) {
-  // Re-encode to WebP (or JPEG on browsers that can't encode WebP —
-  // canvas.toBlob silently falls back to PNG, so verify the result type).
+// ── Transcoding ────────────────────────────────────────────────────────
+// Decode + WebP encode is the per-image CPU cost (~20-40ms for a 160KB
+// PNG). On the main thread it caps the whole pipeline around ~50 img/s
+// regardless of connection speed — so it runs in a pool of Web Workers
+// (one per core, max 4) via OffscreenCanvas, keeping the fetch lanes and
+// the UI free. Browsers without OffscreenCanvas fall back to main-thread.
+
+const WORKER_SRC = `self.onmessage = async (e) => {
+  const { id, buf, type, quality } = e.data
+  try {
+    const bmp = await createImageBitmap(new Blob([buf], { type }))
+    const canvas = new OffscreenCanvas(bmp.width, bmp.height)
+    canvas.getContext('2d').drawImage(bmp, 0, 0)
+    bmp.close()
+    let out = await canvas.convertToBlob({ type: 'image/webp', quality })
+    if (!out || out.type !== 'image/webp') out = await canvas.convertToBlob({ type: 'image/jpeg', quality: 0.8 })
+    const ab = await out.arrayBuffer()
+    self.postMessage({ id, ok: true, buf: ab, type: out.type }, [ab])
+  } catch { self.postMessage({ id, ok: false }) }
+}`
+
+let _pool = null
+let _poolUrl = null
+let _msgId = 0
+const _pending = new Map()
+
+function getPool() {
+  if (_pool) return _pool
+  if (typeof OffscreenCanvas === 'undefined' || typeof Worker === 'undefined') return null
+  _poolUrl = URL.createObjectURL(new Blob([WORKER_SRC], { type: 'text/javascript' }))
+  const size = Math.min(4, Math.max(2, (navigator.hardwareConcurrency || 4) - 1))
+  _pool = Array.from({ length: size }, () => {
+    const w = new Worker(_poolUrl)
+    w.onmessage = (e) => {
+      const { id, ok, buf, type } = e.data
+      const resolve = _pending.get(id)
+      if (resolve) { _pending.delete(id); resolve(ok ? new Blob([buf], { type }) : null) }
+    }
+    return w
+  })
+  return _pool
+}
+
+function destroyPool() {
+  if (_pool) { _pool.forEach(w => w.terminate()); _pool = null }
+  if (_poolUrl) { URL.revokeObjectURL(_poolUrl); _poolUrl = null }
+  _pending.clear()
+}
+
+function transcodeInWorker(blob) {
+  const pool = getPool()
+  if (!pool) return null
+  const id = ++_msgId
+  const worker = pool[id % pool.length]
+  return blob.arrayBuffer().then(buf => new Promise(resolve => {
+    _pending.set(id, resolve)
+    worker.postMessage({ id, buf, type: blob.type, quality: TRANSCODE_QUALITY }, [buf])
+  }))
+}
+
+async function transcodeMainThread(blob) {
   try {
     const bmp = await createImageBitmap(blob)
     const canvas = document.createElement('canvas')
     canvas.width = bmp.width
     canvas.height = bmp.height
-    const ctx = canvas.getContext('2d')
-    ctx.drawImage(bmp, 0, 0)
+    canvas.getContext('2d').drawImage(bmp, 0, 0)
     bmp.close()
     let out = await new Promise(r => canvas.toBlob(r, 'image/webp', TRANSCODE_QUALITY))
     if (!out || out.type !== 'image/webp') {
       out = await new Promise(r => canvas.toBlob(r, 'image/jpeg', 0.8))
     }
-    return out && out.size < blob.size ? out : blob
+    return out
   } catch {
-    return blob // CORS-tainted or undecodable — keep the original
+    return null
   }
+}
+
+async function transcode(blob) {
+  const out = (await transcodeInWorker(blob)) ?? (await transcodeMainThread(blob))
+  return out && out.size < blob.size ? out : blob
 }
 
 export async function downloadOfflineImages(games) {
@@ -213,6 +275,7 @@ export async function downloadOfflineImages(games) {
     st.game = ''
     st.finishedAt = Date.now()
     _abort = null
+    destroyPool()
   }
 }
 
