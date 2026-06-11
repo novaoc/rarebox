@@ -88,10 +88,15 @@ Built by [Nova](https://github.com/novaoc).
 - Cached for 24h with version-based invalidation — instant on repeat visits
 
 ### Card Booth (IRL selling)
-- Set up a booth for a card show or store table: pick items from your shelves, put your asking price on them
+- Set up a booth for a card show or store table: pick items from your shelves, put your asking price on them — or **search the card database** to list things you haven't tracked
+- Booth details with almost no typing: store/event name, table #, and a **location picker** (search the venue via OpenStreetMap or one-tap GPS) — buyers get a **Get directions** button that opens their maps app
 - Share as a link or QR — the **entire booth travels inside the link** (URL fragment), so nothing is uploaded or hosted anywhere
-- Small booths: one QR scannable by any phone camera; big booths: animated multi-frame QR (scanned from Booth → Scan)
+- Small booths: one QR scannable by any phone camera; big booths: animated multi-frame QR (scanned from Booth → Scan); 250-listing cap keeps every share path comfortable
 - Buyers see a read-only booth with your prices and a table total, and can **save shops** to revisit later — even offline
+- **Compare to market**: any saved shop's asking prices checked against live Rarebox-tracked prices — per-item over/under deltas and a verdict badge ("12% under market")
+- Saved shops sort by total or name, and a **cross-shop search** finds a card across every booth you've saved — built for big events
+- **Booth directories**: bundle saved shops into one QR/link (entries are tiny da.gd short links — a 40-booth hall fits a single camera-scannable QR); recipients tap "Add all" and every booth downloads to their device with a progress bar. Perfect for event organizers
+- In-app tutorial video on the Booth page (auto-plays once, replay via the ⓘ icon)
 - Visitor-friendly by design: shared booths show no database prompts or download popups — first-timers get a small dismissible invite to try Rarebox instead
 - Uniform listing mats: card scans, booster boxes, and tins all frame to the same size
 - Booths and saved shops are included in backups and device transfer
