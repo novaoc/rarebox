@@ -21,7 +21,7 @@
         </div>
         <div class="be-field">
           <label>When</label>
-          <input v-model="booth.date" class="input" placeholder="e.g. Sat June 14" @change="persist" />
+          <input v-model="booth.date" type="date" class="input" @change="persist" />
         </div>
       </div>
       <div class="be-field">
@@ -361,6 +361,9 @@ async function useMyLocation() {
   locBusy.value = 'gps'
   locError.value = ''
   try {
+    if (!window.isSecureContext || !navigator.geolocation) {
+      throw { code: 'insecure' }
+    }
     const pos = await new Promise((res, rej) =>
       navigator.geolocation.getCurrentPosition(res, rej, { enableHighAccuracy: true, timeout: 12000 }))
     const { latitude: lat, longitude: lon } = pos.coords
@@ -371,8 +374,13 @@ async function useMyLocation() {
       label = d.name || d.display_name?.split(', ').slice(0, 2).join(', ') || ''
     } catch { /* coords alone are fine */ }
     setLoc(lat, lon, label)
-  } catch {
-    locError.value = 'Location unavailable — check the browser permission, or search the venue instead.'
+  } catch (e) {
+    // GeolocationPositionError codes: 1 denied, 2 unavailable, 3 timeout
+    locError.value =
+      e?.code === 'insecure' ? 'Location needs a secure (https) page — search the venue instead.'
+      : e?.code === 1 ? 'Location permission is blocked — allow it for this site in your browser, or search the venue.'
+      : e?.code === 2 ? "Your device couldn't determine a position (on laptops/desktops, OS location services are often off) — search the venue instead."
+      : "Couldn't get a location fix — search the venue instead."
   } finally {
     locBusy.value = ''
   }
