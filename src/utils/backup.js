@@ -8,6 +8,8 @@ const STORAGE_KEYS = {
 const DECKS_KEY = 'rarebox_decks'
 const BOOTHS_KEY = 'rarebox_booths'
 const SAVED_SHOPS_KEY = 'rarebox_saved_shops'
+const WANTLIST_KEY = 'rarebox_wantlist'
+const JOURNAL_KEY = 'rarebox_booth_journal'
 
 /**
  * Build the full backup payload from the REAL stores (IndexedDB for
@@ -36,7 +38,7 @@ export async function buildBackupPayload({ includePriceCache = true } = {}) {
     if (rawDecks) backup.data.decks = JSON.parse(rawDecks)
   } catch { /* unreadable decks — skip */ }
 
-  for (const [field, key] of [['booths', BOOTHS_KEY], ['savedShops', SAVED_SHOPS_KEY]]) {
+  for (const [field, key] of [['booths', BOOTHS_KEY], ['savedShops', SAVED_SHOPS_KEY], ['wantlist', WANTLIST_KEY], ['journal', JOURNAL_KEY]]) {
     try {
       const raw = localStorage.getItem(key)
       if (raw) {
@@ -179,6 +181,12 @@ async function importBackupInner(data) {
   }
   if (data.data.savedShops) {
     try { localStorage.setItem(SAVED_SHOPS_KEY, JSON.stringify(data.data.savedShops)) } catch { /* quota */ }
+  }
+  if (data.data.wantlist) {
+    try { localStorage.setItem(WANTLIST_KEY, JSON.stringify(data.data.wantlist)) } catch { /* quota */ }
+  }
+  if (data.data.journal) {
+    try { localStorage.setItem(JOURNAL_KEY, JSON.stringify(data.data.journal)) } catch { /* quota */ }
   }
 
   // 3. Reload — stores re-init from the imported IDB state

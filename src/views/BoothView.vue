@@ -88,6 +88,11 @@
         <button class="btn btn-secondary" :disabled="comparing" @click="compareMarket">
           {{ comparing ? `Checking prices ${compareDone}/${compareTotal}…` : '📊 Compare to market' }}
         </button>
+        <select v-if="viewing.booth.items.length > 3" v-model="shopSortMode" class="select shop-sort-mode" aria-label="Sort listings">
+          <option value="listed">Seller's order</option>
+          <option value="cheap">Price: low → high</option>
+          <option value="dear">Price: high → low</option>
+        </select>
         <button class="btn btn-secondary" @click="closeViewer">Back to Booth</button>
       </div>
       <p v-if="viewing.market" class="shop-compare-note">
@@ -107,7 +112,7 @@
       </div>
 
       <div class="shop-grid">
-        <div v-for="(it, i) in viewing.booth.items" :key="i" v-show="!matchesOnly || viewMatches?.idx.has(i)"
+        <div v-for="{ it, i } in displayItems" :key="i" v-show="!matchesOnly || viewMatches?.idx.has(i)"
              class="shop-item card-sm card" :class="{ 'shop-item-want': viewMatches?.idx.has(i) }">
           <span v-if="viewMatches?.idx.has(i)" class="shop-want-tag">ON YOUR LIST</span>
           <div class="shop-item-img">
@@ -191,6 +196,11 @@
 
         <div v-if="savedShops.length" class="booth-tools">
           <input v-model="shopFilter" class="input booth-filter" placeholder="🔍 Find a card across every saved shop…" />
+          <select v-model="filterGame" class="select booth-game" aria-label="Filter by game">
+            <option value="all">All games</option>
+            <option v-for="(label, g) in GAME_LABELS" :key="g" :value="g">{{ label }}</option>
+          </select>
+          <input v-model.number="filterMax" type="number" min="0" class="input booth-max" placeholder="Max $" aria-label="Max price" />
           <select v-model="shopSort" class="select booth-sort" aria-label="Sort saved shops">
             <option value="newest">Newest first</option>
             <option value="cheap">Total: low → high</option>
@@ -204,7 +214,7 @@
         </div>
 
         <!-- Cross-shop card search results -->
-        <template v-if="shopFilter.trim()">
+        <template v-if="filterActive">
           <p class="booth-filter-note">
             {{ filterHits.reduce((s, h) => s + h.items.length, 0) }} match{{ filterHits.reduce((s, h) => s + h.items.length, 0) !== 1 ? 'es' : '' }}
             across {{ filterHits.length }} shop{{ filterHits.length !== 1 ? 's' : '' }}
@@ -302,7 +312,18 @@ const viewMatches = computed(() => {
 const shopMatches = computed(() => matchShops(savedShops.value, wants.value))
 
 watch(viewing, (v) => {
-  if (v) { wants.value = loadWantlist(); matchesOnly.value = false }
+  if (v) { wants.value = loadWantlist(); matchesOnly.value = false; shopSortMode.value = 'listed' }
+})
+
+// Sort pairs of (item, original index) — market deltas and want-highlights
+// are keyed by original index, so sorting must never renumber them.
+const shopSortMode = ref('listed')
+const displayItems = computed(() => {
+  const items = viewing.value?.booth.items || []
+  const pairs = items.map((it, i) => ({ it, i }))
+  if (shopSortMode.value === 'cheap') pairs.sort((a, b) => (a.it.price || 0) - (b.it.price || 0))
+  else if (shopSortMode.value === 'dear') pairs.sort((a, b) => (b.it.price || 0) - (a.it.price || 0))
+  return pairs
 })
 const dirBusy = ref(false)
 const dirDone = ref(0)
@@ -371,6 +392,8 @@ function saveShop() {
 
 function openSaved(s) {
   shopFilter.value = ''
+  filterGame.value = 'all'
+  filterMax.value = null
   viewing.value = { booth: s.booth, saved: true, savedId: s.id, market: s.market || null }
 }
 
@@ -462,6 +485,18 @@ function shopVerdict(s) {
 // ── Saved-shop sorting & cross-shop filtering ──
 const shopSort = ref('newest')
 const shopFilter = ref('')
+const filterGame = ref('all')
+const filterMax = ref(null)
+
+const GAME_LABELS = {
+  pokemon: 'Pokémon', mtg: 'Magic', yugioh: 'Yu-Gi-Oh!', lorcana: 'Lorcana',
+  'one-piece': 'One Piece', riftbound: 'Riftbound',
+}
+
+// Any of the three controls makes it a search — "everything under $20 at
+// every table" needs no text at all
+const filterActive = computed(() =>
+  Boolean(shopFilter.value.trim()) || filterGame.value !== 'all' || filterMax.value > 0)
 
 const sortedShops = computed(() => {
   const shops = [...savedShops.value]
@@ -473,12 +508,14 @@ const sortedShops = computed(() => {
 })
 
 const filterHits = computed(() => {
+  if (!filterActive.value) return []
   const q = shopFilter.value.trim().toLowerCase()
-  if (!q) return []
   const hits = []
   for (const s of sortedShops.value) {
     const items = (s.booth.items || []).filter(it =>
-      (it.name || '').toLowerCase().includes(q) || (it.setName || '').toLowerCase().includes(q))
+      (!q || (it.name || '').toLowerCase().includes(q) || (it.setName || '').toLowerCase().includes(q))
+      && (filterGame.value === 'all' || (it.game || '') === filterGame.value)
+      && (!(filterMax.value > 0) || ((it.price || 0) <= filterMax.value)))
     if (items.length) hits.push({ shop: s, items })
   }
   // cheapest matching item first — that's what you're hunting for
@@ -653,7 +690,9 @@ onBeforeUnmount(() => {
 
 .booth-tools { display: flex; gap: 10px; margin: 4px 0 6px; flex-wrap: wrap; }
 .booth-filter { flex: 1; min-width: 200px; }
-.booth-sort { width: auto; }
+.booth-sort, .booth-game { width: auto; }
+.booth-max { width: 88px; }
+.shop-sort-mode { width: auto; }
 .booth-filter-note { font-size: 12.5px; color: var(--text-secondary); margin: 8px 0 4px; font-weight: 700; }
 
 .booth-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 250px), 1fr)); gap: 14px; margin-top: 12px; }
