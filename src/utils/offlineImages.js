@@ -75,15 +75,26 @@ function trackRate(st) {
 let _abort = null
 
 // Hosts that send no CORS header — the browser can't read (or re-encode)
-// their bytes directly, so bulk downloads for these route through the
-// allowlisted /api/img relay. Normal browsing still hits the CDN directly.
+// their bytes directly. Bulk downloads for these route through wsrv.nl
+// (images.weserv.nl), the long-running free public image proxy: it adds
+// CORS, converts to WebP server-side (so LESS data crosses the wire than
+// fetching the original), and costs the project nothing — no account, no
+// billing surface, nothing on our Vercel. Normal browsing still loads
+// straight from the source CDNs; if wsrv is ever unavailable those games'
+// bulk downloads fail gracefully and Top up retries later.
 const NEEDS_PROXY = new Set([
   'images.ygoprodeck.com', 'cards.lorcast.io', 'optcgapi.com', 'cmsassets.rgpub.io',
   'den-media.pokellector.com',
 ])
+// Sources that ship print-resolution scans — have wsrv downscale them
+// server-side so the transfer is small too (640px ≫ the app's display size).
+const RESIZE_HOSTS = new Set(['cmsassets.rgpub.io', 'optcgapi.com', 'images.ygoprodeck.com']) // wsrv never upscales, so small card scans pass through untouched
 function fetchUrlFor(url) {
   try {
-    return NEEDS_PROXY.has(new URL(url).host) ? '/api/img?u=' + encodeURIComponent(url) : url
+    const host = new URL(url).host
+    if (!NEEDS_PROXY.has(host)) return url
+    const resize = RESIZE_HOSTS.has(host) ? '&w=640' : ''
+    return 'https://wsrv.nl/?url=' + encodeURIComponent(url) + '&output=webp&q=72' + resize + '&maxage=1y'
   } catch { return url }
 }
 
@@ -181,7 +192,8 @@ export async function downloadOfflineImages(games) {
           const resp = await fetch(fetchUrlFor(url), { mode: 'cors', signal: ac.signal })
           if (!resp.ok) throw new Error('http ' + resp.status)
           let blob = await resp.blob()
-          if (blob.size > TRANSCODE_MAX_BYTES) blob = await transcode(blob)
+          const alreadyEfficient = blob.type === 'image/webp' || blob.type === 'image/avif'
+          if (blob.size > TRANSCODE_MAX_BYTES && !alreadyEfficient) blob = await transcode(blob)
           await cache.put(url, new Response(blob, {
             headers: { 'Content-Type': blob.type || 'image/webp', 'Content-Length': String(blob.size) },
           }))
