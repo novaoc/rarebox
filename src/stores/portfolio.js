@@ -246,6 +246,28 @@ export const usePortfolioStore = defineStore('portfolio', () => {
     persist()
   }
 
+  // Hunt marks: "GOT IT" ticks on missing cards while out card hunting —
+  // a tally of the day's finds before they're promoted to shelf items.
+  // Stored per master set as { [cardId]: timestamp }.
+  function toggleHuntMark(portfolioId, key, cardId) {
+    const portfolio = portfolios.value.find(p => p.id === portfolioId)
+    const ms = portfolio?.masterSets?.[key]
+    if (!ms) return
+    if (!ms.hunt) ms.hunt = {}
+    if (ms.hunt[cardId]) delete ms.hunt[cardId]
+    else ms.hunt[cardId] = Date.now()
+    persist()
+  }
+
+  function clearHuntMarks(portfolioId, key, cardIds = null) {
+    const portfolio = portfolios.value.find(p => p.id === portfolioId)
+    const ms = portfolio?.masterSets?.[key]
+    if (!ms?.hunt) return
+    if (cardIds) for (const id of cardIds) delete ms.hunt[id]
+    else ms.hunt = {}
+    persist()
+  }
+
   function addItem(portfolioId, item) {
     const portfolio = portfolios.value.find(p => p.id === portfolioId)
     if (!portfolio) return null
@@ -825,6 +847,8 @@ export const usePortfolioStore = defineStore('portfolio', () => {
     showcaseMasterSet,
     unshowcaseMasterSet,
     dismissMasterSetSuggestion,
+    toggleHuntMark,
+    clearHuntMarks,
     updateItem,
     removeItem,
     removeItems,

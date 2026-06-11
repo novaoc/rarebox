@@ -117,10 +117,20 @@
           v-for="g in masterSetGroups"
           :key="g.key"
           :group="g"
-          @toggle-expand="toggleMsExpand(g.key)"
+          @open="msGalleryKey = g.key"
           @unshowcase="store.unshowcaseMasterSet(portfolio.id, g.key)"
         />
       </div>
+
+      <!-- Hunt-mode gallery -->
+      <MasterSetGallery
+        v-if="msGalleryGroup"
+        :group="msGalleryGroup"
+        :marks="msGalleryGroup.hunt"
+        @close="msGalleryKey = null"
+        @toggle-mark="(cardId) => store.toggleHuntMark(portfolio.id, msGalleryGroup.key, cardId)"
+        @add-found="addFoundCards"
+      />
 
       <!-- Items view -->
       <div class="card no-padding-mobile">
@@ -504,7 +514,9 @@ import PortfolioChart from '../components/PortfolioChart.vue'
 import AddItemModal from '../components/AddItemModal.vue'
 import BulkImportModal from '../components/BulkImportModal.vue'
 import MasterSetStack from '../components/MasterSetStack.vue'
-import { getSets as getPokemonSets, getJapaneseSets, getCardsBySet, getJapaneseCardsBySet } from '../services/pokemonApi'
+import MasterSetGallery from '../components/MasterSetGallery.vue'
+import { fetchSetCards } from '../utils/masterSets'
+import { getSets as getPokemonSets, getJapaneseSets } from '../services/pokemonApi'
 import { getProvider } from '../services/tcg/providers'
 import { getTcgPrefs } from '../services/tcg/cardCache'
 
@@ -551,13 +563,6 @@ async function loadMsSetMeta() {
 }
 onMounted(loadMsSetMeta)
 
-const msExpanded = ref(new Set())
-function toggleMsExpand(key) {
-  const next = new Set(msExpanded.value)
-  next.has(key) ? next.delete(key) : next.add(key)
-  msExpanded.value = next
-}
-
 const msGroups = computed(() => {
   const groups = new Map()
   for (const item of portfolio.value?.items || []) {
@@ -565,7 +570,14 @@ const msGroups = computed(() => {
     if (!key) continue
     let g = groups.get(key)
     if (!g) {
-      g = { key, game: item.game || 'pokemon', name: item.cardData?.set?.name || item.setName || '', items: [], ids: new Set(), value: 0, count: 0 }
+      g = {
+        key,
+        game: item.game || 'pokemon',
+        name: item.cardData?.set?.name || item.setName || '',
+        setId: item.cardData?.set?.id || item.setName || '',
+        lang: item._lang === 'ja' ? 'ja' : null,
+        items: [], ids: new Set(), value: 0, count: 0,
+      }
       groups.set(key, g)
     }
     g.items.push(item)
@@ -595,19 +607,40 @@ const masterSetGroups = computed(() => {
       name: g.name || saved.name,
       total: g.total || saved.total || null,
       logo: g.logo || saved.logo || '',
+      setId: g.setId || saved.setId || '',
+      lang: g.lang || saved.lang || null,
+      hunt: saved.hunt || {},
       gameLabel: MS_GAME_LABELS[g.game] || g.game,
       complete: !!(g.total && g.owned >= g.total),
-      expanded: msExpanded.value.has(key),
     })
   }
   return out.sort((a, b) => b.value - a.value)
 })
 
-const collapsedMsKeys = computed(() => {
-  const keys = new Set(Object.keys(portfolio.value?.masterSets || {}))
-  for (const k of msExpanded.value) keys.delete(k)
-  return keys
-})
+// All showcased sets stay collapsed in the table — the gallery is where
+// you appreciate (and hunt) the cards
+const collapsedMsKeys = computed(() => new Set(Object.keys(portfolio.value?.masterSets || {})))
+
+// ── Hunt-mode gallery ──────────────────────────────────────────────────
+const msGalleryKey = ref(null)
+const msGalleryGroup = computed(() => masterSetGroups.value.find(g => g.key === msGalleryKey.value) || null)
+
+function addFoundCards(cards) {
+  const g = msGalleryGroup.value
+  if (!g) return
+  const today = new Date().toISOString().slice(0, 10)
+  for (const card of cards) {
+    store.addItem(portfolio.value.id, {
+      type: 'card', quantity: 1, purchasePrice: 0, purchaseDate: today, notes: '',
+      cardId: card.id,
+      game: card.game === 'pokemon' ? undefined : card.game,
+      _lang: card._lang || null,
+      cardData: { name: card.name, number: card.number, images: card.images, set: card.set, rarity: card.rarity, supertype: card.supertype, _lang: card._lang },
+      priceVariant: '', currentMarketPrice: card.price,
+    })
+  }
+  store.clearHuntMarks(portfolio.value.id, g.key, cards.map(c => c.id))
+}
 
 const msSuggestion = computed(() => {
   const showcased = portfolio.value?.masterSets || {}
@@ -625,7 +658,7 @@ const msSuggestion = computed(() => {
 function showcaseSuggestion() {
   const s = msSuggestion.value
   if (!s) return
-  store.showcaseMasterSet(portfolio.value.id, s.key, { name: s.name, game: s.game, total: s.total, logo: s.logo })
+  store.showcaseMasterSet(portfolio.value.id, s.key, { name: s.name, game: s.game, total: s.total, logo: s.logo, setId: s.setId, lang: s.lang })
 }
 
 // ── Add Master Set from the shelf (no Browse round-trip) ───────────────
@@ -670,22 +703,7 @@ async function confirmAddMasterSet() {
   msForm.error = ''
   msForm.progress = 'Fetching set list…'
   try {
-    let cards = []
-    if (msForm.game === 'pokemon') {
-      const data = set._lang === 'ja' ? await getJapaneseCardsBySet(set.id, 1, 999) : await getCardsBySet(set.id, 1, 250)
-      cards = (data.data || []).map(c => ({
-        id: c.id, name: c.name, number: c.number, images: c.images, rarity: c.rarity,
-        supertype: c.supertype, set: { id: c.set?.id || set.id, name: c.set?.name || set.name },
-        price: (() => { const r = getMarketPrice(c); return r?.price || r || 0 })(),
-        _lang: set._lang === 'ja' ? 'ja' : null, game: 'pokemon',
-      }))
-    } else {
-      const raw = await getProvider(msForm.game)?.getSetCards(set.id) || []
-      cards = raw.map(c => ({
-        id: c.id, name: c.name, number: c.number, images: { small: c.image }, rarity: c.rarity,
-        set: { id: set.id, name: set.name }, price: c.price || 0, game: msForm.game,
-      }))
-    }
+    const cards = await fetchSetCards({ game: msForm.game, setId: set.id, setName: set.name, lang: set._lang })
     if (!cards.length) throw new Error('Set has no cards')
 
     const key = `${msForm.game}:${String(set.id).toLowerCase()}`
@@ -702,7 +720,7 @@ async function confirmAddMasterSet() {
         priceVariant: '', currentMarketPrice: card.price,
       })
     }
-    store.showcaseMasterSet(portfolio.value.id, key, { name: set.name, game: msForm.game, total: set.total || cards.length, logo: set.logo })
+    store.showcaseMasterSet(portfolio.value.id, key, { name: set.name, game: msForm.game, total: set.total || cards.length, logo: set.logo, setId: set.id, lang: set._lang || null })
     msForm.progress = `Done — ${set.name} is on the shelf as a master set ✓`
     setTimeout(() => { showMasterSetModal.value = false; msForm.busy = false; msForm.progress = '' }, 1400)
   } catch (e) {
