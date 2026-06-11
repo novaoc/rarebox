@@ -11,6 +11,9 @@
         </div>
         <div class="msg-head-actions">
           <span v-if="foundToday" class="sticker msg-today">{{ foundToday }} found today 🎉</span>
+          <button v-if="needCount && !loading" class="btn btn-secondary btn-sm" :disabled="isoDone" @click="isoTheRest">
+            {{ isoDone ? '✓ On your wantlist' : `🎯 ISO the rest (${needCount})` }}
+          </button>
         </div>
       </div>
 
@@ -77,6 +80,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { fetchSetCards, sortByNumber } from '../utils/masterSets'
+import { loadWantlist, saveWantlist, generateWantId, wantKey } from '../utils/wantlist'
 
 const props = defineProps({
   group: { type: Object, required: true }, // { key, name, game, gameLabel, setId, lang, items, hunt }
@@ -119,6 +123,35 @@ function tapCard(card) {
   // (they enlarge via the explicit "Show bigger" button instead)
   if (owned.value.has(card.id)) { preview.value = card; return }
   emit('toggle-mark', card.id)
+}
+
+// ── ISO the rest: every card you still need → Booth wantlist ──
+// The hunt grid is already a wantlist in spirit; this makes it one in fact,
+// so scanning any booth at the show lights up your set holes.
+const isoDone = ref(false)
+
+function isoTheRest() {
+  const wants = loadWantlist()
+  const have = new Set(wants.map(wantKey))
+  const missing = cards.value.filter(c => !owned.value.has(c.id) && !props.marks[c.id])
+  for (const c of missing) {
+    const entry = {
+      id: generateWantId(),
+      type: 'card',
+      game: props.group.game || 'pokemon',
+      cardId: c.id,
+      name: c.name || '',
+      setName: c.set?.name || props.group.name || '',
+      number: c.number || '',
+      img: c.images?.small || '',
+      qty: 1,
+      maxPrice: 0,
+      addedAt: new Date().toISOString(),
+    }
+    if (!have.has(wantKey(entry))) { wants.unshift(entry); have.add(wantKey(entry)) }
+  }
+  saveWantlist(wants)
+  isoDone.value = true
 }
 
 function addFound() {

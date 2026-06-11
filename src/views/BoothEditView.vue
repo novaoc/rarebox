@@ -116,13 +116,13 @@
             <div v-for="c in searchResults" :key="c.game + c.id" class="picker-row search-row">
               <img v-if="c.image" :src="c.image" class="search-img" loading="lazy" @error="$event.target.style.display='none'" />
               <span v-else class="search-img search-noimg">🃏</span>
-              <span class="picker-name">{{ c.name }}<span class="picker-sub" style="display:block">{{ [gameLabel(c.game), c.set, c.number ? '#' + c.number : ''].filter(Boolean).join(' · ') }}</span></span>
+              <span class="picker-name">{{ c.name }} <span v-if="c.sealed" class="badge badge-info be-sealed-badge">Sealed</span><span class="picker-sub" style="display:block">{{ [gameLabel(c.game), c.set, c.number ? '#' + c.number : ''].filter(Boolean).join(' · ') }}</span></span>
               <span class="picker-price">{{ c.price ? fmtMoney(c.price) : '—' }}</span>
               <button class="btn btn-primary btn-sm" :disabled="atCap" @click="addFromSearch(c)">+ Add</button>
             </div>
             <p v-if="searchBusy" class="text-muted search-msg">Searching all games…</p>
             <p v-else-if="searched && !searchResults.length" class="text-muted search-msg">No matches — try fewer words.</p>
-            <p v-else-if="!searched" class="text-muted search-msg">Search the card database across all six games — list things that aren't on your shelves yet.</p>
+            <p v-else-if="!searched" class="text-muted search-msg">Search singles and sealed (boxes, ETBs, decks) across all six games — list things that aren't on your shelves yet.</p>
           </div>
         </div>
         <div class="modal-footer">
@@ -172,6 +172,7 @@ import { usePortfolioStore } from '../stores/portfolio'
 import BoothShareModal from '../components/BoothShareModal.vue'
 import { loadBooths, saveBooths, boothTotal, MAX_BOOTH_ITEMS } from '../utils/booth'
 import { multiSearch } from '../services/tcg/multiSearch'
+import { searchSealed } from '../services/sealedIndex'
 
 const route = useRoute()
 const store = usePortfolioStore()
@@ -292,8 +293,16 @@ async function runSearch() {
   if (q.length < 2) return
   searchBusy.value = true
   try {
-    const { cards } = await multiSearch(q, { page: 1, pageSize: 30 })
-    searchResults.value = cards
+    // Singles from the live providers; sealed (boxes, ETBs, decks) from the
+    // static TCGplayer index — one search box covers the whole table.
+    const [cardsRes, sealedRes] = await Promise.allSettled([
+      multiSearch(q, { page: 1, pageSize: 30 }),
+      searchSealed(q, { limit: 16 }),
+    ])
+    searchResults.value = [
+      ...(cardsRes.status === 'fulfilled' ? cardsRes.value.cards : []),
+      ...(sealedRes.status === 'fulfilled' ? sealedRes.value : []),
+    ]
   } catch {
     searchResults.value = []
   } finally {
@@ -304,7 +313,7 @@ async function runSearch() {
 
 function addFromSearch(c) {
   const ok = pushItem({
-    type: 'card',
+    type: c.sealed ? 'sealed' : 'card',
     game: c.game || 'pokemon',
     cardId: c.id || '',
     name: c.name,
@@ -446,6 +455,7 @@ function clearLoc() {
 .search-img { width: 38px; height: 52px; object-fit: contain; border: 1.5px solid var(--ink); border-radius: 6px; background: #fff; flex-shrink: 0; }
 .search-noimg { display: inline-flex; align-items: center; justify-content: center; font-size: 20px; opacity: .4; }
 .search-msg { font-size: 13px; text-align: center; padding: 16px 0; }
+.be-sealed-badge { font-size: 9.5px; vertical-align: 2px; }
 
 .picker-list { max-height: 46vh; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; }
 .picker-row {

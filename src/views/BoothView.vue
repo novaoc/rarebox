@@ -87,8 +87,21 @@
         asking {{ fmtMoney(viewing.market.askTotal) }} vs market {{ fmtMoney(viewing.market.marketTotal) }}.
       </p>
 
+      <div v-if="viewMatches" class="shop-wants card">
+        <span class="shop-wants-mark" aria-hidden="true">🎯</span>
+        <span class="shop-wants-text">
+          <strong>{{ viewMatches.hits.length }} listing{{ viewMatches.hits.length !== 1 ? 's' : '' }}</strong>
+          here match{{ viewMatches.hits.length === 1 ? 'es' : '' }} your wantlist.
+        </span>
+        <button class="btn btn-sm" :class="matchesOnly ? 'btn-primary' : 'btn-secondary'" @click="matchesOnly = !matchesOnly">
+          {{ matchesOnly ? 'Show everything' : 'Show matches only' }}
+        </button>
+      </div>
+
       <div class="shop-grid">
-        <div v-for="(it, i) in viewing.booth.items" :key="i" class="shop-item card-sm card">
+        <div v-for="(it, i) in viewing.booth.items" :key="i" v-show="!matchesOnly || viewMatches?.idx.has(i)"
+             class="shop-item card-sm card" :class="{ 'shop-item-want': viewMatches?.idx.has(i) }">
+          <span v-if="viewMatches?.idx.has(i)" class="shop-want-tag">ON YOUR LIST</span>
           <div class="shop-item-img">
             <img v-if="it.img" :src="it.img" :alt="it.name" loading="lazy" @error="$event.target.style.display='none'" />
             <span v-else class="shop-item-noimg" aria-hidden="true">🃏</span>
@@ -144,6 +157,8 @@
           </div>
         </div>
       </section>
+
+      <WantlistPanel @changed="onWantsChanged" />
 
       <section class="booth-section">
         <div class="booth-section-head">
@@ -218,6 +233,7 @@
             <div class="booth-card-sub">
               Saved {{ fmtDate(s.savedAt) }}
               <span v-if="shopVerdict(s)" class="badge booth-card-verdict" :class="`badge-${shopVerdict(s).cls}`">{{ shopVerdict(s).label }}</span>
+              <span v-if="shopMatches.get(s.id)" class="badge badge-accent booth-card-verdict">🎯 {{ shopMatches.get(s.id).count }} want{{ shopMatches.get(s.id).count !== 1 ? 's' : '' }} here</span>
             </div>
             <div class="booth-card-actions">
               <button class="btn btn-primary btn-sm" @click="openSaved(s)">Open</button>
@@ -234,17 +250,19 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import jsQR from 'jsqr'
 import BoothShareModal from '../components/BoothShareModal.vue'
 import BoothShareListModal from '../components/BoothShareListModal.vue'
+import WantlistPanel from '../components/WantlistPanel.vue'
 import {
   loadBooths, saveBooths, loadSavedShops, saveSavedShops,
   boothFromLocation, directoryFromLocation, boothFromDirectoryRef, dagdResolve,
   decodeBoothBytes, decodeDirectoryBytes, boothTotal, generateBoothId,
   directionsUrl, fmtBoothDate,
 } from '../utils/booth'
+import { loadWantlist, matchBooth, matchShops } from '../utils/wantlist'
 import { compareBoothToMarket, marketVerdict } from '../utils/boothMarket'
 import { FrameCollector, isFrame } from '../utils/qrTransfer'
 
@@ -255,6 +273,28 @@ const shareBooth = ref(null)
 const shareListOpen = ref(false)
 const viewing = ref(null) // { booth, saved, savedId?, market? }
 const dirViewing = ref(null) // { title, entries: [{name, venue, count, total, ref, status}] }
+
+// ── Wantlist matching ──
+// Reloaded whenever a booth opens — the panel only exists on the hub, so a
+// want added there must still light up a booth opened later in the session.
+const wants = ref(loadWantlist())
+const matchesOnly = ref(false)
+
+function onWantsChanged(list) {
+  wants.value = [...list]
+}
+
+const viewMatches = computed(() => {
+  if (!viewing.value || !wants.value.length) return null
+  const { hits, wantIds } = matchBooth(viewing.value.booth, wants.value)
+  return hits.length ? { hits, wantIds, idx: new Set(hits.map(h => h.index)) } : null
+})
+
+const shopMatches = computed(() => matchShops(savedShops.value, wants.value))
+
+watch(viewing, (v) => {
+  if (v) { wants.value = loadWantlist(); matchesOnly.value = false }
+})
 const dirBusy = ref(false)
 const dirDone = ref(0)
 
@@ -630,6 +670,26 @@ onBeforeUnmount(() => {
 .shop-item-noimg { font-size: 34px; opacity: 0.35; }
 .shop-item-body { display: flex; flex-direction: column; flex: 1; }
 .shop-item-body .shop-item-row { margin-top: auto; padding-top: 6px; }
+
+/* wantlist matches */
+.shop-wants {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 14px; margin: -4px 0 12px;
+  background: var(--accent-dim);
+  flex-wrap: wrap;
+}
+.shop-wants-mark { font-size: 18px; }
+.shop-wants-text { flex: 1; font-size: 13px; min-width: 160px; }
+.shop-item-want { position: relative; box-shadow: 0 0 0 2.5px var(--accent); }
+.shop-want-tag {
+  position: absolute; top: -9px; left: 50%; transform: translateX(-50%) rotate(-3deg);
+  z-index: 1;
+  font-size: 9px; font-weight: 900; letter-spacing: 0.5px; white-space: nowrap;
+  padding: 2px 8px;
+  background: var(--accent); color: var(--on-accent);
+  border: 1.5px solid var(--ink); border-radius: 6px;
+  box-shadow: var(--shadow-pressed);
+}
 
 .shop-mkt { font-size: 10.5px; font-weight: 800; white-space: nowrap; }
 .shop-mkt.under { color: var(--text-success, #1e9e5a); }
