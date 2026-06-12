@@ -596,13 +596,29 @@ const scenes = {
         if (row) { row.style.opacity = .35; row.style.filter = 'grayscale(1)' }
         countUp(document.getElementById('daychip'), 650.00, 900, '💵 $')
         setTimeout(() => {
-          const s = el(`<div class="bigsticker on" style="left:380px;top:560px;opacity:0;font-size:25px">Day log updated ✓ (undo if you fat-finger)</div>`)
+          const s = el(`<div class="bigsticker on" id="logst" style="left:380px;top:560px;opacity:0;font-size:25px">Day log updated ✓</div>`)
           requestAnimationFrame(() => s.style.opacity = 1)
         }, 700)
       }],
+      // trades bring stock IN too — and the ledger keeps the receipts
+      [17500, () => {
+        const st = document.getElementById('logst')
+        if (st) st.style.opacity = 0
+        const c = CARDS.luffy
+        const r = document.createElement('div')
+        r.className = 'listrow'
+        r.innerHTML = `<img src="${c.img}"/><div class="nm">${c.name}<div class="meta">${c.sub} · listed at $3,975.00</div></div>
+          <div class="chip blue" style="font-size:14px;padding:3px 11px">📥 traded in</div>`
+        document.getElementById('rows').appendChild(r)
+        requestAnimationFrame(() => requestAnimationFrame(() => r.classList.add('on')))
+      }],
+      [18900, () => {
+        const s = el(`<div class="bigsticker yellow on" style="left:330px;top:560px;opacity:0;font-size:25px">Sold · traded · bought — Excel has it all 📊</div>`)
+        requestAnimationFrame(() => s.style.opacity = 1)
+      }],
       // ── beat 4: the live QR — never goes stale ──
-      [18300, () => wipe(() => {
-        headline('The QR on your stand? <span class="marker-word">Always current<i></i></span>.<div class="subline">Sell a card — the code updates itself.</div>')
+      [20600, () => wipe(() => {
+        headline('The QR on your stand? <span class="marker-word">Always current<i></i></span>.<div class="subline">Sell a card — it re-encodes itself. Even on a second screen, run from your phone.</div>')
         setTimeout(markerOn, 600)
         const mat = el(`<div class="panel" id="livemat" style="position:absolute;right:110px;top:300px;width:310px;padding:22px;text-align:center;opacity:0;transform:scale(.8);transition:all .55s cubic-bezier(.34,1.56,.64,1)">
           <div class="chip red sticker" style="font-size:14px;padding:3px 12px;margin-bottom:10px">● LIVE</div>
@@ -623,7 +639,7 @@ const scenes = {
           requestAnimationFrame(() => s.style.opacity = 1)
         }, 2300)
       })],
-      ...outro(22000),
+      ...outro(23800),
     ])
   },
 

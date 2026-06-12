@@ -11,6 +11,8 @@ const routes = [
   { path: '/decks/meta', name: 'MetaDecks', component: () => import('../views/MetaDecksView.vue'), meta: { title: 'Meta Decks', description: 'Browse popular competitive Pokémon TCG decks. Import with one click.' } },
   { path: '/decks/:id', name: 'DeckBuilder', component: () => import('../views/DeckBuilderView.vue'), meta: { title: 'Deck Builder', description: 'Build your deck, track card ownership, and calculate costs.' } },
   { path: '/booth', name: 'Booth', component: () => import('../views/BoothView.vue'), meta: { title: 'Card Booth', description: 'Set up your booth for a card show: list what you sell with your prices and share it as a QR or link — no servers, your data stays yours.' } },
+  // static segment outranks :id in vue-router, but keep it first for clarity
+  { path: '/booth/display', name: 'BoothDisplay', component: () => import('../views/BoothDisplayView.vue'), meta: { bare: true, title: 'Booth Display', description: 'Live booth QR on a second screen, driven from your phone.' } },
   { path: '/booth/:id', name: 'BoothEdit', component: () => import('../views/BoothEditView.vue'), meta: { title: 'Edit Booth', description: 'Edit your booth listings and prices.' } },
   // bare: between deals you want zero chrome to mis-tap — the view carries its own exit
   { path: '/booth/:id/table', name: 'BoothTable', component: () => import('../views/BoothTableView.vue'), meta: { bare: true, title: 'Table Mode', description: 'Run your booth live: mark cash sales and trades in two taps, keep a day log, show a live QR.' } },

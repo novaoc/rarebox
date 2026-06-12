@@ -49,8 +49,18 @@
           </div>
           <input v-model="brand.mark" class="input be-mark" placeholder="🔥 or initials" maxlength="12" @change="persist" />
         </div>
-        <input v-model.trim="brand.logo" class="input be-logo" placeholder="Logo image link (https://…) — optional, monogram works without one" @change="persist" />
-        <p v-if="brand.logo && !/^https:\/\//.test(brand.logo)" class="be-logo-warn">Logo links must start with https:// — it won't be shared otherwise.</p>
+        <div class="be-logo-row">
+          <input v-model.trim="brand.logo" class="input be-logo" placeholder="Logo image link (https://…) — optional, monogram works without one" @change="persist" />
+          <template v-if="canUploadLogo">
+            <input ref="logoFile" type="file" accept="image/*" style="display:none" @change="onLogoPicked" />
+            <button type="button" class="btn btn-secondary btn-sm" :disabled="logoBusy" @click="$refs.logoFile.click()">
+              {{ logoBusy ? 'Uploading…' : '📤 Upload' }}
+            </button>
+          </template>
+        </div>
+        <p v-if="logoError" class="be-logo-warn">{{ logoError }}</p>
+        <p v-else-if="brand.logo && !/^https:\/\//.test(brand.logo)" class="be-logo-warn">Logo links must start with https:// — it won't be shared otherwise.</p>
+        <p v-else-if="canUploadLogo" class="be-logo-note">Upload goes from your device straight to Imgur and saves the link — nothing passes through Rarebox.</p>
         <div v-if="brand.color || brand.mark || brand.logo" class="be-brand-preview">
           <img v-if="/^https:\/\//.test(brand.logo || '')" :src="brand.logo" class="be-brand-logo" alt="" @error="$event.target.style.display='none'" />
           <span v-else class="be-brand-mark" :style="{ background: brand.color || 'var(--accent)', color: markText }">{{ brand.mark || '◆' }}</span>
@@ -194,6 +204,7 @@ import BoothShareModal from '../components/BoothShareModal.vue'
 import { loadBooths, saveBooths, boothTotal, MAX_BOOTH_ITEMS } from '../utils/booth'
 import { multiSearch } from '../services/tcg/multiSearch'
 import { searchSealed } from '../services/sealedIndex'
+import { uploadLogo, logoUploadAvailable } from '../services/imageHost'
 
 const route = useRoute()
 const store = usePortfolioStore()
@@ -217,6 +228,28 @@ const brand = computed(() => booth.value?.brand)
 function setBrandColor(c) {
   brand.value.color = brand.value.color === c ? '' : c // tap again to clear
   persist()
+}
+
+// Logo upload (hidden until an image-host client id is configured)
+const canUploadLogo = logoUploadAvailable()
+const logoFile = ref(null)
+const logoBusy = ref(false)
+const logoError = ref('')
+
+async function onLogoPicked(e) {
+  const file = e.target.files?.[0]
+  e.target.value = '' // same file re-pickable
+  if (!file) return
+  logoBusy.value = true
+  logoError.value = ''
+  try {
+    brand.value.logo = await uploadLogo(file)
+    persist()
+  } catch (err) {
+    logoError.value = err?.message || 'Upload failed — paste a link instead.'
+  } finally {
+    logoBusy.value = false
+  }
 }
 
 // Dark swatches need light text on the monogram chip
@@ -478,7 +511,10 @@ function clearLoc() {
 .be-swatch:active { box-shadow: none; transform: translate(1px, 1px); }
 .be-swatch.active { outline: 3px solid var(--accent); outline-offset: 2px; }
 .be-mark { width: 130px; }
+.be-logo-row { display: flex; gap: 8px; align-items: center; }
+.be-logo-row .be-logo { flex: 1; }
 .be-logo-warn { font-size: 11.5px; color: var(--danger); font-weight: 600; margin-top: 4px; }
+.be-logo-note { font-size: 11.5px; color: var(--text-muted); font-weight: 600; margin-top: 4px; }
 .be-brand-preview { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
 .be-brand-mark {
   display: inline-flex; align-items: center; justify-content: center;

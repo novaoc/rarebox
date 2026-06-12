@@ -200,6 +200,18 @@
             {{ booth.items.length }} listing{{ booth.items.length !== 1 ? 's' : '' }} · {{ fmtMoney(total) }} —
             updates as the table changes
           </div>
+
+          <div class="bt-remote">
+            <button v-if="!remoteArmed" class="btn btn-secondary btn-sm" @click="armRemote">📡 Show on another device</button>
+            <template v-else>
+              <canvas ref="pairCanvas" class="bt-pair-qr"></canvas>
+              <div class="bt-remote-hint">Scan with the display device's camera — its QR follows this table live.
+                <span class="bt-remote-status">📡 {{ remoteStatus }}</span></div>
+              <p class="bt-remote-note">Updates travel through ntfy.sh end-to-end encrypted — the relay only sees scrambled bytes; the key lives in this pairing code.</p>
+              <button class="btn btn-ghost btn-sm" @click="disarmRemote">Stop broadcasting</button>
+            </template>
+          </div>
+
           <button class="btn btn-secondary btn-sm" @click="kioskOpen = false">Close</button>
         </div>
       </div>
@@ -218,6 +230,7 @@ import { exportBoothLedger } from '../utils/boothExcel'
 import { multiSearch } from '../services/tcg/multiSearch'
 import { searchSealed } from '../services/sealedIndex'
 import { tokenMatch } from '../utils/search'
+import { generateSecret, displayUrl, deriveChannel, publishState } from '../utils/remoteQr'
 
 const route = useRoute()
 const booths = ref(loadBooths())
@@ -528,6 +541,12 @@ async function renderKiosk() {
 watch(kioskOpen, async (open) => {
   if (open) {
     renderKiosk()
+    if (remoteArmed.value && booth.value?.remoteSecret) {
+      await nextTick()
+      if (pairCanvas.value) QRCode.toCanvas(pairCanvas.value, displayUrl(booth.value.remoteSecret), {
+        width: 200, margin: 2, color: { dark: '#141414', light: '#ffffff' }, errorCorrectionLevel: 'M',
+      })
+    }
     // Keep the stand's screen awake while the kiosk is up (best-effort)
     try { wakeLock = await navigator.wakeLock?.request('screen') } catch { /* unsupported/denied */ }
   } else {
@@ -537,18 +556,63 @@ watch(kioskOpen, async (open) => {
   }
 })
 
+// ── Remote display: broadcast state to a paired second screen ──
+// The pairing secret persists on the booth record (it never enters the
+// share codec — packBooth picks fields explicitly), so re-arming later
+// reuses the same channel and an already-paired tablet just keeps working.
+const remoteArmed = ref(false)
+const remoteStatus = ref('starting…')
+const pairCanvas = ref(null)
+let remoteChannel = null
+let publishDebounce = null
+
+async function armRemote() {
+  if (!booth.value.remoteSecret) {
+    booth.value.remoteSecret = generateSecret()
+    persist()
+  }
+  remoteChannel = await deriveChannel(booth.value.remoteSecret)
+  remoteArmed.value = true
+  await nextTick()
+  if (pairCanvas.value) {
+    await QRCode.toCanvas(pairCanvas.value, displayUrl(booth.value.remoteSecret), {
+      width: 200, margin: 2, color: { dark: '#141414', light: '#ffffff' }, errorCorrectionLevel: 'M',
+    })
+  }
+  publishNow()
+}
+
+function disarmRemote() {
+  remoteArmed.value = false
+  remoteChannel = null
+  clearTimeout(publishDebounce)
+}
+
+async function publishNow() {
+  if (!remoteChannel || !booth.value) return
+  remoteStatus.value = 'sending…'
+  const ok = await publishState(remoteChannel, await encodeBoothBytes(booth.value))
+  remoteStatus.value = ok ? 'broadcasting' : (navigator.onLine ? 'send failed — retrying on next change' : 'offline — will send when back')
+}
+
 // Inventory changed mid-display → refresh the code (debounced: a burst of
-// taps re-encodes once)
+// taps re-encodes once) and push to the paired display
 watch(() => booth.value && JSON.stringify(booth.value.items), () => {
-  if (!kioskOpen.value) return
-  clearTimeout(kioskDebounce)
-  kioskDebounce = setTimeout(renderKiosk, 400)
+  if (kioskOpen.value) {
+    clearTimeout(kioskDebounce)
+    kioskDebounce = setTimeout(renderKiosk, 400)
+  }
+  if (remoteArmed.value) {
+    clearTimeout(publishDebounce)
+    publishDebounce = setTimeout(publishNow, 1500)
+  }
 })
 
 onMounted(() => { filterInput.value?.focus() })
 onBeforeUnmount(() => {
   if (kioskAnim) clearInterval(kioskAnim)
   clearTimeout(kioskDebounce)
+  clearTimeout(publishDebounce)
   clearTimeout(toastTimer)
   try { wakeLock?.release() } catch { /* already gone */ }
 })
@@ -687,6 +751,11 @@ onBeforeUnmount(() => {
 .bt-kiosk-sub { font-size: 13.5px; font-weight: 700; color: var(--text-secondary); max-width: 420px; }
 .bt-kiosk-live { color: #c92f2f; font-weight: 900; letter-spacing: 0.04em; animation: bt-pulse 1.6s ease infinite; }
 @keyframes bt-pulse { 50% { opacity: 0.45; } }
+.bt-remote { display: flex; flex-direction: column; align-items: center; gap: 8px; margin-top: 4px; }
+.bt-pair-qr { border: 2px solid var(--ink); border-radius: 10px; background: #fff; }
+.bt-remote-hint { font-size: 12.5px; font-weight: 700; color: var(--text-secondary); max-width: 380px; }
+.bt-remote-status { display: block; margin-top: 3px; color: var(--ink); }
+.bt-remote-note { font-size: 11px; color: var(--text-muted); font-weight: 600; max-width: 380px; }
 
 @media (max-width: 480px) {
   .bt-deal { min-width: 84px; padding: 9px 10px; }
