@@ -9,7 +9,7 @@
  */
 
 import { saveGameCards, isCacheFresh, getGameCards } from './cardCache.js'
-import { getOpPriceMap, opPriceFor, opVariantSlug } from './providers.js'
+import { getOpPriceMap, opPriceFor, opVariantSlug, getYgoPriceMap, ygoPriceFor } from './providers.js'
 import { getProvider } from './providers.js'
 
 const BULK_TIMEOUT = 300_000   // 5 min for large downloads
@@ -357,23 +357,39 @@ async function fetchOnePiece(onProgress) {
   return normalized.length
 }
 
-/** Daily price refresh for an ALREADY-downloaded One Piece cache — the
- *  cards don't change, the market does. Stamp-gated to one run per day. */
+/** Daily price refresh for ALREADY-downloaded card caches — the cards don't
+ *  change, the market does. TCGplayer-asset games only; stamp-gated. */
 export async function refreshOnePiecePrices() {
   try {
     const today = new Date().toISOString().slice(0, 10)
-    if (localStorage.getItem('rarebox_op_price_merge') === today) return
-    const rows = await getGameCards('one-piece')
-    if (!rows.length) return
-    const priceMap = await getOpPriceMap()
-    if (!Object.keys(priceMap).length) return
-    let changed = 0
-    for (const r of rows) {
-      const next = num(opPriceFor(priceMap, r.number, r.name, null))
-      if (next != null && next !== r.price) { r.price = next; changed++ }
+    if (localStorage.getItem('rarebox_tcgp_price_merge') === today) return
+    let touched = false
+
+    const opRows = await getGameCards('one-piece')
+    if (opRows.length) {
+      const priceMap = await getOpPriceMap()
+      let changed = 0
+      for (const r of opRows) {
+        const next = num(opPriceFor(priceMap, r.number, r.name, null))
+        if (next != null && next !== r.price) { r.price = next; changed++ }
+      }
+      if (changed) await saveGameCards('one-piece', opRows)
+      touched = true
     }
-    if (changed) await saveGameCards('one-piece', rows)
-    localStorage.setItem('rarebox_op_price_merge', today)
+
+    const ygoRows = await getGameCards('yugioh')
+    if (ygoRows.length) {
+      const priceMap = await getYgoPriceMap()
+      let changed = 0
+      for (const r of ygoRows) {
+        const next = num(ygoPriceFor(priceMap, r.set, r.number, r.rarity, null))
+        if (next != null && next !== r.price) { r.price = next; changed++ }
+      }
+      if (changed) await saveGameCards('yugioh', ygoRows)
+      touched = true
+    }
+
+    if (touched || true) localStorage.setItem('rarebox_tcgp_price_merge', today)
   } catch { /* best effort — browse/search overrides still apply */ }
 }
 
@@ -389,6 +405,7 @@ async function fetchYugioh(onProgress) {
   let batchNum = 0
 
   onProgress({ game: 'yugioh', phase: 'Fetching cards…', loaded: 0, total: 0 })
+  const ygoPrices = await getYgoPriceMap().catch(() => ({}))
 
   while (offset < 100_000) {
     const d = await fetchJson(`${YGO_API}/cardinfo.php?num=${BATCH}&offset=${offset}`)
@@ -409,7 +426,7 @@ async function fetchYugioh(onProgress) {
         set: setInfo.set_name || '',
         number: setInfo.set_code || '',
         image: imgs[0]?.image_url_small || imgs[0]?.image_url || '',
-        price: num(prices.tcgplayer_price),
+        price: num(ygoPriceFor(ygoPrices, setInfo.set_name, setInfo.set_code, setInfo.set_rarity, num(prices.tcgplayer_price))),
         rarity: setInfo.set_rarity || '',
       })
     }

@@ -7,7 +7,7 @@
 // Falls back to live APIs otherwise.
 
 import { searchCache, isGameCached } from './cardCache.js'
-import { getProvider, getOpPriceMap, opPriceFor, opVariantSlug } from './providers.js'
+import { getProvider, getOpPriceMap, opPriceFor, opVariantSlug, getYgoPriceMap, ygoPriceFor } from './providers.js'
 import { tokenMatch } from '../../utils/search.js'
 
 const TIMEOUT = 8000
@@ -372,7 +372,7 @@ async function searchSealed(query) {
 // ── Yu-Gi-Oh: YGOPRODeck ────────────────────────────────────────────────────
 async function searchYugioh(query) {
   const url = `https://db.ygoprodeck.com/api/v7/cardinfo.php?fname=${encodeURIComponent(query)}`
-  const d = await fetchJson(url)
+  const [d, priceMap] = await Promise.all([fetchJson(url), getYgoPriceMap()])
   const arr = d.data || []
   return {
     cards: arr.map(c => {
@@ -383,7 +383,8 @@ async function searchYugioh(query) {
         number: setInfo.set_code || `${c.id}`,
         set: setInfo.set_name || c.archetype || '',
         image: c.card_images?.[0]?.image_url_small || '',
-        price: num(c.card_prices?.[0]?.tcgplayer_price) || num(c.card_prices?.[0]?.cardmarket_price),
+        price: ygoPriceFor(priceMap, setInfo.set_name, setInfo.set_code, setInfo.set_rarity,
+          num(c.card_prices?.[0]?.tcgplayer_price) || num(c.card_prices?.[0]?.cardmarket_price)),
         rarity: setInfo.set_rarity || '',
         game: 'yugioh',
         _raw: c,

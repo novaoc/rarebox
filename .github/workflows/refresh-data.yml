@@ -37,7 +37,9 @@ jobs:
       - uses: actions/checkout@v5
 
       - name: Install scraper deps
-        run: pip install httpx beautifulsoup4
+        run: |
+          pip install httpx beautifulsoup4
+          sudo apt-get update -q && (sudo apt-get install -y 7zip || sudo apt-get install -y p7zip-full)
 
       - name: Riftbound prices
         run: python3 scripts/build_riftbound_prices.py
@@ -51,6 +53,9 @@ jobs:
       - name: One Piece TCGplayer prices
         run: python3 scripts/build_op_prices.py
 
+      - name: Yu-Gi-Oh! TCGplayer prices
+        run: python3 scripts/build_ygo_prices.py
+
       - name: Sealed product index
         run: python3 scripts/build_sealed_index.py
 
@@ -60,7 +65,7 @@ jobs:
 
       - name: Commit if changed
         run: |
-          git add public/riftbound-prices.json public/jp-prices.json public/jp-index.json public/op-prices.json public/sealed-index public/meta-decks
+          git add public/riftbound-prices.json public/jp-prices.json public/jp-index.json public/op-prices.json public/ygo-prices.json scripts/data/ygo_products.json public/sealed-index public/meta-decks
           if git diff --cached --quiet; then
             echo "no data changes"
             exit 0

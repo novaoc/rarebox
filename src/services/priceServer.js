@@ -167,6 +167,8 @@ export async function fetchPrice(query, grade = 'ungraded') {
   const isMtg = lq.includes('magic') || lq.includes('mtg')
   const isOnePiece = lq.includes('one piece') || lq.includes('op0')
   const isRiftbound = lq.includes('riftbound')
+  const isYugioh = lq.includes('yugioh') || lq.includes('yu-gi-oh')
+  const isLorcana = lq.includes('lorcana')
 
   // Prefer relevant products; fall back to all results
   let filtered = products.filter(p => {
@@ -174,6 +176,8 @@ export async function fetchPrice(query, grade = 'ungraded') {
     if (isMtg) return consoleName.includes('magic')
     if (isOnePiece) return consoleName.includes('one piece')
     if (isRiftbound) return consoleName.includes('riftbound')
+    if (isYugioh) return consoleName.includes('yugioh')
+    if (isLorcana) return consoleName.includes('lorcana')
     return consoleName.includes('pokemon')
   })
 
@@ -194,8 +198,8 @@ export async function fetchPrice(query, grade = 'ungraded') {
     image: product.imageUri || '',
     all_grades: {
       ungraded: parsePrice(product.price1),
-      grade9:   parsePrice(product.price2),
-      grade10:  parsePrice(product.price3),
+      grade9:   parsePrice(product.price3),
+      grade10:  parsePrice(product.price2),
     },
     cached: false,
   }

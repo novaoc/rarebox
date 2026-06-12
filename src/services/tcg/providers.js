@@ -460,10 +460,38 @@ const riftbound = {
   },
 }
 
-// ── Yu-Gi-Oh!: YGOPRODeck ─────────────────────────────────────────────────────
-// Card data + images from YGOPRODeck (CORS *). Prices from card_prices field
-// (tcgplayer_price). Sets from cardsets.php, cards from cardinfo.php?set={name}.
+// ── Yu-Gi-Oh!: YGOPRODeck + TCGplayer prices (static asset) ─────────────────
+// Card data + images from YGOPRODeck (CORS *). PRICES from public/
+// ygo-prices.json (daily CI, tcgcsv's TCGplayer dump): the 2026-06-12 audit
+// measured YGOPRODeck's own fields at median 68.8% drift vs TCGplayer —
+// set_price is a stale low-listing snapshot, tcgplayer_price is the card's
+// cheapest printing. Keys: `{setSlug}|{SET_CODE}|{raritySlug}` with a
+// code-level key when the code has a single rarity in that set.
 const YGO_API = 'https://db.ygoprodeck.com/api/v7'
+
+export function ygoSlug(s) {
+  return String(s || '').normalize('NFKD').replace(/[̀-ͯ]/g, '')
+    .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'unknown'
+}
+
+export async function getYgoPriceMap(signal) {
+  try {
+    return await cached('ygo:tcgp-prices', 3600_000, async (sig) => {
+      const d = await getJson('/ygo-prices.json', { signal: sig })
+      return d.prices || {}
+    }, { signal })
+  } catch { return {} }
+}
+
+/** TCGplayer-first price for one YGO printing. */
+export function ygoPriceFor(priceMap, setName, setCode, rarity, fallback) {
+  const sl = ygoSlug(setName)
+  const code = String(setCode || '').toUpperCase()
+  return priceMap[`${sl}|${code}|${ygoSlug(rarity)}`]
+    ?? priceMap[`${sl}|${code}`]
+    ?? fallback
+    ?? null
+}
 
 const yugioh = {
   id: 'yugioh',
@@ -487,6 +515,7 @@ const yugioh = {
     return cached(`yugioh:cards:${setName}`, 600_000, async (signal) => {
       const d = await getJson(`${YGO_API}/cardinfo.php?cardset=${encodeURIComponent(setName)}`, { signal })
       const cards = d.data || []
+      const priceMap = await getYgoPriceMap()
       return cards.map(c => {
         const setInfo = (c.card_sets || []).find(s => s.set_name === setName) || {}
         const prices = c.card_prices?.[0] || {}
@@ -496,10 +525,10 @@ const yugioh = {
           name: c.name,
           number: setInfo.set_code || '',
           image: imgs[0]?.image_url_small || imgs[0]?.image_url || '',
-          // set_price is THIS printing's price; tcgplayer_price is the card's
-          // cheapest printing overall (wrong for reprints — e.g. a $1.85
-          // Metal Raiders common showing $0.20 from a later reprint)
-          price: num(setInfo.set_price) || num(prices.tcgplayer_price),
+          // TCGplayer market first; YGOPRODeck's own fields only as a last
+          // resort (audit: median 68.8% drift — see header note)
+          price: ygoPriceFor(priceMap, setName, setInfo.set_code, setInfo.set_rarity,
+            num(setInfo.set_price) || num(prices.tcgplayer_price)),
           rarity: setInfo.set_rarity || '',
         }
       })

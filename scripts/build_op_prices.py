@@ -50,8 +50,13 @@ def fetch(url: str):
 
 
 def variant_slug(name: str) -> str:
-    """'Monkey.D.Luffy (SP)' → 'sp'; '(061)' → '' (collector number)."""
-    m = re.search(r"\(((?!.*/)[^)]+)\)\s*$", name or "")
+    """'Monkey.D.Luffy (SP)' → 'sp'; '(061)' → '' (collector number).
+    Trailing bracket qualifiers are stripped FIRST: promo names like
+    'Kuroobi (Online Regional 2023) [Finalist]' must slug to the promo
+    variant, never to the empty/base slug — empty-slug promo entries were
+    stomping base-card keys with inflated prices (audit 2026-06-12)."""
+    n = re.sub(r"(\s*\[[^\]]*\])+\s*$", "", name or "")
+    m = re.search(r"\(((?!.*/)[^)]+)\)\s*$", n)
     if not m or not re.search(r"[a-zA-Z]", m.group(1)):
         return ""
     slug = re.sub(r"\s+", "-", m.group(1).strip().lower())
@@ -72,6 +77,7 @@ def main() -> int:
     print(f"{len(groups)} One Piece groups")
 
     prices: dict[str, float] = {}
+    price_src: dict[str, tuple] = {}
     gaps: list = []
     for g in groups:
         try:
@@ -83,11 +89,11 @@ def main() -> int:
 
         by_pid: dict[int, float] = {}
         for r in rows:
-            p = r.get("marketPrice") or r.get("midPrice") or r.get("lowPrice")
+            # marketPrice ONLY — a lone $100k midPrice listing poisoned a key
+            # in the first build; gap-fill covers products without market data
+            p = r.get("marketPrice")
             if p and p > 0:
-                # one product can have Normal+Foil rows — prefer the higher-
-                # signal market row, which is whichever has marketPrice
-                if r["productId"] not in by_pid or r.get("marketPrice"):
+                if r["productId"] not in by_pid or p > by_pid[r["productId"]]:
                     by_pid[r["productId"]] = round(p, 2)
 
         gap_numbers = []
@@ -101,9 +107,14 @@ def main() -> int:
             if not price:
                 gap_numbers.append((key, num_key))
                 continue
-            # reprints of the same number+variant in different groups: keep the
-            # HIGHER price (the collectible printing, not the budget reprint)
-            if key not in prices or price > prices[key]:
+            # A card's HOME group (OP03-xxx priced inside the OP-03 group)
+            # always wins; among foreign groups (reprints/promo boxes), the
+            # higher price wins but can never override the home group.
+            abbr_norm = re.sub(r"[^A-Z0-9]", "", (g.get("abbreviation") or "").upper())
+            is_home = num_key.split("-")[0].replace("-", "") == abbr_norm
+            prev = price_src.get(key)
+            if prev is None or (is_home and not prev[1]) or (is_home == prev[1] and price > prev[0]):
+                price_src[key] = (price, is_home)
                 prices[key] = price
         if gap_numbers:
             gaps.append((g.get("name", ""), gap_numbers))
