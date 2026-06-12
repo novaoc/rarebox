@@ -896,7 +896,11 @@ async function searchPC() {
   try {
     const grade = selectedItem.value?.type === 'graded' ? (selectedItem.value.grade || '10') : 'ungraded'
     pcResult.value = await fetchPrice(pcQuery.value, grade)
-  } catch (e) { pcError.value = 'Fetch failed' }
+  } catch (e) {
+    pcError.value = e?.message === 'no_graded_data'
+      ? 'No graded market data for that grade — the slab may trade too thinly. Set the value manually below.'
+      : 'Fetch failed'
+  }
   finally { pcSearching.value = false }
 }
 

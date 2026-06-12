@@ -1,10 +1,15 @@
 // Rarebox Price Service — PriceCharting JSON API, runs directly in the browser.
 // No backend, no API key. CORS is fully open on PriceCharting's search endpoint.
 //
-// Price fields from the API:
-//   price1 = ungraded / loose (used for raw cards and sealed)
-//   price2 = mid-grade (approx. PSA 8–9 range)
-//   price3 = gem mint / grade 10 (PSA 10, BGS 10, CGC 10, etc.)
+// Price fields from the search API — VERIFIED EMPIRICALLY 2026-06-12
+// (Base Set Charizard 1st Ed: price2 $435k ↔ PSA 10 market, price3 $49k ↔
+// PSA 9 market; consistent across Pokémon/MTG/YGO/One Piece/Lorcana/
+// Riftbound samples — price2 > price3 everywhere):
+//   price1 = ungraded / loose (raw cards and sealed)
+//   price2 = TOP grade (PSA 10 / gem tier)
+//   price3 = Grade 9
+// The old mapping had 2↔3 swapped AND fell back to the raw price when
+// graded data was missing — which quoted raw prices as "PSA 10".
 
 const PC_BASE = 'https://www.pricecharting.com'
 
@@ -95,24 +100,25 @@ function parsePrice(val) {
 
 /**
  * Pick the right price field based on grade.
- * Grade 10 (PSA 10, BGS 10, CGC 10, etc.) → price3 (gem mint)
- * Grade 9–9.5 → price2 (mid-grade)
- * Ungraded / grade <9 → price1 (loose)
+ * Grade 10 family (PSA/BGS/CGC/ACE 10) → price2 (top grade)
+ * Grade 9–9.5 → price3 (grade 9)
+ * Ungraded → price1
+ * A graded request with no graded market data returns NULL — never the
+ * raw price. Quoting raw as "PSA 10" is how mispriced slabs happen.
  */
 function priceForGrade(product, grade) {
   const g = String(grade || 'ungraded').toLowerCase()
-
-  // Gem mint (grade 10, psa10, bgs10, cgc10, ace10, etc.)
   if (g === '10' || g.endsWith('10') || g === 'bgs10b') {
-    return parsePrice(product.price3) || parsePrice(product.price2) || parsePrice(product.price1)
+    return parsePrice(product.price2)
   }
-
-  // Mid-grade (9, 9.5, psa9, etc.)
   if (g.includes('9')) {
-    return parsePrice(product.price2) || parsePrice(product.price1)
+    return parsePrice(product.price3)
   }
-
-  // Ungraded or lower grade
+  if (g !== 'ungraded' && /\d/.test(g)) {
+    // grade 8 and below: PC's search API has no field for it — grade 9 is
+    // the nearest graded anchor; null when even that's missing
+    return parsePrice(product.price3)
+  }
   return parsePrice(product.price1)
 }
 
@@ -123,8 +129,7 @@ function priceForGrade(product, grade) {
  */
 /**
  * Graded-market search for the booth pickers: products that actually have
- * graded prices, mapped to { name, set, image, psa9, psa10 }. psa9 ≈
- * PriceCharting's mid-grade band (PSA 8-9), psa10 = gem mint.
+ * graded prices, mapped to { name, set, image, psa9, psa10 }.
  */
 export async function searchGradedProducts(query, { limit = 12 } = {}) {
   const products = await searchPC(query)
@@ -134,8 +139,8 @@ export async function searchGradedProducts(query, { limit = 12 } = {}) {
       name: p.productName || '',
       set: p.consoleName || '',
       image: p.imageUri || '',
-      psa9: parsePrice(p.price2),
-      psa10: parsePrice(p.price3),
+      psa9: parsePrice(p.price3),
+      psa10: parsePrice(p.price2),
       graded: true,
     }))
     .filter(p => p.name && (p.psa9 || p.psa10))
@@ -177,7 +182,7 @@ export async function fetchPrice(query, grade = 'ungraded') {
 
   const product = filtered[0]
   const price = priceForGrade(product, grade)
-  if (!price) throw new Error('no_results')
+  if (!price) throw new Error(grade !== 'ungraded' ? 'no_graded_data' : 'no_results')
 
   const result = {
     query: q,
