@@ -224,6 +224,31 @@
                     </ol>
                     <p class="bt-tip-why">The two devices then talk <strong>directly</strong> — instant updates, immune to venue Wi-Fi, works in a dead zone. You'll see <strong>LIVE · DIRECT</strong> on the display.</p>
                     <p class="bt-tip-optional">Totally optional — on any normal connection it works without this, just via an encrypted relay instead.</p>
+
+                    <button v-if="!tipKnowMore" class="bt-tip-link bt-tip-more" @click="tipKnowMore = true">Know more — how the tech works</button>
+                    <div v-else class="bt-tip-deep">
+                      <h4>How it works</h4>
+                      <p>
+                        Your phone and the display pair through the QR code, then try to talk
+                        <strong>directly to each other</strong> over the local network (WebRTC, end-to-end
+                        encrypted). When that works, price updates are a few kilobytes traveling between two
+                        devices at the same table — they never leave the building and never touch the internet.
+                      </p>
+                      <p>
+                        If the network <em>blocks</em> devices from seeing each other (common on guest Wi-Fi —
+                        it's called <strong>client isolation</strong>), both devices fall back to an encrypted
+                        internet relay. That still works, but it uses the venue's internet connection and the
+                        free relay caps messages per day <strong>per public IP</strong> — so at a big show where
+                        every dealer shares one connection, everyone's broadcasts compete for the same budget.
+                      </p>
+                      <h4>For venue &amp; show organizers</h4>
+                      <p>
+                        Allowing device-to-device traffic on the dealers' Wi-Fi (turning off client isolation,
+                        e.g. on a separate dealers-only network) means booth traffic stays local: faster
+                        updates for dealers, <strong>less load on your internet line</strong>, and no shared
+                        rate limits. Each dealer's phone hotspot achieves the same thing without any venue help.
+                      </p>
+                    </div>
                   </div>
                   <div class="modal-footer">
                     <button class="btn btn-primary" @click="dismissHotspotTip">Got it</button>
@@ -554,6 +579,7 @@ const remoteStatus = ref('starting…')
 // Hotspot tip: shown once, the first time a seller arms the second screen
 const HOTSPOT_TIP_KEY = 'rarebox_hotspot_tip_seen'
 const hotspotTipOpen = ref(false)
+const tipKnowMore = ref(false)
 function dismissHotspotTip() {
   hotspotTipOpen.value = false
   try { localStorage.setItem(HOTSPOT_TIP_KEY, '1') } catch { /* quota */ }
@@ -813,4 +839,8 @@ onBeforeUnmount(() => {
   background: var(--accent-dim); border: 1.5px solid var(--ink); border-radius: var(--radius);
   font-size: 12.5px; line-height: 1.5;
 }
+.bt-tip-more { display: block; margin-top: 12px; font-size: 12.5px; }
+.bt-tip-deep { margin-top: 12px; border-top: 1.5px dashed var(--ink); padding-top: 10px; }
+.bt-tip-deep h4 { font-size: 12px; font-weight: 900; letter-spacing: 0.4px; text-transform: uppercase; margin: 10px 0 4px; }
+.bt-tip-deep p { font-size: 12.5px; line-height: 1.55; color: var(--text-secondary); margin-bottom: 8px; }
 </style>
