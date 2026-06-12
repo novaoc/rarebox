@@ -6,10 +6,11 @@
 // bridges that: [tcgdexSetId, localId, englishName, price] per card.
 // Images come from the tcgdex CDN; set display names from JP_EN_NAMES.
 
-import { jpSetToSeries, JP_EN_NAMES } from './pokemonApi'
+import { jpSetToSeries, JP_EN_NAMES, jpProductImage } from './pokemonApi'
 import { tokenMatch } from '../utils/search.js'
 
 let _index = null
+let _sets = {}
 let _loading = null
 
 async function loadIndex() {
@@ -19,7 +20,9 @@ async function loadIndex() {
     try {
       const res = await fetch('/jp-index.json')
       if (!res.ok) throw new Error(`http_${res.status}`)
-      _index = (await res.json()).cards || []
+      const d = await res.json()
+      _index = d.cards || []
+      _sets = d.sets || {}
     } catch {
       _index = []
       _loading = null // allow a retry on the next search
@@ -33,9 +36,14 @@ function stripZeros(s) {
   return s.replace(/^0+(?=\d)/, '')
 }
 
-function jpImage(setId, localId) {
+function jpImage(setId, localId, pid) {
+  // tcgdex scans when the set has them; TCGplayer product photo otherwise
+  // (the Mega era has NO tcgdex scans — blind URLs there 404)
+  const meta = _sets[String(setId).toLowerCase()]
+  if (meta && meta.scans === false) return jpProductImage(pid) || ''
   const series = jpSetToSeries(setId)
-  return series ? `https://assets.tcgdex.net/ja/${series}/${setId}/${localId}/low.webp` : ''
+  if (series) return `https://assets.tcgdex.net/ja/${series}/${setId}/${localId}/low.webp`
+  return jpProductImage(pid) || ''
 }
 
 /** Set display: "Inferno X (M2a)" when we know the EN community name. */
@@ -56,7 +64,7 @@ export async function searchJapanese(query, { limit = 24, setIds = null, number 
   const wantSets = setIds ? new Set(setIds.map(s => String(s).toLowerCase())) : null
   const wantNum = number != null && number !== '' ? stripZeros(String(number)) : null
   const out = []
-  for (const [setId, localId, name, price] of idx) {
+  for (const [setId, localId, name, price, pid] of idx) {
     if (wantSets && !wantSets.has(setId.toLowerCase())) continue
     if (wantNum && stripZeros(String(localId)) !== wantNum) continue
     if (q && !tokenMatch(q, name)) continue
@@ -65,7 +73,7 @@ export async function searchJapanese(query, { limit = 24, setIds = null, number 
       name,
       number: localId,
       set: jpSetLabel(setId),
-      image: jpImage(setId, localId),
+      image: jpImage(setId, localId, pid),
       price: price || null,
       game: 'pokemon',
       _lang: 'ja',

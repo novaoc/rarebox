@@ -310,17 +310,17 @@ export async function getJapaneseSets() {
     }
   } catch { /* corrupt cache — refetch */ }
   const url = 'https://api.tcgdex.net/v2/ja/sets'
-  const data = await fetchWithCache(url)
+  const [data, jpIdx] = await Promise.all([fetchWithCache(url), getJpIndex()])
   sortJapaneseSets(data)
   const sets = data.map(s => ({
     id: s.id,
-    name: JP_EN_NAMES[s.id] || s.name,
+    name: JP_EN_NAMES[s.id] || jpIdx.sets[s.id.toLowerCase()]?.en || s.name,
     nameJp: s.name,
     series: '',
     total: s.cardCount?.total || 0,
     printedTotal: s.cardCount?.official || 0,
     releaseDate: s.releaseDate || null,
-    images: { logo: JP_SET_LOGOS[s.id] || null, symbol: null },
+    images: { logo: JP_SET_LOGOS[s.id] || jpIdx.sets[s.id.toLowerCase()]?.logo || null, symbol: null },
     _lang: 'ja',
     _series: jpSetToSeries(s.id),
     _hasImages: !!jpSetToSeries(s.id)
@@ -343,6 +343,32 @@ async function getJpPriceMap() {
     if (res.ok) _jpPrices = (await res.json()).prices || {}
   } catch { /* leave null — retry next call (first attempt may be offline) */ }
   return _jpPrices || {}
+}
+
+// English names + tcgplayer product ids + set meta (logos, scan flags)
+// from /jp-index.json — the same asset that powers JP search-by-EN-name.
+let _jpIndex = null
+async function getJpIndex() {
+  if (_jpIndex) return _jpIndex
+  try {
+    const res = await fetch('/jp-index.json')
+    if (res.ok) {
+      const d = await res.json()
+      const names = {}
+      const pids = {}
+      for (const [sid, lid, name, , pid] of d.cards || []) {
+        const k = jpPriceKey(sid, lid)
+        names[k] = name
+        if (pid) pids[k] = pid
+      }
+      _jpIndex = { names, pids, sets: d.sets || {} }
+    }
+  } catch { /* retry next call */ }
+  return _jpIndex || { names: {}, pids: {}, sets: {} }
+}
+
+export function jpProductImage(pid, large = false) {
+  return pid ? `https://tcgplayer-cdn.tcgplayer.com/product/${pid}_${large ? '400w' : '200w'}.jpg` : null
 }
 
 function jpPriceKey(setId, localId) {
@@ -372,23 +398,33 @@ export async function getJapaneseCardsBySet(setId, page = 1, pageSize = 36) {
     }
   }
 
-  const jpPrices = await getJpPriceMap()
+  const [jpPrices, jpIdx] = await Promise.all([getJpPriceMap(), getJpIndex()])
   const allCards = rawCards.map(c => {
     const localId = c.localId || c.id?.split('-').pop() || ''
-    // tcgdex card briefs carry the canonical image base URL; absence means the CDN
-    // has no scan for this card (e.g. Mega era) — show placeholder, not a 404
+    const key = jpPriceKey(setId, localId)
+    // tcgdex card briefs carry the canonical image base URL; absence means
+    // the CDN has no scan (the whole Mega era!) — fall back to the
+    // TCGplayer product photo so JP cards are never faceless
     const imageBase = c.image || null
-    const price = jpPrices[jpPriceKey(setId, localId)]
+    const pid = jpIdx.pids[key]
+    const images = imageBase
+      ? { small: imageBase + '/low.webp', large: imageBase + '/high.webp' }
+      : { small: jpProductImage(pid), large: jpProductImage(pid, true) }
+    const price = jpPrices[key]
+    // English names (from TCGplayer's catalog) with the JP marker the
+    // sealed index already uses — searchable + identifiable at a glance
+    const en = jpIdx.names[key]
     return {
       id: c.id,
-      name: c.name,
+      name: en ? `${en} (JP)` : c.name,
+      nameJp: c.name,
       number: localId,
       set: { id: setId, name: enName },
-      images: imageBase ? { small: imageBase + '/low.webp', large: imageBase + '/high.webp' } : { small: null, large: null },
+      images,
       supertype: 'Pokémon',
       tcgplayer: price ? { prices: { normal: { market: price, low: null, mid: price } } } : undefined,
       _lang: 'ja',
-      _hasImage: !!imageBase
+      _hasImage: !!(imageBase || pid)
     }
   })
   const start = (page - 1) * pageSize

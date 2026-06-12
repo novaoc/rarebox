@@ -412,7 +412,15 @@ export async function smartSearch(q, { pageSize = 24, sealedLimit = 12 } = {}) {
   const memoKey = `v2|${q.trim().toLowerCase()}|${pageSize}`
   const hit = _memo.get(memoKey)
   if (hit && Date.now() - hit.ts < MEMO_TTL) return hit.result
-  const parsed = await parseQuery(q)
+  // community slang: "moonbreon" → the canonical query, resolved by the
+  // normal brain (set codes + numbers give an exact top hit)
+  let nick = null
+  try {
+    const { resolveNickname } = await import('./nicknames.js')
+    nick = resolveNickname(q)
+  } catch { /* optional */ }
+  const parsed = await parseQuery(nick ? nick.q : q)
+  if (nick) parsed.understood.unshift(`“${q.trim()}” → ${nick.label}`)
   // When parsing consumed the whole query into filters ("M2 110/80 SAR"),
   // an empty clean text is CORRECT — only fall back to the raw query when
   // nothing was understood at all.
