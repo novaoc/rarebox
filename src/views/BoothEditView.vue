@@ -3,7 +3,7 @@
     <div class="be-head">
       <router-link to="/booth" class="btn btn-ghost btn-sm">← Booths</router-link>
       <div class="be-head-actions">
-        <router-link :to="`/booth/${booth.id}/table`" class="btn btn-secondary btn-sm" :class="{ disabled: !booth.items.length }">🔥 Table mode</router-link>
+        <router-link :to="`/booth/${booth.id}/table`" class="btn btn-secondary btn-sm" :class="{ disabled: !booth.items.length }"><RbIcon name="bolt" :size="14" /> Table mode</router-link>
         <button class="btn btn-primary btn-sm" :disabled="!booth.items.length" @click="showShare = true">📣 Share</button>
       </div>
     </div>
@@ -54,13 +54,17 @@
           <template v-if="canUploadLogo">
             <input ref="logoFile" type="file" accept="image/*" style="display:none" @change="onLogoPicked" />
             <button type="button" class="btn btn-secondary btn-sm" :disabled="logoBusy" @click="$refs.logoFile.click()">
-              {{ logoBusy ? 'Uploading…' : '📤 Upload' }}
+              <RbIcon v-if="!logoBusy" name="upload" :size="15" /> {{ logoBusy ? 'Uploading…' : 'Upload' }}
             </button>
           </template>
+          <a v-else class="btn btn-secondary btn-sm" href="https://postimages.org" target="_blank" rel="noopener">
+            <RbIcon name="upload" :size="15" /> Get a link ↗
+          </a>
         </div>
         <p v-if="logoError" class="be-logo-warn">{{ logoError }}</p>
         <p v-else-if="brand.logo && !/^https:\/\//.test(brand.logo)" class="be-logo-warn">Logo links must start with https:// — it won't be shared otherwise.</p>
         <p v-else-if="canUploadLogo" class="be-logo-note">Upload goes from your device straight to Imgur and saves the link — nothing passes through Rarebox.</p>
+        <p v-else class="be-logo-note">No account needed: upload on Postimages (free), copy the <strong>Direct link</strong> it gives you, and paste it here.</p>
         <div v-if="brand.color || brand.mark || brand.logo" class="be-brand-preview">
           <img v-if="/^https:\/\//.test(brand.logo || '')" :src="brand.logo" class="be-brand-logo" alt="" @error="$event.target.style.display='none'" />
           <span v-else class="be-brand-mark" :style="{ background: brand.color || 'var(--accent)', color: markText }">{{ brand.mark || '◆' }}</span>
@@ -73,7 +77,7 @@
       <h2>Listings <span class="badge badge-accent" v-if="booth.items.length">{{ booth.items.length }}</span></h2>
       <div class="be-listings-total" v-if="booth.items.length">Table total: <strong>{{ fmtMoney(total) }}</strong></div>
       <button class="btn btn-primary btn-sm" :disabled="atCap" @click="openPicker">+ From shelf</button>
-      <button class="btn btn-secondary btn-sm" :disabled="atCap" @click="openSearch">🔍 Search cards</button>
+      <button class="btn btn-secondary btn-sm" :disabled="atCap" @click="openSearch"><RbIcon name="magnifier" :size="15" /> Search cards</button>
     </div>
     <p v-if="atCap" class="be-cap-note">Booth is full ({{ MAX_BOOTH_ITEMS }} listings) — that keeps the QR scannable. Split into a second booth for more.</p>
 
@@ -205,6 +209,7 @@ import { loadBooths, saveBooths, boothTotal, MAX_BOOTH_ITEMS } from '../utils/bo
 import { multiSearch } from '../services/tcg/multiSearch'
 import { searchSealed } from '../services/sealedIndex'
 import { uploadLogo, logoUploadAvailable } from '../services/imageHost'
+import RbIcon from '../components/icons/RbIcon.vue'
 
 const route = useRoute()
 const store = usePortfolioStore()

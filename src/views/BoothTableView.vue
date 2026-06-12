@@ -6,12 +6,12 @@
       <div class="bt-head-main">
         <div class="bt-title">{{ booth.name }}</div>
         <div class="bt-recap">
-          <span class="bt-chip bt-chip-cash" :class="{ neg: totals.cashNet < 0 }">💵 {{ fmtMoney(totals.cashNet) }} today</span>
-          <span class="bt-chip bt-chip-trade">🔁 {{ totals.tradesOut.count }} trade{{ totals.tradesOut.count !== 1 ? 's' : '' }}</span>
-          <span v-if="totals.buys.count" class="bt-chip bt-chip-trade">💰 {{ totals.buys.count }} bought</span>
+          <span class="bt-chip bt-chip-cash" :class="{ neg: totals.cashNet < 0 }"><RbIcon name="coin" :size="13" /> {{ fmtMoney(totals.cashNet) }} today</span>
+          <span class="bt-chip bt-chip-trade"><RbIcon name="swap" :size="13" /> {{ totals.tradesOut.count }} trade{{ totals.tradesOut.count !== 1 ? 's' : '' }}</span>
+          <span v-if="totals.buys.count" class="bt-chip bt-chip-trade"><RbIcon name="download" :size="13" /> {{ totals.buys.count }} bought</span>
         </div>
       </div>
-      <button class="btn btn-primary btn-sm" @click="kioskOpen = true">📺 Live QR</button>
+      <button class="btn btn-primary btn-sm" @click="kioskOpen = true"><RbIcon name="antenna" :size="15" /> Live QR</button>
     </header>
 
     <div class="bt-tools">
@@ -30,7 +30,7 @@
       <div v-for="{ it, i } in visibleItems" :key="i" class="bt-item card">
         <div class="bt-item-img">
           <img v-if="it.img" :src="it.img" :alt="it.name" loading="lazy" @error="$event.target.style.display='none'" />
-          <span v-else aria-hidden="true">🃏</span>
+          <span v-else aria-hidden="true"><RbIcon name="card" :size="26" /></span>
         </div>
         <div class="bt-item-main">
           <div class="bt-item-name">{{ it.name }}</div>
@@ -42,8 +42,8 @@
           </div>
         </div>
         <div class="bt-item-actions">
-          <button class="bt-deal bt-deal-cash" @click="sell(i)">💵 Sold</button>
-          <button class="bt-deal bt-deal-trade" @click="openTrade(i)">🔁 Trade</button>
+          <button class="bt-deal bt-deal-cash" @click="sell(i)"><RbIcon name="coin" :size="15" /> Sold</button>
+          <button class="bt-deal bt-deal-trade" @click="openTrade(i)"><RbIcon name="swap" :size="15" /> Trade</button>
         </div>
       </div>
     </div>
@@ -54,7 +54,7 @@
         <button class="bt-log-toggle" @click="logOpen = !logOpen">
           {{ logOpen ? '▾' : '▸' }} Today's log ({{ today.length }})
         </button>
-        <button class="btn btn-secondary btn-sm" @click="exportLedger">📊 Export Excel</button>
+        <button class="btn btn-secondary btn-sm" @click="exportLedger"><RbIcon name="chart" :size="15" /> Export Excel</button>
       </div>
       <p class="bt-log-summary">
         Sales {{ fmtMoney(totals.sales.cash) }} ({{ totals.sales.count }})
@@ -95,18 +95,18 @@
           </form>
           <label class="bt-buy-toggle">
             <input type="checkbox" v-model="buyMode" />
-            💰 I'm buying these — log what I paid &amp; deduct it from table cash
+            <RbIcon name="coin" :size="15" /> I'm buying these — log what I paid &amp; deduct it from table cash
           </label>
           <div class="bt-search-list">
             <div v-for="c in searchResults" :key="(c.sealed ? 's' : 'c') + c.game + c.id" class="bt-search-row">
               <img v-if="c.image" :src="c.image" class="bt-search-img" loading="lazy" @error="$event.target.style.display='none'" />
-              <span v-else class="bt-search-img bt-search-noimg">🃏</span>
+              <span v-else class="bt-search-img bt-search-noimg"><RbIcon name="card" :size="22" /></span>
               <span class="bt-search-name">{{ c.name }} <span v-if="c.sealed" class="badge badge-info bt-sealed">Sealed</span>
                 <span class="bt-search-sub">{{ [c.set, c.number ? '#' + c.number : ''].filter(Boolean).join(' · ') }}</span>
               </span>
               <template v-if="buyMode">
                 <span class="bt-cost-wrap">paid $<input type="number" min="0" step="0.01" class="bt-cost" v-model.number="c._cost" :placeholder="c.price ? c.price.toFixed(2) : '0'" /></span>
-                <button class="btn btn-primary btn-sm" :disabled="atCap" @click="addFromSearch(c, true)">💰 Buy</button>
+                <button class="btn btn-primary btn-sm" :disabled="atCap" @click="addFromSearch(c, true)"><RbIcon name="coin" :size="14" /> Buy</button>
               </template>
               <template v-else>
                 <span class="bt-search-price">{{ c.price ? fmtMoney(c.price) : '—' }}</span>
@@ -129,7 +129,7 @@
     <div v-if="trade" class="modal-overlay" @click.self="closeTrade">
       <div class="modal" style="max-width: 580px">
         <div class="modal-header">
-          <h3>🔁 Log a trade</h3>
+          <h3><RbIcon name="swap" :size="18" /> Log a trade</h3>
           <button class="btn btn-ghost btn-icon" @click="closeTrade">✕</button>
         </div>
         <div class="modal-body">
@@ -137,7 +137,7 @@
             <span class="bt-trade-label">Going out</span>
             <div class="bt-trade-outrow">
               <img v-if="trade.it.img" :src="trade.it.img" class="bt-search-img" @error="$event.target.style.display='none'" />
-              <span v-else class="bt-search-img bt-search-noimg">🃏</span>
+              <span v-else class="bt-search-img bt-search-noimg"><RbIcon name="card" :size="22" /></span>
               <span class="bt-search-name">{{ trade.it.name }}
                 <span class="bt-search-sub">{{ [trade.it.setName, trade.it.number ? '#' + trade.it.number : ''].filter(Boolean).join(' · ') }}</span>
               </span>
@@ -153,12 +153,12 @@
           <div v-if="tradeResults.length" class="bt-search-list bt-trade-results">
             <div v-for="c in tradeResults" :key="(c.sealed ? 's' : 'c') + c.game + c.id" class="bt-search-row">
               <img v-if="c.image" :src="c.image" class="bt-search-img" loading="lazy" @error="$event.target.style.display='none'" />
-              <span v-else class="bt-search-img bt-search-noimg">🃏</span>
+              <span v-else class="bt-search-img bt-search-noimg"><RbIcon name="card" :size="22" /></span>
               <span class="bt-search-name">{{ c.name }} <span v-if="c.sealed" class="badge badge-info bt-sealed">Sealed</span>
                 <span class="bt-search-sub">{{ [c.set, c.number ? '#' + c.number : ''].filter(Boolean).join(' · ') }}</span>
               </span>
               <span class="bt-search-price">{{ c.price ? fmtMoney(c.price) : '—' }}</span>
-              <button class="btn btn-primary btn-sm" @click="takeIncoming(c)">📥 Take</button>
+              <button class="btn btn-primary btn-sm" @click="takeIncoming(c)"><RbIcon name="download" :size="14" /> Take</button>
             </div>
           </div>
 
@@ -192,21 +192,14 @@
     <Teleport to="body">
       <div v-if="kioskOpen" class="bt-kiosk" @click="kioskOpen = false">
         <div class="bt-kiosk-inner" @click.stop>
-          <div class="bt-kiosk-name">{{ booth.name }}</div>
-          <canvas ref="kioskCanvas" class="bt-kiosk-qr"></canvas>
-          <div v-if="kioskFrames > 1" class="bt-kiosk-frames">{{ kioskFrame + 1 }} / {{ kioskFrames }} — scan from Rarebox (Booth → Scan)</div>
-          <div class="bt-kiosk-sub">
-            <span class="bt-kiosk-live">● LIVE</span>
-            {{ booth.items.length }} listing{{ booth.items.length !== 1 ? 's' : '' }} · {{ fmtMoney(total) }} —
-            updates as the table changes
-          </div>
+          <BoothLiveQr :booth="booth" status="live" />
 
           <div class="bt-remote">
-            <button v-if="!remoteArmed" class="btn btn-secondary btn-sm" @click="armRemote">📡 Show on another device</button>
+            <button v-if="!remoteArmed" class="btn btn-secondary btn-sm" @click="armRemote"><RbIcon name="antenna" :size="15" /> Show on another device</button>
             <template v-else>
               <canvas ref="pairCanvas" class="bt-pair-qr"></canvas>
               <div class="bt-remote-hint">Scan with the display device's camera — its QR follows this table live.
-                <span class="bt-remote-status">📡 {{ remoteStatus }}</span></div>
+                <span class="bt-remote-status"><RbIcon name="antenna" :size="13" /> {{ remoteStatus }}</span></div>
               <p class="bt-remote-note">Updates travel through ntfy.sh end-to-end encrypted — the relay only sees scrambled bytes; the key lives in this pairing code.</p>
               <button class="btn btn-ghost btn-sm" @click="disarmRemote">Stop broadcasting</button>
             </template>
@@ -223,8 +216,9 @@
 import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute } from 'vue-router'
 import QRCode from 'qrcode'
-import { loadBooths, saveBooths, boothTotal, boothToUrl, encodeBoothBytes, MAX_BOOTH_ITEMS } from '../utils/booth'
-import { buildFrames } from '../utils/qrTransfer'
+import { loadBooths, saveBooths, boothTotal, encodeBoothBytes, MAX_BOOTH_ITEMS } from '../utils/booth'
+import BoothLiveQr from '../components/BoothLiveQr.vue'
+import RbIcon from '../components/icons/RbIcon.vue'
 import { loadJournal, addEntry, removeEntry, todayEntries, boothEntries, journalTotals, generateJournalId } from '../utils/boothJournal'
 import { exportBoothLedger } from '../utils/boothExcel'
 import { multiSearch } from '../services/tcg/multiSearch'
@@ -502,45 +496,12 @@ function exportLedger() {
   exportBoothLedger(booth.value, allBoothEntries.value)
 }
 
-// ── Kiosk QR: re-renders whenever the booth changes ──
+// ── Kiosk QR (rendering lives in BoothLiveQr — it watches the booth) ──
 const kioskOpen = ref(false)
-const kioskCanvas = ref(null)
-const kioskFrames = ref(0)
-const kioskFrame = ref(0)
-const SINGLE_QR_LIMIT = 2300
-const FRAME_MS = 400
-let kioskAnim = null
-let kioskDebounce = null
-let frames = []
 let wakeLock = null
-
-async function renderKiosk() {
-  if (!kioskOpen.value || !booth.value) return
-  await nextTick()
-  if (!kioskCanvas.value) return
-  if (kioskAnim) { clearInterval(kioskAnim); kioskAnim = null }
-  const url = await boothToUrl(booth.value)
-  const opts = { width: 420, margin: 2, color: { dark: '#141414', light: '#ffffff' }, errorCorrectionLevel: 'M' }
-  if (url.length <= SINGLE_QR_LIMIT) {
-    frames = []
-    kioskFrames.value = 1
-    await QRCode.toCanvas(kioskCanvas.value, url, opts)
-  } else {
-    frames = buildFrames(await encodeBoothBytes(booth.value))
-    kioskFrames.value = frames.length
-    kioskFrame.value = 0
-    const draw = (i) => kioskCanvas.value && QRCode.toCanvas(kioskCanvas.value, [{ data: frames[i], mode: 'byte' }], opts)
-    draw(0)
-    kioskAnim = setInterval(() => {
-      kioskFrame.value = (kioskFrame.value + 1) % frames.length
-      draw(kioskFrame.value)
-    }, FRAME_MS)
-  }
-}
 
 watch(kioskOpen, async (open) => {
   if (open) {
-    renderKiosk()
     if (remoteArmed.value && booth.value?.remoteSecret) {
       await nextTick()
       if (pairCanvas.value) QRCode.toCanvas(pairCanvas.value, displayUrl(booth.value.remoteSecret), {
@@ -550,7 +511,6 @@ watch(kioskOpen, async (open) => {
     // Keep the stand's screen awake while the kiosk is up (best-effort)
     try { wakeLock = await navigator.wakeLock?.request('screen') } catch { /* unsupported/denied */ }
   } else {
-    if (kioskAnim) { clearInterval(kioskAnim); kioskAnim = null }
     try { wakeLock?.release() } catch { /* already gone */ }
     wakeLock = null
   }
@@ -595,13 +555,9 @@ async function publishNow() {
   remoteStatus.value = ok ? 'broadcasting' : (navigator.onLine ? 'send failed — retrying on next change' : 'offline — will send when back')
 }
 
-// Inventory changed mid-display → refresh the code (debounced: a burst of
-// taps re-encodes once) and push to the paired display
+// Inventory changed → push to the paired display (debounced: a burst of
+// taps publishes once). The on-screen kiosk re-renders itself.
 watch(() => booth.value && JSON.stringify(booth.value.items), () => {
-  if (kioskOpen.value) {
-    clearTimeout(kioskDebounce)
-    kioskDebounce = setTimeout(renderKiosk, 400)
-  }
   if (remoteArmed.value) {
     clearTimeout(publishDebounce)
     publishDebounce = setTimeout(publishNow, 1500)
@@ -610,8 +566,6 @@ watch(() => booth.value && JSON.stringify(booth.value.items), () => {
 
 onMounted(() => { filterInput.value?.focus() })
 onBeforeUnmount(() => {
-  if (kioskAnim) clearInterval(kioskAnim)
-  clearTimeout(kioskDebounce)
   clearTimeout(publishDebounce)
   clearTimeout(toastTimer)
   try { wakeLock?.release() } catch { /* already gone */ }
@@ -736,10 +690,13 @@ onBeforeUnmount(() => {
 .bt-kiosk {
   position: fixed; inset: 0; z-index: 400;
   background: var(--bg-secondary, #faf6ef);
-  display: flex; align-items: center; justify-content: center;
+  display: flex; justify-content: center;
+  /* taller than the screen once the pairing section is open — scroll, and
+     let margin:auto center the short case */
+  overflow-y: auto;
   padding: calc(24px + env(safe-area-inset-top, 0px)) 24px calc(24px + env(safe-area-inset-bottom, 0px));
 }
-.bt-kiosk-inner { display: flex; flex-direction: column; align-items: center; gap: 14px; text-align: center; max-width: 92vw; }
+.bt-kiosk-inner { display: flex; flex-direction: column; align-items: center; gap: 14px; text-align: center; max-width: 92vw; margin: auto; }
 .bt-kiosk-name { font-size: clamp(20px, 4vw, 30px); font-weight: 900; }
 .bt-kiosk-qr {
   border: var(--bw) solid var(--ink); border-radius: var(--radius);

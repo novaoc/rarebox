@@ -51,7 +51,7 @@
           <div class="search-list">
             <div v-for="c in searchResults" :key="(c.sealed ? 's' : 'c') + c.game + c.id" class="wl-row">
               <img v-if="c.image" :src="c.image" class="wl-row-img" loading="lazy" @error="$event.target.style.display='none'" />
-              <span v-else class="wl-row-img wl-row-noimg">🃏</span>
+              <span v-else class="wl-row-img wl-row-noimg"><RbIcon name="card" :size="22" /></span>
               <span class="wl-row-name">
                 {{ c.name }} <span v-if="c.sealed" class="badge badge-info wl-sealed">Sealed</span>
                 <span class="wl-row-sub">{{ [gameLabel(c.game), c.set, c.number ? '#' + c.number : ''].filter(Boolean).join(' · ') }}</span>
@@ -75,6 +75,7 @@
 
 <script setup>
 import { ref, nextTick } from 'vue'
+import RbIcon from './icons/RbIcon.vue'
 import { multiSearch } from '../services/tcg/multiSearch'
 import { searchSealed } from '../services/sealedIndex'
 import { loadWantlist, saveWantlist, generateWantId, wantKey } from '../utils/wantlist'

@@ -86,7 +86,7 @@
         <button v-if="!viewing.saved" class="btn btn-primary" @click="saveShop">⭐ Save this shop</button>
         <span v-else class="badge badge-success">✓ Saved</span>
         <button class="btn btn-secondary" :disabled="comparing" @click="compareMarket">
-          {{ comparing ? `Checking prices ${compareDone}/${compareTotal}…` : '📊 Compare to market' }}
+          <RbIcon v-if="!comparing" name="chart" :size="15" /> {{ comparing ? `Checking prices ${compareDone}/${compareTotal}…` : 'Compare to market' }}
         </button>
         <select v-if="viewing.booth.items.length > 3" v-model="shopSortMode" class="select shop-sort-mode" aria-label="Sort listings">
           <option value="listed">Seller's order</option>
@@ -117,7 +117,7 @@
           <span v-if="viewMatches?.idx.has(i)" class="shop-want-tag">ON YOUR LIST</span>
           <div class="shop-item-img">
             <img v-if="it.img" :src="it.img" :alt="it.name" loading="lazy" @error="$event.target.style.display='none'" />
-            <span v-else class="shop-item-noimg" aria-hidden="true">🃏</span>
+            <span v-else class="shop-item-noimg" aria-hidden="true"><RbIcon name="card" :size="34" /></span>
           </div>
           <div class="shop-item-body">
             <div class="shop-item-name">{{ it.name }}</div>
@@ -164,7 +164,7 @@
             </div>
             <div class="booth-card-actions">
               <router-link :to="`/booth/${b.id}`" class="btn btn-secondary btn-sm">Edit</router-link>
-              <router-link v-if="b.items.length" :to="`/booth/${b.id}/table`" class="btn btn-secondary btn-sm">🔥 Table</router-link>
+              <router-link v-if="b.items.length" :to="`/booth/${b.id}/table`" class="btn btn-secondary btn-sm"><RbIcon name="bolt" :size="14" /> Table</router-link>
               <button class="btn btn-primary btn-sm" :disabled="!b.items.length" @click="shareBooth = b">Share</button>
               <button class="btn btn-ghost btn-sm" @click="deleteBooth(b.id)">Delete</button>
             </div>
@@ -179,7 +179,7 @@
           <h2>Saved shops</h2>
           <div class="booth-head-actions">
             <button v-if="savedShops.length" class="btn btn-secondary btn-sm" @click="shareListOpen = true">📣 Share list</button>
-            <button class="btn btn-secondary btn-sm" @click="startScan">📷 Scan a booth</button>
+            <button class="btn btn-secondary btn-sm" @click="startScan"><RbIcon name="camera" :size="15" /> Scan a booth</button>
           </div>
         </div>
         <p class="booth-section-sub">Booths other collectors shared with you — open them any time, even offline.</p>
@@ -272,6 +272,7 @@
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import jsQR from 'jsqr'
+import RbIcon from '../components/icons/RbIcon.vue'
 import BoothShareModal from '../components/BoothShareModal.vue'
 import BoothShareListModal from '../components/BoothShareListModal.vue'
 import WantlistPanel from '../components/WantlistPanel.vue'
