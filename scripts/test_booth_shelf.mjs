@@ -92,9 +92,23 @@ const result = await page.evaluate(async () => {
     sync.shelfAdd(offBooth, { type: 'card', cardId: 'x', name: 'X', qty: 1 })
     ok(!offBooth.shelfId && !store.portfolios.some(p => p.name === 'Booth: Off'), 'sync off: no shelf created')
 
+    // 8. buyer-side: moveItem relocates between shelves intact
+    const pickups = store.createPortfolio('Pickups: Test Event', '#2fbf71')
+    const bought = store.addItem(pickups.id, {
+      type: 'card', quantity: 1, purchasePrice: 50, purchaseDate: '2026-06-11', notes: 'Bought at Test Booth',
+      cardId: 'sv8-238', cardData: { name: 'Pikachu ex', number: '238', set: { name: 'Surging Sparks' }, images: {} },
+      currentMarketPrice: 60,
+    })
+    const okMove = store.moveItem(pickups.id, bought.id, curated.id)
+    const movedItem = store.portfolios.find(p => p.id === curated.id).items.find(i => i.id === bought.id)
+    ok(okMove && movedItem?.purchasePrice === 50 && movedItem?.notes.includes('Test Booth'), 'moveItem: relocated with fields intact')
+    ok(!store.portfolios.find(p => p.id === pickups.id).items.length, 'moveItem: source emptied')
+    ok(store.moveItem(pickups.id, 'nope', curated.id) === false, 'moveItem: missing item returns false')
+
     // cleanup
     store.deletePortfolio(curated.id)
     store.deletePortfolio(booth.shelfId)
+    store.deletePortfolio(pickups.id)
   } catch (e) {
     checks.push({ ok: false, label: 'EXCEPTION: ' + (e?.message || e) })
   }

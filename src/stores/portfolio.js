@@ -291,6 +291,19 @@ export const usePortfolioStore = defineStore('portfolio', () => {
     persist()
   }
 
+  function moveItem(fromId, itemId, toId) {
+    if (fromId === toId) return false
+    const src = portfolios.value.find(p => p.id === fromId)
+    const dst = portfolios.value.find(p => p.id === toId)
+    if (!src || !dst) return false
+    const at = src.items.findIndex(i => i.id === itemId)
+    if (at === -1) return false
+    const [item] = src.items.splice(at, 1)
+    dst.items.push(item)
+    persist()
+    return true
+  }
+
   function removeItem(portfolioId, itemId) {
     const portfolio = portfolios.value.find(p => p.id === portfolioId)
     if (!portfolio) return
@@ -850,6 +863,7 @@ export const usePortfolioStore = defineStore('portfolio', () => {
     toggleHuntMark,
     clearHuntMarks,
     updateItem,
+    moveItem,
     removeItem,
     removeItems,
     updateCardPrice,

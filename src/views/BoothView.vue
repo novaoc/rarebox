@@ -111,6 +111,12 @@
         </button>
       </div>
 
+      <div v-if="boughtIdx.size" class="shop-pickups card">
+        <span><strong>{{ boughtIdx.size }}</strong> pickup{{ boughtIdx.size !== 1 ? 's' : '' }} from this booth saved to
+          <strong>“{{ pickupsShelfName }}”</strong> — move them to any shelf later (or just leave them there).</span>
+        <router-link class="btn btn-primary btn-sm" :to="'/portfolio/' + pickupsShelfId">View shelf</router-link>
+      </div>
+
       <div class="shop-grid">
         <div v-for="{ it, i } in displayItems" :key="i" v-show="!matchesOnly || viewMatches?.idx.has(i)"
              class="shop-item card-sm card" :class="{ 'shop-item-want': viewMatches?.idx.has(i) }">
@@ -127,6 +133,12 @@
               <span v-if="(it.qty || 1) > 1" class="text-muted shop-qty">×{{ it.qty }}</span>
               <span v-if="itemDelta(i)" class="shop-mkt" :class="itemDelta(i).cls">{{ itemDelta(i).label }}</span>
             </div>
+            <button v-if="!boughtIdx.has(i)" class="btn btn-secondary btn-sm shop-buy-btn" @click="markBought(it, i)">
+              <RbIcon name="coin" :size="13" /> Bought it
+            </button>
+            <router-link v-else class="btn btn-ghost btn-sm shop-buy-btn shop-bought" :to="'/portfolio/' + pickupsShelfId">
+              ✓ On your pickups shelf →
+            </router-link>
           </div>
         </div>
       </div>
@@ -283,6 +295,8 @@ import {
   directionsUrl, fmtBoothDate,
 } from '../utils/booth'
 import { loadWantlist, matchBooth, matchShops } from '../utils/wantlist'
+import { usePortfolioStore } from '../stores/portfolio'
+import { fmtBoothDate as fmtDateForShelf } from '../utils/booth'
 import { compareBoothToMarket, marketVerdict } from '../utils/boothMarket'
 import { FrameCollector, isFrame } from '../utils/qrTransfer'
 
@@ -292,6 +306,48 @@ const savedShops = ref(loadSavedShops())
 const shareBooth = ref(null)
 const shareListOpen = ref(false)
 const viewing = ref(null) // { booth, saved, savedId?, market? }
+
+// ── Buyer pickups: bought items land on an event shelf ─────────────────
+const pStore = usePortfolioStore()
+const boughtIdx = ref(new Set())
+const pickupsShelfId = ref('')
+
+const pickupsShelfName = computed(() => {
+  const b = viewing.value?.booth
+  if (!b) return 'Pickups'
+  const where = b.venue || b.name || 'card show'
+  const when = b.date ? ` — ${fmtDateForShelf(b.date)}` : ''
+  return `Pickups: ${where}${when}`
+})
+
+function ensurePickupsShelf() {
+  const name = pickupsShelfName.value
+  let shelf = pStore.portfolios.find(p => p.name === name)
+  if (!shelf) shelf = pStore.createPortfolio(name, '#2fbf71')
+  pickupsShelfId.value = shelf.id
+  return shelf.id
+}
+
+function markBought(it, i) {
+  const shelfId = ensurePickupsShelf()
+  pStore.addItem(shelfId, {
+    type: it.type === 'graded' ? 'graded' : it.type === 'sealed' ? 'sealed' : 'card',
+    game: it.game && it.game !== 'pokemon' ? it.game : undefined,
+    cardId: it.cardId || undefined,
+    quantity: 1,
+    purchasePrice: it.price || 0, // what the booth asked — edit later if you haggled
+    purchaseDate: (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` })(),
+    notes: `Bought at ${viewing.value?.booth?.name || 'a booth'}${viewing.value?.booth?.venue ? ` (${viewing.value.booth.venue})` : ''}`,
+    cardData: {
+      name: it.name || '',
+      number: it.number || '',
+      set: { name: it.setName || '' },
+      images: { small: it.img || '' },
+    },
+    currentMarketPrice: it.price || 0,
+  })
+  boughtIdx.value = new Set([...boughtIdx.value, i])
+}
 const dirViewing = ref(null) // { title, entries: [{name, venue, count, total, ref, status}] }
 
 // ── Wantlist matching ──
@@ -446,6 +502,8 @@ const snapshotAge = computed(() => {
     : `${Math.round(mins / 1440)} days ago`
   return { label, stale: mins >= 24 * 60 }
 })
+
+watch(viewing, () => { boughtIdx.value = new Set(); pickupsShelfId.value = '' })
 
 function itemDelta(i) {
   const m = viewing.value?.market
@@ -818,5 +876,12 @@ onBeforeUnmount(() => {
   font-size: 13px; font-weight: 600; color: var(--danger);
   padding: 8px 12px; background: var(--danger-dim);
   border: 1.5px solid var(--ink); border-radius: var(--radius); margin-top: 10px;
+}
+.shop-buy-btn { margin-top: 8px; width: 100%; font-size: 12px; }
+.shop-bought { color: var(--success-text, var(--accent-text)); font-weight: 800; }
+.shop-pickups {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;
+  padding: 10px 14px; margin-bottom: 12px;
+  background: var(--accent-dim); font-size: 13px;
 }
 </style>

@@ -446,6 +446,16 @@
               <label class="form-label">Current Market Value ($)</label>
               <input v-model.number="editForm.currentValue" class="input" type="number" step="0.01" />
             </div>
+            <div v-if="store.portfolios.length > 1" class="form-group">
+              <label class="form-label">Move to shelf</label>
+              <div class="flex gap-2">
+                <select v-model="moveTargetId" class="select" style="flex:1">
+                  <option value="">Stay on “{{ portfolio.name }}”</option>
+                  <option v-for="p in store.portfolios.filter(p => p.id !== portfolio.id)" :key="p.id" :value="p.id">{{ p.name }}</option>
+                </select>
+                <button class="btn btn-secondary" :disabled="!moveTargetId" @click="moveEditingItem">Move</button>
+              </div>
+            </div>
             <div class="form-group">
               <label class="form-label">Purchase Date</label>
               <input v-model="editForm.purchaseDate" class="input" type="date" />
@@ -951,6 +961,14 @@ function saveEditItem() { store.updateItem(portfolio.value.id, editingItem.value
 function saveCurrentValue() { if (selectedItem.value) store.updateItem(portfolio.value.id, selectedItem.value.id, { [selectedItem.value.type === 'card' ? 'currentMarketPrice' : 'currentValue']: editCurrentValue.value }) }
 function onBulkImported(count) { refreshStatus.value = `Imported ${count} cards`; setTimeout(() => { refreshStatus.value = '' }, 3000) }
 function removeItem(item) { if (confirm(`Remove ${getItemName(item)}?`)) store.removeItem(portfolio.value.id, item.id) }
+
+const moveTargetId = ref('')
+function moveEditingItem() {
+  if (!editingItem.value || !moveTargetId.value) return
+  store.moveItem(portfolio.value.id, editingItem.value.id, moveTargetId.value)
+  editingItem.value = null
+  moveTargetId.value = ''
+}
 
 function pcQueryForItem(item) {
   if (item.type === 'graded') {
