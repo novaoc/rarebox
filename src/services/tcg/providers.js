@@ -187,7 +187,37 @@ const lorcana = {
   },
 }
 
-// ── One Piece: OPTCG API ────────────────────────────────────────────────────
+// ── One Piece: OPTCG API + TCGplayer prices (static asset) ─────────────────
+// optcgapi's own market prices lag badly on fast movers (Luffy SP EB-02:
+// $232 there vs $2,386 on TCGplayer). public/op-prices.json is built daily
+// in CI from tcgcsv's TCGplayer dump (+ a PriceCharting gap-fill) keyed by
+// `{card_set_id}|{variant}` — exact per-printing prices incl. SP/Manga.
+
+const OP_VARIANT_ALIASES = { spr: 'sp' }
+
+/** 'Monkey.D.Luffy (SPR)' → 'sp'; '(061)' → '' (collector number). */
+export function opVariantSlug(name) {
+  const m = String(name || '').match(/\(((?!.*\/)[^)]+)\)\s*$/)
+  if (!m || !/[a-zA-Z]/.test(m[1])) return ''
+  const slug = m[1].trim().toLowerCase().replace(/\s+/g, '-')
+  return OP_VARIANT_ALIASES[slug] || slug
+}
+
+export async function getOpPriceMap(signal) {
+  try {
+    return await cached('opt:tcgp-prices', 3600_000, async (sig) => {
+      const d = await getJson('/op-prices.json', { signal: sig })
+      return d.prices || {}
+    }, { signal })
+  } catch { return {} }
+}
+
+/** TCGplayer-first price for an optcgapi card row. */
+export function opPriceFor(priceMap, cardSetId, cardName, fallback) {
+  const key = `${String(cardSetId || '').toUpperCase()}|${opVariantSlug(cardName)}`
+  return priceMap[key] ?? fallback ?? null
+}
+
 const OPT = 'https://optcgapi.com/api'
 // The /allSetCards/ endpoint returns ALL cards in one call (~3300 cards).
 // We cache aggressively because the data changes infrequently.

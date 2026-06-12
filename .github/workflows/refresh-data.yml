@@ -48,6 +48,9 @@ jobs:
       - name: Japanese Pokémon search index
         run: python3 scripts/build_jp_index.py
 
+      - name: One Piece TCGplayer prices
+        run: python3 scripts/build_op_prices.py
+
       - name: Sealed product index
         run: python3 scripts/build_sealed_index.py
 
@@ -57,7 +60,7 @@ jobs:
 
       - name: Commit if changed
         run: |
-          git add public/riftbound-prices.json public/jp-prices.json public/jp-index.json public/sealed-index public/meta-decks
+          git add public/riftbound-prices.json public/jp-prices.json public/jp-index.json public/op-prices.json public/sealed-index public/meta-decks
           if git diff --cached --quiet; then
             echo "no data changes"
             exit 0

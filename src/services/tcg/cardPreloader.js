@@ -9,6 +9,7 @@
  */
 
 import { saveGameCards, isCacheFresh, getGameCards } from './cardCache.js'
+import { getOpPriceMap, opPriceFor, opVariantSlug } from './providers.js'
 import { getProvider } from './providers.js'
 
 const BULK_TIMEOUT = 300_000   // 5 min for large downloads
@@ -328,23 +329,52 @@ async function fetchLorcana(onProgress) {
 async function fetchOnePiece(onProgress) {
   onProgress({ game: 'one-piece', phase: 'Fetching all cards…', loaded: 0, total: 0 })
 
-  const d = await fetchJson('https://optcgapi.com/api/allSetCards/')
+  const [d, priceMap] = await Promise.all([
+    fetchJson('https://optcgapi.com/api/allSetCards/'),
+    getOpPriceMap().catch(() => ({})),
+  ])
   const cards = Array.isArray(d) ? d : d?.data || []
 
   onProgress({ game: 'one-piece', phase: 'Processing…', loaded: cards.length, total: cards.length })
 
-  const normalized = cards.map(c => ({
-    id: c.card_set_id || c.card_name,
-    name: c.card_name || '',
-    set: c.set_name || '',
-    number: c.card_set_id || '',
-    image: c.card_image || '',
-    price: num(c.market_price || c.inventory_price),
-    rarity: c.rarity || '',
-  }))
+  const normalized = cards.map(c => {
+    // variant-suffixed ids keep SP/Manga/Alt-Art distinct in the search
+    // cache (they share card_set_id), matching the browse provider's ids
+    const variant = opVariantSlug(c.card_name)
+    return {
+      id: (c.card_set_id ? (variant ? `${c.card_set_id}#${variant}` : c.card_set_id) : c.card_name),
+      name: c.card_name || '',
+      set: c.set_name || '',
+      number: c.card_set_id || '',
+      image: c.card_image || '',
+      // TCGplayer-first: optcgapi's own prices lag badly on fast movers
+      price: num(opPriceFor(priceMap, c.card_set_id, c.card_name, c.market_price || c.inventory_price)),
+      rarity: c.rarity || '',
+    }
+  })
 
   await saveGameCards('one-piece', normalized)
   return normalized.length
+}
+
+/** Daily price refresh for an ALREADY-downloaded One Piece cache — the
+ *  cards don't change, the market does. Stamp-gated to one run per day. */
+export async function refreshOnePiecePrices() {
+  try {
+    const today = new Date().toISOString().slice(0, 10)
+    if (localStorage.getItem('rarebox_op_price_merge') === today) return
+    const rows = await getGameCards('one-piece')
+    if (!rows.length) return
+    const priceMap = await getOpPriceMap()
+    if (!Object.keys(priceMap).length) return
+    let changed = 0
+    for (const r of rows) {
+      const next = num(opPriceFor(priceMap, r.number, r.name, null))
+      if (next != null && next !== r.price) { r.price = next; changed++ }
+    }
+    if (changed) await saveGameCards('one-piece', rows)
+    localStorage.setItem('rarebox_op_price_merge', today)
+  } catch { /* best effort — browse/search overrides still apply */ }
 }
 
 // ── Yu-Gi-Oh ────────────────────────────────────────────────────────────────

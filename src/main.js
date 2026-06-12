@@ -18,6 +18,9 @@ installOfflineArtFallback()
 // once per session, after startup work has settled
 setTimeout(() => {
   import('./services/tcg/providers').then(m => m.sweepBrowseCache()).catch(() => {})
+  // One Piece market moves; the cached card DB doesn't — merge fresh
+  // TCGplayer prices in once a day (stamp-gated inside)
+  import('./services/tcg/cardPreloader.js').then(m => m.refreshOnePiecePrices()).catch(() => {})
 }, 15_000)
 
 // A deploy deletes the previous build's hashed chunks from the precache;

@@ -7,7 +7,7 @@
 // Falls back to live APIs otherwise.
 
 import { searchCache, isGameCached } from './cardCache.js'
-import { getProvider } from './providers.js'
+import { getProvider, getOpPriceMap, opPriceFor, opVariantSlug } from './providers.js'
 import { tokenMatch } from '../../utils/search.js'
 
 const TIMEOUT = 8000
@@ -118,20 +118,23 @@ async function getOptCards() {
 }
 
 async function searchOnePiece(query) {
-  const cards = await getOptCards()
+  const [cards, priceMap] = await Promise.all([getOptCards(), getOpPriceMap()])
   const matches = cards.filter(c => tokenMatch(query, c.card_name, c.card_set_id)).slice(0, 50) // cap at 50 to avoid huge payloads
   return {
-    cards: matches.map(c => ({
-      id: c.card_set_id,
-      name: c.card_name,
-      number: c.card_set_id,
-      set: c.set_name || '',
-      image: c.card_image || '',
-      price: c.market_price || c.inventory_price || null,
-      rarity: c.rarity || '',
-      game: 'one-piece',
-      _raw: c,
-    })),
+    cards: matches.map(c => {
+      const variant = opVariantSlug(c.card_name)
+      return {
+        id: variant ? `${c.card_set_id}#${variant}` : c.card_set_id,
+        name: c.card_name,
+        number: c.card_set_id,
+        set: c.set_name || '',
+        image: c.card_image || '',
+        price: opPriceFor(priceMap, c.card_set_id, c.card_name, c.market_price || c.inventory_price),
+        rarity: c.rarity || '',
+        game: 'one-piece',
+        _raw: c,
+      }
+    }),
     total: matches.length,
   }
 }
