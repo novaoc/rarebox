@@ -200,10 +200,38 @@
               <canvas ref="pairCanvas" class="bt-pair-qr"></canvas>
               <div class="bt-remote-hint">Scan with the display device's camera — its QR follows this table live.
                 <span class="bt-remote-status"><RbIcon name="antenna" :size="13" /> {{ remoteStatus }}</span></div>
-              <p class="bt-remote-note">Devices link directly when the network allows (tip: a phone hotspot works with no internet at all); otherwise updates relay through ntfy.sh end-to-end encrypted — it only ever sees scrambled bytes; the key lives in this pairing code.</p>
+              <p class="bt-remote-note">Devices link directly when the network allows; otherwise updates relay through ntfy.sh end-to-end encrypted — it only ever sees scrambled bytes; the key lives in this pairing code.
+                <button class="bt-tip-link" @click="hotspotTipOpen = true">Best setup tip</button></p>
               <button class="btn btn-ghost btn-sm" @click="disarmRemote">Stop broadcasting</button>
             </template>
           </div>
+
+          <!-- One-time hotspot tip — the recommended (but optional) setup -->
+          <Teleport to="body">
+            <transition name="fade">
+              <div v-if="hotspotTipOpen" class="modal-overlay" style="z-index:600" @click.self="dismissHotspotTip">
+                <div class="modal" style="max-width:420px">
+                  <div class="modal-header">
+                    <h3>📶 Best setup (optional)</h3>
+                    <button class="btn btn-ghost btn-icon" @click="dismissHotspotTip" aria-label="Close">✕</button>
+                  </div>
+                  <div class="modal-body">
+                    <p class="bt-tip-lead">For the fastest updates — and a live QR that works with <strong>no internet at all</strong>:</p>
+                    <ol class="bt-tip-steps">
+                      <li>Turn on your phone's <strong>Personal Hotspot</strong></li>
+                      <li>Connect the display device to that hotspot</li>
+                      <li>Scan the pairing code as usual</li>
+                    </ol>
+                    <p class="bt-tip-why">The two devices then talk <strong>directly</strong> — instant updates, immune to venue Wi-Fi, works in a dead zone. You'll see <strong>LIVE · DIRECT</strong> on the display.</p>
+                    <p class="bt-tip-optional">Totally optional — on any normal connection it works without this, just via an encrypted relay instead.</p>
+                  </div>
+                  <div class="modal-footer">
+                    <button class="btn btn-primary" @click="dismissHotspotTip">Got it</button>
+                  </div>
+                </div>
+              </div>
+            </transition>
+          </Teleport>
 
           <button class="btn btn-secondary btn-sm" @click="kioskOpen = false">Close</button>
         </div>
@@ -523,6 +551,13 @@ watch(kioskOpen, async (open) => {
 // reuses the same channel and an already-paired tablet just keeps working.
 const remoteArmed = ref(false)
 const remoteStatus = ref('starting…')
+// Hotspot tip: shown once, the first time a seller arms the second screen
+const HOTSPOT_TIP_KEY = 'rarebox_hotspot_tip_seen'
+const hotspotTipOpen = ref(false)
+function dismissHotspotTip() {
+  hotspotTipOpen.value = false
+  try { localStorage.setItem(HOTSPOT_TIP_KEY, '1') } catch { /* quota */ }
+}
 const pairCanvas = ref(null)
 let remoteChannel = null
 let publishDebounce = null
@@ -561,6 +596,7 @@ async function armRemote() {
   }
   publishNow()
   peer.offer()
+  try { if (!localStorage.getItem(HOTSPOT_TIP_KEY)) hotspotTipOpen.value = true } catch { /* private mode */ }
 }
 
 function disarmRemote() {
@@ -761,5 +797,20 @@ onBeforeUnmount(() => {
   .bt-head { flex-wrap: wrap; justify-content: space-between; }
   .bt-head-main { order: 3; flex-basis: 100%; }
   .bt-title { white-space: normal; }
+}
+.bt-tip-link {
+  display: inline;
+  border: none; background: none; padding: 0;
+  font: inherit; font-weight: 800; font-size: inherit;
+  color: var(--accent-text, inherit); text-decoration: underline;
+  cursor: pointer;
+}
+.bt-tip-lead { font-size: 13.5px; line-height: 1.55; }
+.bt-tip-steps { margin: 12px 0; padding-left: 22px; display: flex; flex-direction: column; gap: 6px; font-size: 13.5px; font-weight: 700; }
+.bt-tip-why { font-size: 13px; line-height: 1.55; color: var(--text-secondary); }
+.bt-tip-optional {
+  margin-top: 12px; padding: 9px 12px;
+  background: var(--accent-dim); border: 1.5px solid var(--ink); border-radius: var(--radius);
+  font-size: 12.5px; line-height: 1.5;
 }
 </style>
