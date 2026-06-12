@@ -4,7 +4,9 @@
   "version": "1.4.4",
   "type": "module",
   "scripts": {
+    "predev": "node scripts/sync-ocr-assets.mjs",
     "dev": "vite",
+    "prebuild": "node scripts/sync-ocr-assets.mjs",
     "build": "vite build",
     "preview": "vite preview"
   },

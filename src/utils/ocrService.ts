@@ -24,6 +24,15 @@ const JP_SOLID_CHARS = /[぀-ゖァ-ヺ一-鿿]/g
 
 function makeWorker(lang: string): Promise<any> {
   return createWorker(lang, 1, {
+    // Same-origin worker + core (synced into public/ocr/ by
+    // scripts/sync-ocr-assets.mjs) — the CSP blocks tesseract's default
+    // jsDelivr importScripts, which killed every OCR fallback. corePath is
+    // the explicit simd-lstm file: a directory would make the worker probe
+    // for relaxed-SIMD variants we don't ship. Absolute URLs because the
+    // bootstrap runs in a blob: worker, where relative paths resolve against
+    // the blob, not the app.
+    workerPath: new URL('/ocr/worker.min.js', window.location.origin).href,
+    corePath: new URL('/ocr/tesseract-core-simd-lstm.wasm.js', window.location.origin).href,
     logger: (m: any) => {
       if (m.status === 'recognizing text' && _progressCb) {
         _progressCb(Math.round((m.progress || 0) * 100))

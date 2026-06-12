@@ -155,8 +155,8 @@ function dist(a, b) {
 }
 
 // Solve the 8-dof homography mapping dest corners → src corners (Gaussian elim)
-function homography(srcCorners) {
-  const dst = [[0, 0], [OUT_W, 0], [OUT_W, OUT_H], [0, OUT_H]]
+function homography(srcCorners, outW = OUT_W, outH = OUT_H) {
+  const dst = [[0, 0], [outW, 0], [outW, outH], [0, outH]]
   const src = [srcCorners.tl, srcCorners.tr, srcCorners.br, srcCorners.bl]
   const A = []
   const B = []
@@ -185,8 +185,8 @@ function homography(srcCorners) {
   return hm // [a,b,c,d,e,f,g,h]: srcX=(a x + b y + c)/(g x + h y + 1)
 }
 
-function warp(img, corners) {
-  const hm = homography(corners)
+function warp(img, corners, outW = OUT_W, outH = OUT_H) {
+  const hm = homography(corners, outW, outH)
   if (!hm) return null
   const [a, b, c, d, e, f, g2, h2] = hm
 
@@ -200,18 +200,18 @@ function warp(img, corners) {
   const sh = img.height
 
   const out = document.createElement('canvas')
-  out.width = OUT_W
-  out.height = OUT_H
+  out.width = outW
+  out.height = outH
   const octx = out.getContext('2d')
-  const oimg = octx.createImageData(OUT_W, OUT_H)
+  const oimg = octx.createImageData(outW, outH)
   const od = oimg.data
 
-  for (let y = 0; y < OUT_H; y++) {
-    for (let x = 0; x < OUT_W; x++) {
+  for (let y = 0; y < outH; y++) {
+    for (let x = 0; x < outW; x++) {
       const den = g2 * x + h2 * y + 1
       const sx = (a * x + b * y + c) / den
       const sy = (d * x + e * y + f) / den
-      const oi = (y * OUT_W + x) * 4
+      const oi = (y * outW + x) * 4
       if (sx < 0 || sy < 0 || sx >= sw - 1 || sy >= sh - 1) {
         od[oi + 3] = 255
         continue
@@ -238,9 +238,11 @@ function warp(img, corners) {
 
 /**
  * Find and rectify the card in a photo.
- * Returns a 252x352 canvas of the flattened card, or null.
+ * Returns an array of flattened-card canvases (252x352 × `outScale`), or
+ * null. Landscape quads yield BOTH 90° rotations — we can't know which way
+ * the card lies, and the wrong one just won't match downstream.
  */
-export function findCard(img) {
+export function findCard(img, outScale = 1) {
   const scale = DOWNSCALE_W / img.width
   const w = DOWNSCALE_W
   const h = Math.round(img.height * scale)
@@ -272,6 +274,8 @@ export function findCard(img) {
   }
 
   const warps = []
+  const ow = Math.round(OUT_W * outScale)
+  const oh = Math.round(OUT_H * outScale)
   for (const c of quads) {
     const full = {
       tl: { x: c.tl.x / scale, y: c.tl.y / scale },
@@ -279,13 +283,25 @@ export function findCard(img) {
       br: { x: c.br.x / scale, y: c.br.y / scale },
       bl: { x: c.bl.x / scale, y: c.bl.y / scale },
     }
-    const wp = warp(img, full)
-    if (wp) warps.push(wp)
+    if (c.landscape) {
+      // Cycling the source-corner assignment rotates the output 90°: the
+      // quad's long edges land on the portrait dest's vertical sides. Both
+      // cycles cover the two ways a card can lie.
+      const cw = warp(img, { tl: full.tr, tr: full.br, br: full.bl, bl: full.tl }, ow, oh)
+      const ccw = warp(img, { tl: full.bl, tr: full.tl, br: full.tr, bl: full.br }, ow, oh)
+      if (cw) warps.push(cw)
+      if (ccw) warps.push(ccw)
+    } else {
+      const wp = warp(img, full, ow, oh)
+      if (wp) warps.push(wp)
+    }
   }
   return warps.length ? warps : null
 }
 
-// sanity: size, edge balance, card-like aspect
+// sanity: size, edge balance, card-like aspect — portrait OR landscape
+// (cards lie sideways in plenty of real photos; the caller warps landscape
+// quads with rotated corner assignments so the output is still upright)
 function validQuad(c, w, h) {
   const area = quadArea(c)
   if (area < w * h * 0.12 || area > w * h * 0.98) return false
@@ -294,6 +310,9 @@ function validQuad(c, w, h) {
   if (Math.min(wTop, wBot) / Math.max(wTop, wBot) < 0.6) return false
   if (Math.min(hL, hR) / Math.max(hL, hR) < 0.6) return false
   const aspect = ((wTop + wBot) / 2) / ((hL + hR) / 2)
-  if (aspect < 0.5 || aspect > 1.05) return false
+  const portrait = aspect >= 0.5 && aspect <= 1.05
+  const landscape = aspect >= 1.15 && aspect <= 2.0
+  if (!portrait && !landscape) return false
+  c.landscape = landscape
   return true
 }

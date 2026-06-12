@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount, computed } from 'vue'
+import RbIcon from '../icons/RbIcon.vue'
 
 const emit = defineEmits<{
   capture: [imageData: string]

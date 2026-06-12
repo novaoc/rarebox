@@ -6,3 +6,6 @@ dist/
 eng.traineddata
 test_ocr.mjs
 jpn.traineddata
+
+# synced from node_modules by scripts/sync-ocr-assets.mjs (pre-dev/pre-build)
+public/ocr/
