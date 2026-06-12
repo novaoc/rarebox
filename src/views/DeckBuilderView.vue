@@ -147,13 +147,14 @@
   </div>
 
   <div v-else class="empty-state">
-    <div class="icon">🃏</div>
+    <div class="icon"><RbIcon name="card" :size="44" /></div>
     <h3>Deck not found</h3>
     <router-link to="/decks" class="btn btn-primary mt-3">All Decks</router-link>
   </div>
 </template>
 
 <script setup>
+import RbIcon from '../components/icons/RbIcon.vue'
 import { ref, computed, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useDeckStore } from '../stores/decks'

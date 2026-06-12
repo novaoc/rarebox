@@ -4,7 +4,7 @@
       <div class="spinner"></div>
     </div>
     <div v-else-if="noData" class="chart-nodata flex-center flex-col">
-      <span style="font-size:32px;opacity:0.2">📊</span>
+      <span style="opacity:0.45"><RbIcon name="chart" :size="36" /></span>
       <span class="text-muted mt-2" style="font-size:12px">No price history available for this card</span>
       <span v-if="currentPrice" class="mt-2" style="font-size:14px;font-weight:700">
         Current price: <span class="text-accent">${{ currentPrice?.toFixed(2) }}</span>
@@ -63,6 +63,7 @@
 </template>
 
 <script setup>
+import RbIcon from './icons/RbIcon.vue'
 import { ref, watch, computed, onMounted, onBeforeUnmount } from 'vue'
 import { fetchPriceHistory, buildChartSeries, getVariantLabel } from '../services/priceHistory'
 

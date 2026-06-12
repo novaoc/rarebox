@@ -24,7 +24,7 @@
             :class="{ active: itemType === t.value }"
             @click="itemType = t.value"
           >
-            <span>{{ t.icon }}</span> {{ t.label }}
+            <RbIcon :name="t.icon" :size="16" /> {{ t.label }}
           </button>
         </div>
 
@@ -187,6 +187,7 @@
 </template>
 
 <script setup>
+import RbIcon from './icons/RbIcon.vue'
 import { ref, computed, watch, onMounted } from 'vue'
 import { usePortfolioStore } from '../stores/portfolio'
 import { getAllVariants, getMarketPrice } from '../services/pokemonApi'
@@ -207,9 +208,9 @@ const store = usePortfolioStore()
 
 const itemType = ref(props.defaultType || 'card')
 const types = [
-  { value: 'card', label: 'Raw Card', icon: '🃏' },
-  { value: 'graded', label: 'Graded Slab', icon: '🏆' },
-  { value: 'sealed', label: 'Sealed Product', icon: '📦' },
+  { value: 'card', label: 'Raw Card', icon: 'card' },
+  { value: 'graded', label: 'Graded Slab', icon: 'trophy' },
+  { value: 'sealed', label: 'Sealed Product', icon: 'box' },
 ]
 
 // Game / TCG. Pokémon keeps the rich pokemontcg.io flow; any other game is

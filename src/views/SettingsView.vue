@@ -270,15 +270,15 @@
 
       <div class="settings-notes mt-3">
         <div class="note">
-          <span>📊</span>
+          <span><RbIcon name="chart" :size="20" /></span>
           <p>Live prices come from each game's public database — <strong>pokemontcg.io</strong> (Pokémon), <strong>Scryfall</strong> (Magic), <strong>YGOPRODeck</strong> (Yu-Gi-Oh!), <strong>Lorcast</strong> (Lorcana), and <strong>optcgapi</strong> (One Piece). <strong>Riftbound</strong> and <strong>Japanese Pokémon</strong> prices are TCGplayer market data, pre-built daily by Rarebox's automated refresh and served as static files. <strong>PriceCharting</strong> covers sealed &amp; graded. Price history for every game comes from the <strong>rarebox-price-history</strong> dataset — TCGplayer market data archived daily (via tcgcsv) since Feb 2024, with EN Pokémon reaching back to Nov 2022 via tcgdex's frozen archive.</p>
         </div>
         <div class="note">
-          <span>📡</span>
+          <span><RbIcon name="antenna" :size="20" /></span>
           <p>Rarebox works <strong>fully offline</strong> once loaded — shelves, decks, search and browse all run from your device. Only price refreshes and new card lookups need a connection.</p>
         </div>
         <div class="note">
-          <span>🔒</span>
+          <span><RbIcon name="lock" :size="20" /></span>
           <p><strong>No analytics, no accounts, no cookies.</strong> Your collection never leaves this device unless you export it yourself.</p>
         </div>
       </div>
@@ -362,6 +362,7 @@
 </template>
 
 <script setup>
+import RbIcon from '../components/icons/RbIcon.vue'
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { usePortfolioStore } from '../stores/portfolio'

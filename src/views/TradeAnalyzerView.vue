@@ -405,7 +405,7 @@ onMounted(async () => {
 
         <!-- Card list -->
         <div v-if="tradeStore.sideA.items.length === 0" class="empty-state" style="padding:40px 20px">
-          <div class="icon">📦</div>
+          <div class="icon"><RbIcon name="box" :size="44" /></div>
           <h3>No cards added</h3>
           <p>Scan or search to add cards to Side A</p>
         </div>
@@ -507,7 +507,7 @@ onMounted(async () => {
               @click="searchCategory = 'sealed'; searchQuery = ''; searchResults = []"
             >Sealed</button>
           </div>
-          <div v-if="scanHint" class="scan-hint-chip">📷 {{ scanHint }}</div>
+          <div v-if="scanHint" class="scan-hint-chip"><RbIcon name="camera" :size="14" /> {{ scanHint }}</div>
           <input
             v-model="searchQuery"
             @input="onSearchInput"
@@ -593,7 +593,7 @@ onMounted(async () => {
 
         <!-- Card list -->
         <div v-if="tradeStore.sideB.items.length === 0" class="empty-state" style="padding:40px 20px">
-          <div class="icon">📦</div>
+          <div class="icon"><RbIcon name="box" :size="44" /></div>
           <h3>No cards added</h3>
           <p>Scan or search to add cards to Side B</p>
         </div>
@@ -695,7 +695,7 @@ onMounted(async () => {
               @click="searchCategory = 'sealed'; searchQuery = ''; searchResults = []"
             >Sealed</button>
           </div>
-          <div v-if="scanHint" class="scan-hint-chip">📷 {{ scanHint }}</div>
+          <div v-if="scanHint" class="scan-hint-chip"><RbIcon name="camera" :size="14" /> {{ scanHint }}</div>
           <input
             v-model="searchQuery"
             @input="onSearchInput"

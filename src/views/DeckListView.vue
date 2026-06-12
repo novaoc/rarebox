@@ -6,7 +6,7 @@
         <p class="text-muted" style="font-size:13px;margin-top:2px">Build and track decks across all TCGs. Compare against your collection.</p>
       </div>
       <div class="deck-header-actions">
-        <router-link to="/decks/meta" class="btn btn-secondary btn-sm">🃏 Meta Decks</router-link>
+        <router-link to="/decks/meta" class="btn btn-secondary btn-sm"><RbIcon name="card" :size="14" /> Meta Decks</router-link>
         <button class="btn btn-primary btn-sm" @click="showNewDeck = true">+ New Deck</button>
       </div>
     </div>
@@ -24,7 +24,7 @@
 
     <!-- Empty state -->
     <div v-if="filteredDecks.length === 0 && deckStore.decks.length === 0" class="empty-state">
-      <div class="icon">🃏</div>
+      <div class="icon"><RbIcon name="card" :size="44" /></div>
       <span class="sticker">Fresh start</span>
       <h3>No decks yet</h3>
       <p>Create a deck from scratch or import a meta deck to get started.</p>
@@ -34,7 +34,7 @@
       </div>
     </div>
     <div v-else-if="filteredDecks.length === 0" class="empty-state">
-      <div class="icon">🃏</div>
+      <div class="icon"><RbIcon name="card" :size="44" /></div>
       <h3>No {{ gameLabel(activeGame) }} decks</h3>
       <button class="btn btn-primary mt-3" @click="showNewDeck = true">Create {{ gameLabel(activeGame) }} Deck</button>
     </div>
@@ -130,6 +130,7 @@
 </template>
 
 <script setup>
+import RbIcon from '../components/icons/RbIcon.vue'
 import { ref, computed, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { useDeckStore } from '../stores/decks'

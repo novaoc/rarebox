@@ -18,6 +18,7 @@ const routes = [
   { path: '/trade', name: 'TradeLanding', component: () => import('../views/TradeLanding.vue'), meta: { title: 'Trade Analyzer', description: 'Compare card values and analyze trades side-by-side. Add cards by searching or scanning.' } },
   { path: '/trade/analyzer', name: 'TradeAnalyzer', component: () => import('../views/TradeAnalyzerView.vue'), meta: { title: 'Trade Analyzer', description: 'Compare cards side-by-side. Scan or add cards to each side and see the price difference instantly.' } },
   { path: '/terms', name: 'Terms', component: () => import('../views/TermsView.vue'), meta: { title: 'Terms & Conditions', description: 'Terms & Conditions and Privacy Policy for Rarebox.' } },
+  { path: '/guide/shelves', name: 'ShelfGuide', component: () => import('../views/ShelfGuideView.vue'), meta: { title: 'How Shelves Work', description: 'Tutorial: dashboards, shelves, adding cards and sets, sealed, graded, master sets, prices and charts.' } },
   // ── Design prototypes (branch: Design) — standalone, no app chrome ──
   { path: '/designs', name: 'Designs', component: () => import('../views/designs/DesignsIndexView.vue'), meta: { bare: true, title: 'Design Lab' } },
   { path: '/designs/mono', name: 'DesignMono', component: () => import('../views/designs/DesignMonoView.vue'), meta: { bare: true, title: 'Design — Mono' } },

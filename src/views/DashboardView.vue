@@ -183,7 +183,10 @@
       <!-- Individual portfolio cards -->
       <div class="section-header">
         <div class="section-title">Shelves</div>
-        <button class="btn btn-secondary btn-sm" @click="$emit('create-portfolio')">+ New Shelf</button>
+        <div style="display:flex;gap:8px">
+          <router-link to="/guide/shelves" class="btn btn-ghost btn-sm">? How shelves work</router-link>
+          <button class="btn btn-secondary btn-sm" @click="$emit('create-portfolio')">+ New Shelf</button>
+        </div>
       </div>
 
       <div class="portfolios-grid">

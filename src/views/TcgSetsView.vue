@@ -7,7 +7,7 @@
 
     <!-- Unknown / unsupported game -->
     <div v-if="!provider" class="empty-state">
-      <div class="icon">🤔</div>
+      <div class="icon"><RbIcon name="question" :size="44" /></div>
       <h3>Not available</h3>
       <p>This TCG isn't supported yet.</p>
       <router-link to="/sets" class="btn btn-primary mt-3">Back to all TCGs</router-link>
@@ -163,7 +163,7 @@
           </div>
           <!-- Done -->
           <div v-else-if="bulkDone" class="empty-state">
-            <div class="icon">✅</div>
+            <div class="icon"><RbIcon name="check" :size="44" /></div>
             <h3>Added {{ bulkSelectedCount }} cards</h3>
           </div>
           <!-- Cards list -->
@@ -216,6 +216,7 @@
 </template>
 
 <script setup>
+import RbIcon from '../components/icons/RbIcon.vue'
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { tokenMatch } from '../utils/search.js'
 import { useRoute } from 'vue-router'

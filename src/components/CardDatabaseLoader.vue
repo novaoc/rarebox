@@ -21,7 +21,7 @@
           :class="{ selected: selected.has(g.id) }"
           @click="toggle(g.id)"
         >
-          <span class="tcg-icon">{{ g.icon }}</span>
+          <span class="tcg-icon"><RbIcon :name="g.icon" :size="18" /></span>
           <span class="tcg-info">
             <span class="tcg-name">{{ g.name }}</span>
             <span class="tcg-meta">{{ g.cards }} cards · {{ g.size }}</span>
@@ -48,6 +48,7 @@
 </template>
 
 <script setup>
+import RbIcon from './icons/RbIcon.vue'
 import { ref, computed } from 'vue'
 import { saveTcgPrefs } from '../services/tcg/cardCache.js'
 
@@ -55,12 +56,12 @@ const emit = defineEmits(['ready'])
 
 // Real measured numbers from API benchmarks
 const allGames = [
-  { id: 'pokemon', name: 'Pokémon', icon: '⚡', cards: 20359, size: '~2.0 MB', sizeBytes: 2_000_000 },
-  { id: 'mtg', name: 'Magic: The Gathering', icon: '🔮', cards: 100000, size: '~8.0 MB', sizeBytes: 8_000_000 },
-  { id: 'lorcana', name: 'Disney Lorcana', icon: '✨', cards: 2500, size: '~0.3 MB', sizeBytes: 300_000 },
-  { id: 'one-piece', name: 'One Piece', icon: '🏴‍☠️', cards: 3330, size: '~0.4 MB', sizeBytes: 400_000 },
-  { id: 'yugioh', name: 'Yu-Gi-Oh!', icon: '🃏', cards: 9372, size: '~1.2 MB', sizeBytes: 1_200_000 },
-  { id: 'riftbound', name: 'Riftbound', icon: '⚔️', cards: 1064, size: '~0.1 MB', sizeBytes: 100_000 },
+  { id: 'pokemon', name: 'Pokémon', icon: 'bolt', cards: 20359, size: '~2.0 MB', sizeBytes: 2_000_000 },
+  { id: 'mtg', name: 'Magic: The Gathering', icon: 'sparkle', cards: 100000, size: '~8.0 MB', sizeBytes: 8_000_000 },
+  { id: 'lorcana', name: 'Disney Lorcana', icon: 'sparkle', cards: 2500, size: '~0.3 MB', sizeBytes: 300_000 },
+  { id: 'one-piece', name: 'One Piece', icon: 'box', cards: 3330, size: '~0.4 MB', sizeBytes: 400_000 },
+  { id: 'yugioh', name: 'Yu-Gi-Oh!', icon: 'card', cards: 9372, size: '~1.2 MB', sizeBytes: 1_200_000 },
+  { id: 'riftbound', name: 'Riftbound', icon: 'swap', cards: 1064, size: '~0.1 MB', sizeBytes: 100_000 },
 ]
 
 const selected = ref(new Set(['pokemon', 'mtg']))

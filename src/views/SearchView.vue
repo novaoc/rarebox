@@ -43,7 +43,7 @@
       </div>
 
       <div v-else-if="results.length === 0" class="empty-state">
-        <div class="icon">🔍</div>
+        <div class="icon"><RbIcon name="magnifier" :size="44" /></div>
         <h3>No cards found</h3>
         <p>Try a different name or check the spelling</p>
       </div>
@@ -133,13 +133,13 @@
               <div class="alert-section mt-3">
                 <div v-if="!showAlertForm && !activeAlert.length">
                   <button class="btn btn-secondary btn-sm w-full" @click="showAlertForm = true">
-                    🔔 Set Price Alert
+                    <RbIcon name="bell" :size="14" /> Set Price Alert
                   </button>
                 </div>
                 <div v-if="activeAlert.length" class="active-alerts">
                   <div v-for="a in activeAlert" :key="a.id" class="active-alert-row">
                     <span class="alert-badge">
-                      🔔 {{ a.condition === 'above' ? '↑' : '↓' }} ${{ a.threshold.toFixed(2) }}
+                      <RbIcon name="bell" :size="12" /> {{ a.condition === 'above' ? '↑' : '↓' }} ${{ a.threshold.toFixed(2) }}
                     </span>
                     <button class="btn btn-ghost btn-icon btn-sm" @click="removeAlertById(a.id)" title="Remove">✕</button>
                   </div>
@@ -189,6 +189,7 @@
 </template>
 
 <script setup>
+import RbIcon from '../components/icons/RbIcon.vue'
 import { ref, computed } from 'vue'
 import { getMarketPrice, formatVariantLabel } from '../services/pokemonApi'
 import { multiSearch } from '../services/tcg/multiSearch'

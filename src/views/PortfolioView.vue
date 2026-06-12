@@ -103,7 +103,7 @@
       <div v-if="msSuggestion" class="ms-suggest">
         <span class="ms-suggest-text">
           <template v-if="!msSuggestion.total">You have <strong>{{ msSuggestion.owned }} cards</strong> from <strong>{{ msSuggestion.name }}</strong> — showcase the stack as a master set?</template>
-          <template v-else-if="msSuggestion.owned >= msSuggestion.total">🎉 Your <strong>{{ msSuggestion.name }}</strong> set is complete — showcase it as a master set?</template>
+          <template v-else-if="msSuggestion.owned >= msSuggestion.total"><RbIcon name="confetti" :size="15" /> Your <strong>{{ msSuggestion.name }}</strong> set is complete — showcase it as a master set?</template>
           <template v-else>You're <strong>{{ msSuggestion.total - msSuggestion.owned }} card{{ msSuggestion.total - msSuggestion.owned === 1 ? '' : 's' }}</strong> from a <strong>{{ msSuggestion.name }}</strong> master set ({{ msSuggestion.owned }}/{{ msSuggestion.total }}) — showcase the stack?</template>
         </span>
         <div class="ms-suggest-actions">
@@ -161,10 +161,13 @@
         </div>
 
         <div v-if="filteredItems.length === 0" class="empty-state">
-          <div class="icon">📭</div>
+          <div class="icon"><RbIcon name="mailbox" :size="44" /></div>
           <h3>No items match your filters</h3>
           <button v-if="activeFilter !== 'all' || itemSearch" class="btn btn-secondary mt-3" @click="activeFilter = 'all'; itemSearch = ''">Clear Filters</button>
-          <router-link v-else to="/search" class="btn btn-primary mt-3">Search Cards</router-link>
+          <template v-else>
+            <router-link to="/search" class="btn btn-primary mt-3">Search Cards</router-link>
+            <router-link to="/guide/shelves" class="btn btn-ghost mt-3">How shelves work</router-link>
+          </template>
         </div>
 
         <div v-else>
@@ -208,7 +211,7 @@
                 <td>
                   <div class="item-name-cell">
                     <img v-if="item.cardData?.images?.small || item.imageUrl" :src="item.cardData?.images?.small || item.imageUrl" class="item-thumb" loading="lazy" />
-                    <div class="item-sealed-icon" v-else>📦</div>
+                    <div class="item-sealed-icon" v-else><RbIcon name="box" :size="22" /></div>
                     <div>
                       <div class="item-name">{{ getItemName(item) }}</div>
                       <div class="item-sub">{{ getItemSub(item) }}</div>
@@ -501,6 +504,7 @@
 </template>
 
 <script setup>
+import RbIcon from '../components/icons/RbIcon.vue'
 import { ref, computed, watch, nextTick, onMounted, reactive } from 'vue'
 import { tokenMatch } from '../utils/search.js'
 import { useRoute, useRouter } from 'vue-router'

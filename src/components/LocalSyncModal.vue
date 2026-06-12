@@ -2,7 +2,7 @@
   <div class="modal-overlay" @click.self="close">
     <div class="modal slide-up-enter-active" style="max-width: 480px">
       <div class="modal-header">
-        <h3>{{ mode === 'send' ? '📤 Send to Device' : '📥 Receive from Device' }}</h3>
+        <h3><RbIcon :name="mode === 'send' ? 'upload' : 'download'" :size="18" /> {{ mode === 'send' ? 'Send to Device' : 'Receive from Device' }}</h3>
         <button class="btn btn-ghost btn-icon" @click="close">✕</button>
       </div>
 
@@ -60,7 +60,7 @@
         <!-- RECEIVE mode -->
         <template v-if="mode === 'receive'">
           <template v-if="!scanning">
-            <button class="btn btn-primary sync-scan-btn" @click="startScan">📷 Scan QR from other device</button>
+            <button class="btn btn-primary sync-scan-btn" @click="startScan"><RbIcon name="camera" :size="15" /> Scan QR from other device</button>
             <p class="sync-desc" style="text-align:center; margin: 12px 0 8px">— or paste the copied text —</p>
           </template>
 
@@ -116,6 +116,7 @@
 </template>
 
 <script setup>
+import RbIcon from './icons/RbIcon.vue'
 import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import QRCode from 'qrcode'
 import jsQR from 'jsqr'

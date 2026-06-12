@@ -156,7 +156,7 @@ onBeforeUnmount(() => {
       v-if="!cameraActive"
       class="absolute inset-0 z-20 flex flex-col items-center justify-center gap-4 p-6 text-center"
     >
-      <div class="text-5xl mb-2">📸</div>
+      <div class="text-5xl mb-2"><RbIcon name="camera" :size="44" /></div>
       <p class="text-white text-lg font-medium">
         {{ cameraError || 'Camera not active' }}
       </p>

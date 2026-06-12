@@ -10,7 +10,7 @@
           </div>
         </div>
         <div class="msg-head-actions">
-          <span v-if="foundToday" class="sticker msg-today">{{ foundToday }} found today 🎉</span>
+          <span v-if="foundToday" class="sticker msg-today">{{ foundToday }} found today <RbIcon name="confetti" :size="13" /></span>
           <button v-if="needCount && !loading" class="btn btn-secondary btn-sm" :disabled="isoDone" @click="isoTheRest">
             {{ isoDone ? '✓ On your wantlist' : `🎯 ISO the rest (${needCount})` }}
           </button>
@@ -49,7 +49,7 @@
             <div class="msg-card-num">#{{ card.number }}</div>
             <!-- Owned cards enlarge on tap; not-owned tap marks found, so
                  they get an explicit button to show the card to a vendor -->
-            <button v-if="!isOwned(card)" class="msg-enlarge" @click.stop="preview = card">🔍 Show bigger</button>
+            <button v-if="!isOwned(card)" class="msg-enlarge" @click.stop="preview = card"><RbIcon name="magnifier" :size="13" /> Show bigger</button>
           </div>
           </div>
         </template>
@@ -93,6 +93,7 @@
 </template>
 
 <script setup>
+import RbIcon from './icons/RbIcon.vue'
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { fetchSetCards, sortByNumber } from '../utils/masterSets'
 import { loadWantlist, saveWantlist, generateWantId, wantKey } from '../utils/wantlist'

@@ -4,7 +4,7 @@
       <div class="spinner spinner-lg"></div>
     </div>
     <div v-else-if="noData" class="chart-nodata flex-center flex-col" :style="{ height: height + 'px' }">
-      <span style="font-size:40px;opacity:0.2">📈</span>
+      <span style="opacity:0.45"><RbIcon name="trend" :size="40" /></span>
       <span class="text-muted mt-2">Add items to see shelf value</span>
     </div>
     <div v-else>
@@ -40,6 +40,7 @@
 </template>
 
 <script setup>
+import RbIcon from './icons/RbIcon.vue'
 import { ref, watch, onMounted, onBeforeUnmount, computed } from 'vue'
 import { fetchPriceHistory, buildChartSeries, itemHistoryRef } from '../services/priceHistory'
 import { usePortfolioStore } from '../stores/portfolio'
