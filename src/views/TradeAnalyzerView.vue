@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import CameraViewfinder from '../components/scanner/CameraViewfinder.vue'
+import RbIcon from '../components/icons/RbIcon.vue'
 import { useTradeStore } from '../stores/trade'
 import { multiSearch } from '../services/tcg/multiSearch'
 import { scanCard } from '../utils/scanPipeline'

@@ -114,7 +114,9 @@ Built by [Nova](https://github.com/novaoc).
 - Grading multiplier applied per card (PSA 10 = 2x, etc.)
 - Persistent trade state across sessions (IndexedDB)
 - Camera scan identifies cards by **perceptual-hash image matching** (pHash + dHash against a precomputed index of 30,000+ reference card images — the technique used by industrial card sorters), giving the exact printing in under a second with no text reading
-- Photos are perspective-rectified before matching (Sobel → Hough → corner detection → homography warp, pure on-device JS) — thresholds calibrated on a synthetic photo harness so the scanner **never suggests a wrong card**: uncertain scans fall back to search instead of guessing
+- Photos are perspective-rectified before matching (Sobel → Hough → corner detection → homography warp, pure on-device JS) — **including cards lying sideways** (landscape quads warp through both 90° rotations) and cards photographed small in the frame
+- Dim, sleeved, or glary photos land in an ambiguous hash zone — those get a second stage: **normalized cross-correlation re-ranking** against the top candidates' actual reference images (NCC is immune to brightness/contrast shifts), with a **name-band correlation tiebreak** that splits language twins (EN "Lechonk" vs JP "グルトン" share identical artwork). Verified on real bad-lighting phone photos
+- OCR fallback (for unindexed games) runs tesseract from **same-origin assets** (synced from node_modules at build — the CSP forbids CDN workers) and reads the **rectified card**, not the raw frame
 - Hash indexes ship as static files (~840KB total for Pokémon EN/JP, Riftbound, Lorcana, One Piece); regenerate with `python3 scripts/build_scan_index.py <game>`
 - OCR (Tesseract.js v7, English + Japanese) remains as the fallback for unindexed games and low-confidence matches; failed scans pre-fill the search box with the recognized text
 
