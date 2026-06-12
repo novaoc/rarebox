@@ -349,7 +349,7 @@ function fmtDate(iso) {
 
 // ── My booths ──
 function createBooth() {
-  const booth = { id: generateBoothId(), name: 'My booth', venue: '', table: '', date: '', note: '', loc: null, locName: '', items: [], createdAt: new Date().toISOString() }
+  const booth = { id: generateBoothId(), name: 'My booth', venue: '', table: '', date: '', note: '', loc: null, locName: '', items: [], syncShelf: true, createdAt: new Date().toISOString() }
   booths.value.unshift(booth)
   saveBooths(booths.value)
   router.push(`/booth/${booth.id}`)

@@ -297,6 +297,7 @@ import { searchGradedProducts } from '../services/priceServer'
 import { tokenMatch } from '../utils/search'
 import { generateSecret, displayUrl, deriveChannel, deriveSigChannel, publishState, subscribeSig } from '../utils/remoteQr'
 import { phonePeer } from '../utils/remoteP2p'
+import { shelfAdd, shelfRemove, returnToSource, reclaimFromSource } from '../utils/boothShelf'
 
 const route = useRoute()
 const booths = ref(loadBooths())
@@ -367,6 +368,7 @@ function sell(i) {
     game: it.game, type: it.type, cardId: it.cardId,
   })
   const snapshot = decrementListing(i)
+  shelfRemove(booth.value, snapshot, 1)
   persist()
   showUndo({
     label: `Sold ${snapshot.name} — ${fmtMoney(snapshot.price)}`,
@@ -446,17 +448,21 @@ function logTrade() {
       name: inc.name, setName: inc.setName, price: inc.value || 0, cash: 0,
       game: inc.game, type: inc.type, cardId: inc.cardId, tradeId,
     }).id)
+    const incomingItem = {
+      type: inc.type, game: inc.game, cardId: inc.cardId, name: inc.name,
+      setName: inc.setName, number: inc.number, qty: 1,
+      price: inc.value || 0, img: inc.img,
+    }
+    // trade-ins are inventory whether or not they go on the table;
+    // cost basis = the value you gave up for them
+    shelfAdd(booth.value, incomingItem, { qty: 1, purchasePrice: inc.value || 0 })
     if (inc.list && !atCap.value) {
-      const item = {
-        type: inc.type, game: inc.game, cardId: inc.cardId, name: inc.name,
-        setName: inc.setName, number: inc.number, qty: 1,
-        price: inc.value || 0, img: inc.img,
-      }
-      booth.value.items.unshift(item)
-      listed.push(item)
+      booth.value.items.unshift(incomingItem)
+      listed.push(incomingItem)
     }
   }
   const snapshot = decrementListing(booth.value.items.indexOf(it))
+  shelfRemove(booth.value, snapshot, 1)
   persist()
   closeTrade()
   showUndo({
@@ -469,9 +475,10 @@ function removeQuiet(i) {
   const it = booth.value.items[i]
   if (!it) return
   const snapshot = { ...it }
+  returnToSource(booth.value, it)
   booth.value.items.splice(i, 1)
   persist()
-  showUndo({ label: `Removed ${it.name}`, journalIds: [], snapshot, index: i, incoming: [], wholeRow: true })
+  showUndo({ label: `Removed ${it.name}`, journalIds: [], snapshot, index: i, incoming: [], delisted: true, wholeRow: true })
 }
 
 function showUndo(action) {
@@ -484,6 +491,12 @@ function undo() {
   const a = lastAction.value
   if (!a) return
   const items = booth.value.items
+  // shelf mirror: a sale/trade-out comes back, trade-ins leave again,
+  // a delisted row is re-listed as new inventory
+  const undoQty = a.wholeRow ? (a.snapshot.qty || 1) : 1
+  if (a.delisted) reclaimFromSource(booth.value, a.snapshot, undoQty)
+  shelfAdd(booth.value, a.snapshot, { qty: undoQty, purchasePrice: 0 })
+  for (const inc of a.incoming || []) shelfRemove(booth.value, inc, inc.qty || 1)
   // Items a trade listed onto the table leave with the undo
   for (const inc of a.incoming || []) {
     const at = items.indexOf(inc)
@@ -594,17 +607,20 @@ async function runSearch() {
 
 function addFromSearch(c, asBuy = false) {
   if (atCap.value) return
-  booth.value.items.unshift({
+  const listing = {
     type: c.gradedAs ? 'graded' : (c.sealed ? 'sealed' : 'card'),
     game: c.game || 'pokemon',
     cardId: c.id || '',
     name: c.name || '',
     setName: c.set || '',
     number: c.number || '',
+    _lang: c._lang || null,
     qty: 1,
     price: c.price ? Math.round(c.price * 100) / 100 : 0,
     img: c.image || '',
-  })
+  }
+  booth.value.items.unshift(listing)
+  shelfAdd(booth.value, listing, { qty: 1, purchasePrice: asBuy ? +(c._cost ?? c.price ?? 0) : 0 })
   if (asBuy) {
     // cost defaults to market when the input is left blank
     const cost = Math.round(((c._cost ?? c.price) || 0) * 100) / 100

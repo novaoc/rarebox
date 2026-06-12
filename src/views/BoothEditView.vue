@@ -39,6 +39,17 @@
         <label>Note for buyers <span class="text-muted">(optional)</span></label>
         <input v-model="booth.note" class="input" placeholder="Trades welcome · cash & QR payments · prices firm" @change="persist" />
       </div>
+      <div class="be-field">
+        <label class="be-sync-row">
+          <input type="checkbox" :checked="booth.syncShelf === true" @change="toggleSync($event.target.checked)" />
+          <span>Keep a shelf in sync with this booth</span>
+        </label>
+        <p class="be-sync-note" v-if="booth.syncShelf">
+          “Booth: {{ booth.name || 'My booth' }}” mirrors your table: listing from a shelf <strong>moves</strong> the item there,
+          sales and trade-outs leave it, buys and trade-ins join it — your curated shelves stay clean and your totals stay true.
+        </p>
+        <p class="be-sync-note" v-else>Off — listings are standalone copies; sales won't touch your shelves.</p>
+      </div>
       <div class="be-field" v-if="brand">
         <label>Branding <span class="text-muted">(optional — your colors on every share)</span></label>
         <div class="be-brand-row">
@@ -94,7 +105,7 @@
         </div>
         <div class="be-item-controls">
           <label class="be-mini-label">Qty</label>
-          <input type="number" min="1" class="input be-qty" v-model.number="it.qty" @change="persist" />
+          <input type="number" min="1" class="input be-qty" v-model.number="it.qty" @change="onQtyChange(it)" />
           <label class="be-mini-label">Asking $</label>
           <input type="number" min="0" step="0.01" class="input be-price" v-model.number="it.price" @change="persist" />
           <button class="btn btn-ghost btn-icon" aria-label="Remove listing" @click="removeItem(i)">✕</button>
@@ -229,6 +240,7 @@ import { usePortfolioStore } from '../stores/portfolio'
 import BoothShareModal from '../components/BoothShareModal.vue'
 import { loadBooths, saveBooths, boothTotal, MAX_BOOTH_ITEMS } from '../utils/booth'
 import { smartSearch } from '../utils/searchIntel'
+import { syncOn, ensureBoothShelf, shelfAdd, shelfSetQty, returnToSource, moveFromCurated, syncAll } from '../utils/boothShelf'
 import { searchGradedProducts } from '../services/priceServer'
 import { uploadLogo, logoUploadAvailable } from '../services/imageHost'
 import RbIcon from '../components/icons/RbIcon.vue'
@@ -301,14 +313,28 @@ function persist() {
   saveBooths(booths.value)
 }
 
+function toggleSync(on) {
+  booth.value.syncShelf = on
+  if (on) { ensureBoothShelf(booth.value); syncAll(booth.value) }
+  persist()
+}
+
+function onQtyChange(it) {
+  shelfSetQty(booth.value, it)
+  persist()
+}
+
 function removeItem(i) {
+  returnToSource(booth.value, booth.value.items[i])
   booth.value.items.splice(i, 1)
   persist()
 }
 
-function pushItem(item) {
+function pushItem(item, { fromShelf = false } = {}) {
   if (atCap.value) return false
   booth.value.items.push(item)
+  // search/graded adds are new inventory; shelf picks are moved by the caller
+  if (!fromShelf) { shelfAdd(booth.value, item); }
   persist()
   return true
 }
@@ -373,18 +399,25 @@ function addPicked() {
   for (const id of picked.value) {
     const item = shelf.items.find(i => i.id === id)
     if (!item) continue
-    const ok = pushItem({
+    const listing = {
       type: item.type || 'card',
       game: item.game || 'pokemon',
-      cardId: item.cardData?.id || '',
+      cardId: item.cardId || item.cardData?.id || '',
       name: itemName(item),
       setName: item.cardData?.set?.name || item.setName || '',
       number: item.cardData?.number || '',
+      _lang: item._lang || null,
       qty: item.quantity || 1,
       price: Math.round(itemValue(item) * 100) / 100, // asking price starts at market — yours to change
       img: itemImg(item),
-    })
+    }
+    const ok = pushItem(listing, { fromShelf: true })
     if (!ok) break
+    if (syncOn(booth.value)) {
+      const moved = moveFromCurated(booth.value, pickerShelfId.value, item, listing.qty)
+      if (moved) { listing.shelfItemId = moved.shelfItemId; listing.srcShelfId = moved.srcShelfId }
+      persist()
+    }
   }
   pickerOpen.value = false
 }
@@ -665,4 +698,7 @@ function clearLoc() {
   padding: 2px 9px;
   background: var(--accent-dim); border: 1.5px solid var(--ink); border-radius: 99px;
 }
+.be-sync-row { display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 13px; cursor: pointer; }
+.be-sync-row input { width: 16px; height: 16px; accent-color: var(--accent); }
+.be-sync-note { font-size: 12px; color: var(--text-secondary); line-height: 1.5; margin-top: 6px; }
 </style>
