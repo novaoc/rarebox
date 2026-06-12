@@ -21,8 +21,9 @@
           </div>
           <div v-if="frameCount > 1" class="share-frame-info">
             <span class="badge badge-accent">{{ currentFrame + 1 }} / {{ frameCount }}</span>
-            <span class="text-muted" style="font-size: 12px">animated — scan from Rarebox (Booth → Scan)</span>
+            <span class="text-muted" style="font-size: 12px">offline mode: animated — scan from Rarebox (Booth → Scan). Reopen with a connection for a camera-friendly code.</span>
           </div>
+          <p v-else-if="qrShortUrl" class="share-hint">Scannable with any phone camera — a short link to the whole booth (stored by da.gd).</p>
           <p v-else class="share-hint">Scannable with any phone camera — it's just a link.</p>
 
           <button class="btn btn-secondary btn-sm share-poster-btn" :disabled="posterBusy" @click="downloadPoster">
@@ -64,7 +65,7 @@
 <script setup>
 import { ref, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import QRCode from 'qrcode'
-import { encodeBoothBytes, boothToUrl, boothTotal, fmtBoothDate } from '../utils/booth'
+import { encodeBoothBytes, boothToUrl, boothTotal, fmtBoothDate, dagdShorten } from '../utils/booth'
 import { buildFrames } from '../utils/qrTransfer'
 
 const props = defineProps({ booth: { type: Object, required: true } })
@@ -83,6 +84,7 @@ const posterBusy = ref(false)
 const posterError = ref('')
 const frameCount = ref(0)
 const currentFrame = ref(0)
+const qrShortUrl = ref('')
 const total = boothTotal(props.booth)
 
 // A URL QR up to ~2.3KB stays comfortably scannable by native cameras;
@@ -109,16 +111,31 @@ async function prepare() {
       color: { dark: '#141414', light: '#ffffff' },
       errorCorrectionLevel: 'M',
     })
-  } else {
-    const bytes = await encodeBoothBytes(props.booth)
-    frames = buildFrames(bytes)
-    frameCount.value = frames.length
-    drawFrame(0)
-    frameTimer = setInterval(() => {
-      currentFrame.value = (currentFrame.value + 1) % frames.length
-      drawFrame(currentFrame.value)
-    }, FRAME_MS)
+    return
   }
+  // Big booth: shorten via da.gd so it stays ONE camera-scannable QR —
+  // anyone's phone opens it, no Rarebox needed. Animated frames are only
+  // the offline fallback (shortener unreachable).
+  try {
+    const code = await dagdShorten(shareUrl.value)
+    qrShortUrl.value = 'https://da.gd/' + code
+    frames = []
+    frameCount.value = 1
+    await QRCode.toCanvas(qrCanvas.value, qrShortUrl.value, {
+      width: 300, margin: 2,
+      color: { dark: '#141414', light: '#ffffff' },
+      errorCorrectionLevel: 'M',
+    })
+    return
+  } catch { /* offline / da.gd down — animate below */ }
+  const bytes = await encodeBoothBytes(props.booth)
+  frames = buildFrames(bytes)
+  frameCount.value = frames.length
+  drawFrame(0)
+  frameTimer = setInterval(() => {
+    currentFrame.value = (currentFrame.value + 1) % frames.length
+    drawFrame(currentFrame.value)
+  }, FRAME_MS)
 }
 
 async function drawFrame(i) {

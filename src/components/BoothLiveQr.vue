@@ -8,12 +8,14 @@
 
     <canvas ref="canvas" class="blq-qr"></canvas>
     <div v-if="frameCount > 1" class="blq-frames">{{ frame + 1 }} / {{ frameCount }} — scan from Rarebox (Booth → Scan)</div>
+    <div v-if="shortBusy" class="blq-shortening">refreshing link…</div>
+    <div v-if="shortFailed" class="blq-mode-hint">No internet on this screen — animated code shown (needs the Rarebox scanner). It switches back to a camera-friendly code when the connection returns.</div>
 
     <div class="blq-sub">
       <span class="blq-live" :class="{ off: status !== 'live' }">● {{ statusLabel }}</span>
       <template v-if="booth"> {{ booth.items.length }} listing{{ booth.items.length !== 1 ? 's' : '' }} · {{ fmtMoney(total) }}</template>
     </div>
-    <div class="blq-hint">Scan to browse this booth — updates as the table changes</div>
+    <div class="blq-hint">{{ shortFailed ? 'Scan from Rarebox: Booth → Scan' : 'Point any phone camera here — the booth opens in the browser' }}</div>
 
     <div class="blq-foot">
       <span class="blq-rb">RB</span> made with <strong>rarebox</strong>
@@ -37,7 +39,7 @@
  */
 import { ref, computed, watch, onBeforeUnmount, nextTick } from 'vue'
 import QRCode from 'qrcode'
-import { boothTotal, encodeBoothBytes } from '../utils/booth'
+import { boothTotal, encodeBoothBytes, dagdShorten } from '../utils/booth'
 
 const props = defineProps({
   booth: { type: Object, default: null },
@@ -49,7 +51,14 @@ const props = defineProps({
 const canvas = ref(null)
 const frameCount = ref(0)
 const frame = ref(0)
+const shortBusy = ref(false)
+const shortFailed = ref(false)
 let anim = null
+// short-link cache + throttle: one da.gd call per distinct state, ≥8s apart
+let shortForUrl = ''
+let shortUrl = ''
+let lastShortenAt = 0
+let shortTimer = null
 
 const SINGLE_QR_LIMIT = 2300
 const FRAME_MS = 400
@@ -121,28 +130,74 @@ async function render() {
   if (anim) { clearInterval(anim); anim = null }
   const bytes = props.shareBytes || await encodeBoothBytes(props.booth)
   const url = `${window.location.origin}/booth#b=${b64Url(bytes)}`
+
   if (url.length <= SINGLE_QR_LIMIT) {
-    frameCount.value = 1
-    // H-level redundancy buys room for the center badge
-    await QRCode.toCanvas(canvas.value, url, {
-      width: props.size, margin: 2,
-      color: { dark: '#141414', light: '#ffffff' }, errorCorrectionLevel: 'H',
-    })
-    await drawBadge(canvas.value.getContext('2d'), canvas.value.width)
-  } else {
-    const { buildFrames } = await import('../utils/qrTransfer')
-    const frames = buildFrames(bytes)
-    frameCount.value = frames.length
-    frame.value = 0
-    const opts = { width: props.size, margin: 2, color: { dark: '#141414', light: '#ffffff' }, errorCorrectionLevel: 'M' }
-    const draw = i => canvas.value && QRCode.toCanvas(canvas.value, [{ data: frames[i], mode: 'byte' }], opts)
-    draw(0)
-    anim = setInterval(() => { frame.value = (frame.value + 1) % frames.length; draw(frame.value) }, FRAME_MS)
+    shortFailed.value = false
+    await drawStatic(url)
+    return
+  }
+  // Big booth: a da.gd short link keeps it ONE static QR that any phone
+  // camera opens — no Rarebox needed. Re-shortened when inventory changes
+  // (throttled). Animated RBX2 survives only as the offline fallback: a
+  // hotspot-only display can't reach da.gd, and a dead screen helps nobody.
+  const ok = await ensureShortLink(url)
+  if (ok) {
+    shortFailed.value = false
+    await drawStatic(shortUrl)
+    return
+  }
+  shortFailed.value = true
+  drawAnimated(bytes)
+}
+
+async function drawStatic(payload) {
+  frameCount.value = 1
+  // H-level redundancy buys room for the center badge
+  await QRCode.toCanvas(canvas.value, payload, {
+    width: props.size, margin: 2,
+    color: { dark: '#141414', light: '#ffffff' }, errorCorrectionLevel: 'H',
+  })
+  await drawBadge(canvas.value.getContext('2d'), canvas.value.width)
+}
+
+async function drawAnimated(bytes) {
+  const { buildFrames } = await import('../utils/qrTransfer')
+  const frames = buildFrames(bytes)
+  frameCount.value = frames.length
+  frame.value = 0
+  const opts = { width: props.size, margin: 2, color: { dark: '#141414', light: '#ffffff' }, errorCorrectionLevel: 'M' }
+  const draw = i => canvas.value && QRCode.toCanvas(canvas.value, [{ data: frames[i], mode: 'byte' }], opts)
+  draw(0)
+  anim = setInterval(() => { frame.value = (frame.value + 1) % frames.length; draw(frame.value) }, FRAME_MS)
+}
+
+async function ensureShortLink(url) {
+  if (shortForUrl === url && shortUrl) return true
+  // throttle: a burst of edits re-renders often; shorten at most every 8s,
+  // with a trailing retry so the QR converges on the latest state
+  const wait = Math.max(0, lastShortenAt + 8000 - Date.now())
+  if (wait > 0) {
+    clearTimeout(shortTimer)
+    shortTimer = setTimeout(render, wait + 50)
+    return !!shortUrl // keep showing the previous short link meanwhile
+  }
+  lastShortenAt = Date.now()
+  shortBusy.value = true
+  try {
+    const code = await dagdShorten(url)
+    shortUrl = 'https://da.gd/' + code
+    shortForUrl = url
+    return true
+  } catch {
+    return false
+  } finally {
+    shortBusy.value = false
   }
 }
 
 watch(() => [props.shareBytes, props.booth && JSON.stringify(props.booth.items), props.booth?.name], render, { immediate: true })
-onBeforeUnmount(() => { if (anim) clearInterval(anim) })
+let retryTimer = setInterval(() => { if (shortFailed.value) render() }, 30000)
+onBeforeUnmount(() => { if (anim) clearInterval(anim); clearTimeout(shortTimer); clearInterval(retryTimer) })
 </script>
 
 <style scoped>
@@ -188,4 +243,6 @@ onBeforeUnmount(() => { if (anim) clearInterval(anim) })
   border: 1.5px solid var(--ink, #141414);
   font-size: 10px; font-weight: 900; transform: rotate(-6deg);
 }
+.blq-mode-hint { font-size: 11.5px; font-weight: 700; color: var(--text-secondary, #5f5a51); max-width: 420px; text-align: center; }
+.blq-shortening { font-size: 11px; font-weight: 700; color: var(--text-muted, #8a8478); }
 </style>
