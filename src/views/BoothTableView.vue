@@ -6,8 +6,9 @@
       <div class="bt-head-main">
         <div class="bt-title">{{ booth.name }}</div>
         <div class="bt-recap">
-          <span class="bt-chip bt-chip-cash">💵 {{ fmtMoney(totals.cashTotal) }}<template v-if="totals.cashCount"> · {{ totals.cashCount }}</template></span>
-          <span class="bt-chip bt-chip-trade">🔁 {{ totals.tradeCount }} trade{{ totals.tradeCount !== 1 ? 's' : '' }}<template v-if="totals.tradeCount"> · {{ fmtMoney(totals.tradeTotal) }}</template></span>
+          <span class="bt-chip bt-chip-cash" :class="{ neg: totals.cashNet < 0 }">💵 {{ fmtMoney(totals.cashNet) }} today</span>
+          <span class="bt-chip bt-chip-trade">🔁 {{ totals.tradesOut.count }} trade{{ totals.tradesOut.count !== 1 ? 's' : '' }}</span>
+          <span v-if="totals.buys.count" class="bt-chip bt-chip-trade">💰 {{ totals.buys.count }} bought</span>
         </div>
       </div>
       <button class="btn btn-primary btn-sm" @click="kioskOpen = true">📺 Live QR</button>
@@ -41,22 +42,31 @@
           </div>
         </div>
         <div class="bt-item-actions">
-          <button class="bt-deal bt-deal-cash" @click="deal(i, 'cash')">💵 Sold</button>
-          <button class="bt-deal bt-deal-trade" @click="deal(i, 'trade')">🔁 Trade</button>
+          <button class="bt-deal bt-deal-cash" @click="sell(i)">💵 Sold</button>
+          <button class="bt-deal bt-deal-trade" @click="openTrade(i)">🔁 Trade</button>
         </div>
       </div>
     </div>
 
-    <!-- Today's log -->
-    <section v-if="today.length" class="bt-log">
-      <button class="bt-log-toggle" @click="logOpen = !logOpen">
-        {{ logOpen ? '▾' : '▸' }} Today's log ({{ today.length }})
-      </button>
+    <!-- Today's log + running ledger -->
+    <section v-if="today.length || allBoothEntries.length" class="bt-log">
+      <div class="bt-log-head">
+        <button class="bt-log-toggle" @click="logOpen = !logOpen">
+          {{ logOpen ? '▾' : '▸' }} Today's log ({{ today.length }})
+        </button>
+        <button class="btn btn-secondary btn-sm" @click="exportLedger">📊 Export Excel</button>
+      </div>
+      <p class="bt-log-summary">
+        Sales {{ fmtMoney(totals.sales.cash) }} ({{ totals.sales.count }})
+        · Bought {{ fmtMoney(totals.buys.cost) }} ({{ totals.buys.count }})
+        · Trades {{ totals.tradesOut.count }} (out {{ fmtMoney(totals.tradesOut.value) }} / in {{ fmtMoney(totals.tradesIn.value) }})
+        · Net <strong :class="{ 'bt-neg': totals.cashNet < 0 }">{{ fmtMoney(totals.cashNet) }}</strong>
+      </p>
       <div v-if="logOpen" class="bt-log-list">
         <div v-for="e in today" :key="e.id" class="bt-log-row">
           <span class="bt-log-time">{{ fmtTime(e.ts) }}</span>
           <span class="bt-log-name">{{ e.name }}</span>
-          <span class="badge" :class="e.mode === 'trade' ? 'badge-info' : 'badge-success'">{{ e.mode === 'trade' ? '🔁 trade' : '💵 ' + fmtMoney(e.price) }}</span>
+          <span class="badge" :class="kindBadge(e)">{{ kindLabel(e) }}</span>
         </div>
       </div>
     </section>
@@ -83,6 +93,10 @@
               {{ searchBusy ? '…' : 'Search' }}
             </button>
           </form>
+          <label class="bt-buy-toggle">
+            <input type="checkbox" v-model="buyMode" />
+            💰 I'm buying these — log what I paid &amp; deduct it from table cash
+          </label>
           <div class="bt-search-list">
             <div v-for="c in searchResults" :key="(c.sealed ? 's' : 'c') + c.game + c.id" class="bt-search-row">
               <img v-if="c.image" :src="c.image" class="bt-search-img" loading="lazy" @error="$event.target.style.display='none'" />
@@ -90,17 +104,85 @@
               <span class="bt-search-name">{{ c.name }} <span v-if="c.sealed" class="badge badge-info bt-sealed">Sealed</span>
                 <span class="bt-search-sub">{{ [c.set, c.number ? '#' + c.number : ''].filter(Boolean).join(' · ') }}</span>
               </span>
-              <span class="bt-search-price">{{ c.price ? fmtMoney(c.price) : '—' }}</span>
-              <button class="btn btn-primary btn-sm" :disabled="atCap" @click="addFromSearch(c)">+ Add</button>
+              <template v-if="buyMode">
+                <span class="bt-cost-wrap">paid $<input type="number" min="0" step="0.01" class="bt-cost" v-model.number="c._cost" :placeholder="c.price ? c.price.toFixed(2) : '0'" /></span>
+                <button class="btn btn-primary btn-sm" :disabled="atCap" @click="addFromSearch(c, true)">💰 Buy</button>
+              </template>
+              <template v-else>
+                <span class="bt-search-price">{{ c.price ? fmtMoney(c.price) : '—' }}</span>
+                <button class="btn btn-primary btn-sm" :disabled="atCap" @click="addFromSearch(c)">+ Add</button>
+              </template>
             </div>
             <p v-if="searchBusy" class="text-muted bt-search-msg">Searching…</p>
             <p v-else-if="searched && !searchResults.length" class="text-muted bt-search-msg">No matches — try fewer words.</p>
-            <p v-else-if="!searched" class="text-muted bt-search-msg">Singles and sealed, all six games. Bought a collection mid-show? Add it here.</p>
+            <p v-else-if="!searched" class="text-muted bt-search-msg">Singles and sealed, all six games. Bought a collection mid-show? Flip the toggle and the cost comes off your table cash.</p>
           </div>
         </div>
         <div class="modal-footer">
           <span v-if="addedFlash" class="badge badge-success">✓ On the table</span>
           <button class="btn btn-secondary" @click="searchOpen = false">Done</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Trade sheet: what left, what came in, cash either direction -->
+    <div v-if="trade" class="modal-overlay" @click.self="closeTrade">
+      <div class="modal" style="max-width: 580px">
+        <div class="modal-header">
+          <h3>🔁 Log a trade</h3>
+          <button class="btn btn-ghost btn-icon" @click="closeTrade">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="bt-trade-out">
+            <span class="bt-trade-label">Going out</span>
+            <div class="bt-trade-outrow">
+              <img v-if="trade.it.img" :src="trade.it.img" class="bt-search-img" @error="$event.target.style.display='none'" />
+              <span v-else class="bt-search-img bt-search-noimg">🃏</span>
+              <span class="bt-search-name">{{ trade.it.name }}
+                <span class="bt-search-sub">{{ [trade.it.setName, trade.it.number ? '#' + trade.it.number : ''].filter(Boolean).join(' · ') }}</span>
+              </span>
+              <span class="bt-search-price">{{ fmtMoney(trade.it.price) }}</span>
+            </div>
+          </div>
+
+          <span class="bt-trade-label">What came in? <span class="text-muted">(optional — search &amp; take)</span></span>
+          <form class="bt-search-bar" @submit.prevent="runTradeSearch">
+            <input v-model="tradeQuery" class="input" placeholder="e.g. OP-05 booster box" />
+            <button class="btn btn-secondary btn-sm" type="submit" :disabled="tradeBusy || tradeQuery.trim().length < 2">{{ tradeBusy ? '…' : 'Search' }}</button>
+          </form>
+          <div v-if="tradeResults.length" class="bt-search-list bt-trade-results">
+            <div v-for="c in tradeResults" :key="(c.sealed ? 's' : 'c') + c.game + c.id" class="bt-search-row">
+              <img v-if="c.image" :src="c.image" class="bt-search-img" loading="lazy" @error="$event.target.style.display='none'" />
+              <span v-else class="bt-search-img bt-search-noimg">🃏</span>
+              <span class="bt-search-name">{{ c.name }} <span v-if="c.sealed" class="badge badge-info bt-sealed">Sealed</span>
+                <span class="bt-search-sub">{{ [c.set, c.number ? '#' + c.number : ''].filter(Boolean).join(' · ') }}</span>
+              </span>
+              <span class="bt-search-price">{{ c.price ? fmtMoney(c.price) : '—' }}</span>
+              <button class="btn btn-primary btn-sm" @click="takeIncoming(c)">📥 Take</button>
+            </div>
+          </div>
+
+          <div v-if="tradeIncoming.length" class="bt-incoming">
+            <div v-for="(inc, ii) in tradeIncoming" :key="ii" class="bt-incoming-row">
+              <span class="bt-search-name">{{ inc.name }}<span class="bt-search-sub">{{ inc.setName }}</span></span>
+              <label class="bt-mini">value $<input type="number" min="0" step="0.01" class="bt-cost" v-model.number="inc.value" /></label>
+              <label class="bt-mini bt-list-toggle"><input type="checkbox" v-model="inc.list" /> list it</label>
+              <button class="btn btn-ghost btn-icon" aria-label="Remove incoming item" @click="tradeIncoming.splice(ii, 1)">✕</button>
+            </div>
+          </div>
+
+          <span class="bt-trade-label">Cash on top?</span>
+          <div class="bt-cash-row">
+            <button class="btn btn-sm" :class="tradeCashDir === 'in' ? 'btn-primary' : 'btn-secondary'" @click="tradeCashDir = tradeCashDir === 'in' ? '' : 'in'">They paid me</button>
+            <button class="btn btn-sm" :class="tradeCashDir === 'out' ? 'btn-primary' : 'btn-secondary'" @click="tradeCashDir = tradeCashDir === 'out' ? '' : 'out'">I paid them</button>
+            <span class="bt-cost-wrap">$<input type="number" min="0" step="0.01" class="bt-cost" v-model.number="tradeCashAmt" :disabled="!tradeCashDir" /></span>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" @click="closeTrade">Cancel</button>
+          <button class="btn btn-primary" @click="logTrade">
+            Log trade{{ tradeIncoming.filter(x => x.list).length ? ` (+${tradeIncoming.filter(x => x.list).length} to table)` : '' }}
+          </button>
         </div>
       </div>
     </div>
@@ -131,7 +213,8 @@ import { useRoute } from 'vue-router'
 import QRCode from 'qrcode'
 import { loadBooths, saveBooths, boothTotal, boothToUrl, encodeBoothBytes, MAX_BOOTH_ITEMS } from '../utils/booth'
 import { buildFrames } from '../utils/qrTransfer'
-import { loadJournal, addEntry, removeEntry, todayEntries, journalTotals } from '../utils/boothJournal'
+import { loadJournal, addEntry, removeEntry, todayEntries, boothEntries, journalTotals, generateJournalId } from '../utils/boothJournal'
+import { exportBoothLedger } from '../utils/boothExcel'
 import { multiSearch } from '../services/tcg/multiSearch'
 import { searchSealed } from '../services/sealedIndex'
 import { tokenMatch } from '../utils/search'
@@ -149,6 +232,7 @@ const total = computed(() => boothTotal(booth.value || {}))
 const atCap = computed(() => (booth.value?.items.length || 0) >= MAX_BOOTH_ITEMS)
 const today = computed(() => todayEntries(journal.value, booth.value?.id))
 const totals = computed(() => journalTotals(today.value))
+const allBoothEntries = computed(() => boothEntries(journal.value, booth.value?.id))
 
 const visibleItems = computed(() => {
   const items = booth.value?.items || []
@@ -161,10 +245,22 @@ const visibleItems = computed(() => {
 })
 
 function fmtMoney(n) {
-  return '$' + (n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  // table cash can run negative — buying hard mid-show is normal dealering
+  const v = n || 0
+  return (v < 0 ? '−$' : '$') + Math.abs(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 function fmtTime(ts) {
   return new Date(ts).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+}
+
+function kindLabel(e) {
+  if (e.kind === 'sale') return '💵 ' + fmtMoney(e.cash)
+  if (e.kind === 'buy') return '💰 ' + fmtMoney(e.cash) // cash is negative
+  if (e.kind === 'trade-in') return '📥 in · ' + fmtMoney(e.price)
+  return '🔁 out' + (e.cash ? ` · ${fmtMoney(e.cash)} cash` : '')
+}
+function kindBadge(e) {
+  return { sale: 'badge-success', buy: 'badge-danger', 'trade-in': 'badge-info', 'trade-out': 'badge-info' }[e.kind] || 'badge-info'
 }
 
 function persist() {
@@ -175,21 +271,118 @@ function persist() {
 const lastAction = ref(null)
 let toastTimer = null
 
-function deal(i, mode) {
+function decrementListing(i) {
   const it = booth.value.items[i]
-  if (!it) return
-  const entry = addEntry(journal.value, {
-    boothId: booth.value.id, boothName: booth.value.name,
-    name: it.name, setName: it.setName, price: it.price,
-    mode, game: it.game, type: it.type, cardId: it.cardId,
-  })
   const snapshot = { ...it }
   if ((it.qty || 1) > 1) it.qty -= 1
   else booth.value.items.splice(i, 1)
+  return snapshot
+}
+
+function sell(i) {
+  const it = booth.value.items[i]
+  if (!it) return
+  const entry = addEntry(journal.value, {
+    boothId: booth.value.id, boothName: booth.value.name, kind: 'sale',
+    name: it.name, setName: it.setName, price: it.price, cash: it.price,
+    game: it.game, type: it.type, cardId: it.cardId,
+  })
+  const snapshot = decrementListing(i)
   persist()
   showUndo({
-    label: `${mode === 'trade' ? 'Traded' : 'Sold'} ${it.name}${mode === 'trade' ? '' : ' — ' + fmtMoney(snapshot.price)}`,
-    journalId: entry.id, snapshot, index: i,
+    label: `Sold ${snapshot.name} — ${fmtMoney(snapshot.price)}`,
+    journalIds: [entry.id], snapshot, index: i, incoming: [],
+  })
+}
+
+// ── Trade sheet: out + optional in + cash either way ──
+const trade = ref(null) // { i, it }
+const tradeQuery = ref('')
+const tradeResults = ref([])
+const tradeBusy = ref(false)
+const tradeIncoming = ref([]) // { ...itemFields, value, list }
+const tradeCashDir = ref('')
+const tradeCashAmt = ref(0)
+
+function openTrade(i) {
+  const it = booth.value.items[i]
+  if (!it) return
+  trade.value = { i, it }
+  tradeQuery.value = ''
+  tradeResults.value = []
+  tradeIncoming.value = []
+  tradeCashDir.value = ''
+  tradeCashAmt.value = 0
+}
+function closeTrade() { trade.value = null }
+
+async function runTradeSearch() {
+  const q = tradeQuery.value.trim()
+  if (q.length < 2) return
+  tradeBusy.value = true
+  try {
+    const [cardsRes, sealedRes] = await Promise.allSettled([
+      multiSearch(q, { page: 1, pageSize: 16 }),
+      searchSealed(q, { limit: 10 }),
+    ])
+    tradeResults.value = [
+      ...(cardsRes.status === 'fulfilled' ? cardsRes.value.cards : []),
+      ...(sealedRes.status === 'fulfilled' ? sealedRes.value : []),
+    ]
+  } catch { tradeResults.value = [] } finally { tradeBusy.value = false }
+}
+
+function takeIncoming(c) {
+  tradeIncoming.value.push({
+    type: c.sealed ? 'sealed' : 'card',
+    game: c.game || 'pokemon',
+    cardId: c.id || '',
+    name: c.name || '',
+    setName: c.set || '',
+    number: c.number || '',
+    img: c.image || '',
+    value: c.price ? Math.round(c.price * 100) / 100 : 0,
+    list: true,
+  })
+}
+
+function logTrade() {
+  if (!trade.value) return
+  const { i } = trade.value
+  const it = booth.value.items[i]
+  if (!it) { closeTrade(); return }
+  const tradeId = generateJournalId()
+  const cash = tradeCashDir.value === 'in' ? +(tradeCashAmt.value || 0)
+    : tradeCashDir.value === 'out' ? -(tradeCashAmt.value || 0) : 0
+  const ids = []
+  ids.push(addEntry(journal.value, {
+    boothId: booth.value.id, boothName: booth.value.name, kind: 'trade-out',
+    name: it.name, setName: it.setName, price: it.price, cash,
+    game: it.game, type: it.type, cardId: it.cardId, tradeId,
+  }).id)
+  const listed = []
+  for (const inc of tradeIncoming.value) {
+    ids.push(addEntry(journal.value, {
+      boothId: booth.value.id, boothName: booth.value.name, kind: 'trade-in',
+      name: inc.name, setName: inc.setName, price: inc.value || 0, cash: 0,
+      game: inc.game, type: inc.type, cardId: inc.cardId, tradeId,
+    }).id)
+    if (inc.list && !atCap.value) {
+      const item = {
+        type: inc.type, game: inc.game, cardId: inc.cardId, name: inc.name,
+        setName: inc.setName, number: inc.number, qty: 1,
+        price: inc.value || 0, img: inc.img,
+      }
+      booth.value.items.unshift(item)
+      listed.push(item)
+    }
+  }
+  const snapshot = decrementListing(booth.value.items.indexOf(it))
+  persist()
+  closeTrade()
+  showUndo({
+    label: `Traded ${snapshot.name}${listed.length ? ` (+${listed.length} listed)` : ''}`,
+    journalIds: ids, snapshot, index: i, incoming: listed,
   })
 }
 
@@ -199,7 +392,7 @@ function removeQuiet(i) {
   const snapshot = { ...it }
   booth.value.items.splice(i, 1)
   persist()
-  showUndo({ label: `Removed ${it.name}`, journalId: null, snapshot, index: i, wholeRow: true })
+  showUndo({ label: `Removed ${it.name}`, journalIds: [], snapshot, index: i, incoming: [], wholeRow: true })
 }
 
 function showUndo(action) {
@@ -212,12 +405,17 @@ function undo() {
   const a = lastAction.value
   if (!a) return
   const items = booth.value.items
-  // The row may still exist (qty was decremented) — find it by identity
+  // Items a trade listed onto the table leave with the undo
+  for (const inc of a.incoming || []) {
+    const at = items.indexOf(inc)
+    if (at !== -1) items.splice(at, 1)
+  }
+  // The outgoing row may still exist (qty was decremented) — find it by identity
   const found = !a.wholeRow && items.find(it =>
     it.name === a.snapshot.name && it.cardId === a.snapshot.cardId && it.price === a.snapshot.price)
   if (found && !a.wholeRow) found.qty = (found.qty || 1) + 1
   else items.splice(Math.min(a.index, items.length), 0, { ...a.snapshot, qty: a.wholeRow ? a.snapshot.qty : 1 })
-  if (a.journalId) removeEntry(journal.value, a.journalId)
+  for (const id of a.journalIds || []) removeEntry(journal.value, id)
   persist()
   lastAction.value = null
   clearTimeout(toastTimer)
@@ -231,6 +429,7 @@ const searchResults = ref([])
 const searchBusy = ref(false)
 const searched = ref(false)
 const addedFlash = ref(false)
+const buyMode = ref(false)
 
 async function openSearch() {
   searchOpen.value = true
@@ -259,7 +458,7 @@ async function runSearch() {
   }
 }
 
-function addFromSearch(c) {
+function addFromSearch(c, asBuy = false) {
   if (atCap.value) return
   booth.value.items.unshift({
     type: c.sealed ? 'sealed' : 'card',
@@ -272,9 +471,22 @@ function addFromSearch(c) {
     price: c.price ? Math.round(c.price * 100) / 100 : 0,
     img: c.image || '',
   })
+  if (asBuy) {
+    // cost defaults to market when the input is left blank
+    const cost = Math.round(((c._cost ?? c.price) || 0) * 100) / 100
+    addEntry(journal.value, {
+      boothId: booth.value.id, boothName: booth.value.name, kind: 'buy',
+      name: c.name || '', setName: c.set || '', price: cost, cash: -cost,
+      game: c.game || '', type: c.sealed ? 'sealed' : 'card', cardId: c.id || '',
+    })
+  }
   persist()
   addedFlash.value = true
   setTimeout(() => { addedFlash.value = false }, 1500)
+}
+
+function exportLedger() {
+  exportBoothLedger(booth.value, allBoothEntries.value)
 }
 
 // ── Kiosk QR: re-renders whenever the booth changes ──
@@ -363,7 +575,9 @@ onBeforeUnmount(() => {
   border: 1.5px solid var(--ink); border-radius: 99px;
 }
 .bt-chip-cash { background: var(--success-dim, var(--accent-dim)); }
+.bt-chip-cash.neg { background: var(--danger-dim, #ffdede); }
 .bt-chip-trade { background: var(--bg-card); }
+.bt-neg { color: var(--danger); }
 
 .bt-tools { display: flex; gap: 8px; margin: 12px 0 4px; }
 .bt-filter { flex: 1; font-size: 16px; /* ≥16px stops iOS zoom-on-focus */ }
@@ -398,6 +612,8 @@ onBeforeUnmount(() => {
 .bt-deal-trade { background: var(--bg-card); }
 
 .bt-log { margin-top: 20px; }
+.bt-log-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.bt-log-summary { font-size: 12.5px; color: var(--text-secondary); font-weight: 600; margin: 2px 0 8px; }
 .bt-log-toggle {
   font: inherit; font-size: 13px; font-weight: 800; color: var(--ink);
   background: none; border: none; cursor: pointer; padding: 6px 0;
@@ -432,6 +648,25 @@ onBeforeUnmount(() => {
 .bt-search-price { font-weight: 800; font-size: 12.5px; white-space: nowrap; }
 .bt-search-msg { font-size: 13px; text-align: center; padding: 16px 0; }
 .bt-sealed { font-size: 9.5px; vertical-align: 2px; }
+
+/* buy mode + trade sheet */
+.bt-buy-toggle { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 700; margin: -4px 0 10px; cursor: pointer; }
+.bt-buy-toggle input { width: 17px; height: 17px; accent-color: var(--accent); }
+.bt-cost-wrap { font-weight: 800; font-size: 13px; white-space: nowrap; display: inline-flex; align-items: center; }
+.bt-cost {
+  width: 80px; font: inherit; font-weight: 800;
+  border: 1.5px solid var(--border-subtle); border-radius: 7px;
+  padding: 4px 6px; margin-left: 2px;
+  background: var(--bg-card); color: inherit;
+}
+.bt-trade-label { display: block; font-size: 12px; font-weight: 800; margin: 12px 0 6px; }
+.bt-trade-outrow { display: flex; gap: 10px; align-items: center; border: 1.5px solid var(--border-subtle); border-radius: 10px; padding: 8px 10px; }
+.bt-trade-results { max-height: 28vh; }
+.bt-incoming { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+.bt-incoming-row { display: flex; gap: 10px; align-items: center; border: 1.5px solid var(--accent); border-radius: 10px; padding: 8px 10px; flex-wrap: wrap; }
+.bt-mini { font-size: 12px; font-weight: 700; display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+.bt-list-toggle input { width: 16px; height: 16px; accent-color: var(--accent); }
+.bt-cash-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 
 /* kiosk */
 .bt-kiosk {
