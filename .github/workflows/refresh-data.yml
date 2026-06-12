@@ -56,6 +56,10 @@ jobs:
       - name: Yu-Gi-Oh! TCGplayer prices
         run: python3 scripts/build_ygo_prices.py
 
+      - name: Typo-rescue name index
+        run: python3 scripts/build_name_index.py
+        continue-on-error: true # rescue index going stale beats blocking prices
+
       - name: Sealed product index
         run: python3 scripts/build_sealed_index.py
 
@@ -65,7 +69,7 @@ jobs:
 
       - name: Commit if changed
         run: |
-          git add public/riftbound-prices.json public/jp-prices.json public/jp-index.json public/op-prices.json public/ygo-prices.json scripts/data/ygo_products.json public/sealed-index public/meta-decks
+          git add public/riftbound-prices.json public/jp-prices.json public/jp-index.json public/op-prices.json public/ygo-prices.json public/name-index.json scripts/data/ygo_products.json public/sealed-index public/meta-decks
           if git diff --cached --quiet; then
             echo "no data changes"
             exit 0

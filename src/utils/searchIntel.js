@@ -459,7 +459,7 @@ export async function smartSearch(q, { pageSize = 24, sealedLimit = 12 } = {}) {
   if (!text && !wantJa && browseSets.length) {
     for (const s of browseSets.slice(0, 2)) {
       jobs.push(leg((async () => {
-        const { getProvider } = await import('../services/tcg/providers')
+        const { getProvider } = await import('../services/tcg/providers.js')
         const all = await getProvider(s.game)?.getSetCards(s.setId) || []
         return { kind: 'cards', cards: all.slice(0, fetchSize).map(c => ({ ...c, set: s.name, game: s.game })) }
       })().catch(() => ({ kind: 'cards', cards: [] })), { kind: 'cards', cards: [] }))
@@ -488,6 +488,18 @@ export async function smartSearch(q, { pageSize = 24, sealedLimit = 12 } = {}) {
     ])
     cards = results.filter(r => r.kind === 'cards').flatMap(r => r.cards)
     sealed = results.find(r => r.kind === 'sealed')?.items || sealed
+  }
+  if (!cards.length && text && !wantJa) {
+    // LAST RESORT — typo rescue: fuzzy over the names-only index (live
+    // APIs can't fuzz) + Scryfall's server-side fuzzy for MTG
+    try {
+      const { rescueByName, hydratePokemonRescues, rescueMtg } = await import('../services/nameSearch.js')
+      const [byName, mtg] = await Promise.all([
+        rescueByName(text, { limit: 12 }),
+        rescueMtg(text),
+      ])
+      cards = await hydratePokemonRescues([...mtg, ...byName])
+    } catch { /* rescue is best-effort */ }
   }
 
   if (parsed.sets.length) {
