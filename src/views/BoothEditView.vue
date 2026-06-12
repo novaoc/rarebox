@@ -273,7 +273,7 @@ import { useRoute } from 'vue-router'
 import { usePortfolioStore } from '../stores/portfolio'
 import BoothShareModal from '../components/BoothShareModal.vue'
 import { loadBooths, saveBooths, boothTotal, MAX_BOOTH_ITEMS } from '../utils/booth'
-import { smartSearch } from '../utils/searchIntel'
+import { smartSearch, warmSearchIntel } from '../utils/searchIntel'
 import { syncOn, ensureBoothShelf, shelfAdd, shelfSetQty, returnToSource, moveFromCurated, syncAll } from '../utils/boothShelf'
 import { searchGradedProducts } from '../services/priceServer'
 import { uploadLogo, logoUploadAvailable } from '../services/imageHost'
@@ -563,19 +563,23 @@ const searched = ref(false)
 const addedFlash = ref(false)
 
 async function openSearch() {
+  warmSearchIntel()
   searchOpen.value = true
   await nextTick()
   searchInput.value?.focus()
 }
 
+let searchSeq = 0
 async function runSearch() {
   const q = searchQuery.value.trim()
   if (q.length < 2) return
+  const seq = ++searchSeq
   searchBusy.value = true
   try {
     // Singles + sealed through the query-understanding layer (set codes,
     // static TCGplayer index — one search box covers the whole table.
     const { cards, sealed, understood } = await smartSearch(q, { pageSize: 30, sealedLimit: 16 })
+    if (seq !== searchSeq) return
     searchResults.value = [...cards, ...sealed]
     searchUnderstood.value = understood
   } catch {

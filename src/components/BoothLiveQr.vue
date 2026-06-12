@@ -7,15 +7,33 @@
     </div>
 
     <canvas ref="canvas" class="blq-qr"></canvas>
-    <div v-if="frameCount > 1" class="blq-frames">{{ frame + 1 }} / {{ frameCount }} — scan from Rarebox (Booth → Scan)</div>
+    <div v-if="frameCount > 1 && !guideOpen" class="blq-frames">{{ frame + 1 }} / {{ frameCount }} — scan from Rarebox (Booth → Scan)</div>
     <div v-if="shortBusy" class="blq-shortening">refreshing link…</div>
-    <div v-if="shortFailed" class="blq-mode-hint">No internet on this screen — animated code shown (needs the Rarebox scanner). It switches back to a camera-friendly code when the connection returns.</div>
+
+    <!-- Animated fallback: camera-only buyers get a 2-step ramp. Step 1 is a
+         tiny static QR to the Rarebox scanner (their phone's data plan works
+         even when THIS screen is offline); step 2 runs the animated code. -->
+    <template v-if="shortFailed">
+      <div v-if="!guideOpen" class="blq-mode-hint">
+        This screen is offline — the code above needs the Rarebox scanner.
+      </div>
+      <button v-if="!guideOpen" class="blq-guide-btn" @click="guideOpen = true">📷 Only have a phone camera? Start here</button>
+      <div v-else class="blq-guide">
+        <strong>Get the scanner (uses your phone's internet):</strong>
+        <ol>
+          <li>Scan the code above with your camera — the Rarebox scanner opens in your browser</li>
+          <li>Allow camera access when it asks</li>
+          <li>Tap the button below, then point your phone at the moving code until it completes</li>
+        </ol>
+        <button class="blq-guide-btn blq-guide-go" @click="guideOpen = false">▶ Ready — show the moving code</button>
+      </div>
+    </template>
 
     <div class="blq-sub">
       <span class="blq-live" :class="{ off: status !== 'live' }">● {{ statusLabel }}</span>
       <template v-if="booth"> {{ booth.items.length }} listing{{ booth.items.length !== 1 ? 's' : '' }} · {{ fmtMoney(total) }}</template>
     </div>
-    <div class="blq-hint">{{ shortFailed ? 'Scan from Rarebox: Booth → Scan' : 'Point any phone camera here — the booth opens in the browser' }}</div>
+    <div class="blq-hint">{{ guideOpen ? 'Step 1: scan this with your phone camera' : shortFailed ? 'Scan from Rarebox: Booth → Scan' : 'Point any phone camera here — the booth opens in the browser' }}</div>
 
     <div class="blq-foot">
       <span class="blq-rb">RB</span> made with <strong>rarebox</strong>
@@ -53,7 +71,9 @@ const frameCount = ref(0)
 const frame = ref(0)
 const shortBusy = ref(false)
 const shortFailed = ref(false)
+const guideOpen = ref(false)
 let anim = null
+let shortInFlight = false
 // short-link cache + throttle: one da.gd call per distinct state, ≥8s apart
 let shortForUrl = ''
 let shortUrl = ''
@@ -133,6 +153,7 @@ async function render() {
 
   if (url.length <= SINGLE_QR_LIMIT) {
     shortFailed.value = false
+    guideOpen.value = false
     await drawStatic(url)
     return
   }
@@ -140,13 +161,21 @@ async function render() {
   // camera opens — no Rarebox needed. Re-shortened when inventory changes
   // (throttled). Animated RBX2 survives only as the offline fallback: a
   // hotspot-only display can't reach da.gd, and a dead screen helps nobody.
-  const ok = await ensureShortLink(url)
+  // navigator.onLine short-circuits the attempt entirely when offline.
+  const ok = navigator.onLine === false ? false : await ensureShortLink(url)
   if (ok) {
     shortFailed.value = false
+    guideOpen.value = false
     await drawStatic(shortUrl)
     return
   }
   shortFailed.value = true
+  if (guideOpen.value) {
+    // step 1 of the camera ramp: a tiny always-scannable QR to the scanner
+    await drawStatic(`${window.location.origin}/booth?scan=1`)
+    frameCount.value = 1
+    return
+  }
   drawAnimated(bytes)
 }
 
@@ -173,6 +202,7 @@ async function drawAnimated(bytes) {
 
 async function ensureShortLink(url) {
   if (shortForUrl === url && shortUrl) return true
+  if (shortInFlight) return shortForUrl !== '' && !!shortUrl // one fetch at a time; stale link beats none
   // throttle: a burst of edits re-renders often; shorten at most every 8s,
   // with a trailing retry so the QR converges on the latest state
   const wait = Math.max(0, lastShortenAt + 8000 - Date.now())
@@ -183,6 +213,7 @@ async function ensureShortLink(url) {
   }
   lastShortenAt = Date.now()
   shortBusy.value = true
+  shortInFlight = true
   try {
     const code = await dagdShorten(url)
     shortUrl = 'https://da.gd/' + code
@@ -192,12 +223,27 @@ async function ensureShortLink(url) {
     return false
   } finally {
     shortBusy.value = false
+    shortInFlight = false
   }
 }
 
 watch(() => [props.shareBytes, props.booth && JSON.stringify(props.booth.items), props.booth?.name], render, { immediate: true })
-let retryTimer = setInterval(() => { if (shortFailed.value) render() }, 30000)
-onBeforeUnmount(() => { if (anim) clearInterval(anim); clearTimeout(shortTimer); clearInterval(retryTimer) })
+let retryTimer = setInterval(() => { if (shortFailed.value && !guideOpen.value) render() }, 30000)
+function onOnline() { lastShortenAt = 0; guideOpen.value = false; render() }
+function onOffline() { render() } // flip to the offline path right away
+function onVisible() { if (document.visibilityState === 'visible' && shortFailed.value) { lastShortenAt = 0; render() } }
+window.addEventListener('online', onOnline)
+window.addEventListener('offline', onOffline)
+document.addEventListener('visibilitychange', onVisible)
+watch(guideOpen, render)
+onBeforeUnmount(() => {
+  if (anim) clearInterval(anim)
+  clearTimeout(shortTimer)
+  clearInterval(retryTimer)
+  window.removeEventListener('online', onOnline)
+  window.removeEventListener('offline', onOffline)
+  document.removeEventListener('visibilitychange', onVisible)
+})
 </script>
 
 <style scoped>
@@ -245,4 +291,15 @@ onBeforeUnmount(() => { if (anim) clearInterval(anim); clearTimeout(shortTimer);
 }
 .blq-mode-hint { font-size: 11.5px; font-weight: 700; color: var(--text-secondary, #5f5a51); max-width: 420px; text-align: center; }
 .blq-shortening { font-size: 11px; font-weight: 700; color: var(--text-muted, #8a8478); }
+.blq-guide-btn {
+  font: inherit; font-size: 14px; font-weight: 900;
+  padding: 10px 18px; cursor: pointer;
+  color: var(--on-accent, #141414); background: var(--accent, #ffd23f);
+  border: 2px solid var(--ink, #141414); border-radius: 12px;
+  box-shadow: var(--shadow-sm, 3px 3px 0 #141414);
+}
+.blq-guide-btn:active { box-shadow: none; transform: translate(1px, 1px); }
+.blq-guide { display: flex; flex-direction: column; gap: 8px; max-width: 440px; font-size: 13px; text-align: left; }
+.blq-guide ol { padding-left: 20px; display: flex; flex-direction: column; gap: 5px; line-height: 1.45; }
+.blq-guide-go { align-self: center; }
 </style>

@@ -75,6 +75,29 @@ async function codeIndex() {
   return _building
 }
 
+/** Kick the set-list fetches off early (call when a search UI opens) so the
+ *  first real search finds the index already built. */
+export function warmSearchIntel() {
+  codeIndex().catch(() => {})
+}
+
+/** Awaitable readiness (tests, optional UI states). */
+export function searchIntelReady() {
+  return codeIndex()
+}
+
+// A cold code index fans out to 7 APIs (YGO alone lists 1,018 sets) — that
+// must NEVER gate a search. Race a short window; on miss the search runs
+// without set-code resolution and the build finishes for the next one.
+const INDEX_WAIT_MS = 600
+async function codeIndexFast() {
+  if (_codeIndex) return _codeIndex
+  return Promise.race([
+    codeIndex().catch(() => null),
+    new Promise(res => setTimeout(() => res(null), INDEX_WAIT_MS)),
+  ])
+}
+
 /** Token looks like a deliberate set code, not a word. */
 function codeLike(rawToken) {
   if (/\d/.test(rawToken)) return /^[A-Za-z]{0,5}-?\d{1,4}[A-Za-z]{0,3}$/.test(rawToken)
@@ -105,12 +128,12 @@ export async function parseQuery(q) {
   const sets = []
   const understood = []
   const rest = []
-  const index = await codeIndex().catch(() => new Map())
+  const index = await codeIndexFast()
 
   for (const t of tokens) {
     if (LANG_JA.test(t)) { lang = 'ja'; continue }
     if (LANG_EN.test(t)) { lang = 'en'; continue }
-    if (codeLike(t)) {
+    if (index && codeLike(t)) {
       const hits = resolveCode(index, t)
       if (hits) { sets.push(...hits); continue }
     }
@@ -182,7 +205,16 @@ async function searchPokemonInSets(text, setIds, pageSize) {
 
 // ── The smart search ─────────────────────────────────────────────────────
 
+// Short-lived result memo: re-running the same query (chip flips, modal
+// reopens, double-submits) returns instantly instead of re-fanning out
+const _memo = new Map()
+const MEMO_TTL = 5 * 60_000
+const MEMO_MAX = 40
+
 export async function smartSearch(q, { pageSize = 24, sealedLimit = 12 } = {}) {
+  const memoKey = `${q.trim().toLowerCase()}|${pageSize}`
+  const hit = _memo.get(memoKey)
+  if (hit && Date.now() - hit.ts < MEMO_TTL) return hit.result
   const parsed = await parseQuery(q)
   const text = parsed.clean || q.trim()
   const jaSets = parsed.sets.filter(s => s.lang === 'ja').map(s => s.setId)
@@ -233,5 +265,8 @@ export async function smartSearch(q, { pageSize = 24, sealedLimit = 12 } = {}) {
   })
   if (parsed.lang === 'ja') sealed = sealed.filter(s => /japan|jp\b/i.test(`${s.set} ${s.name}`))
 
-  return { cards, sealed, understood: parsed.understood }
+  const result = { cards, sealed, understood: parsed.understood }
+  _memo.set(memoKey, { ts: Date.now(), result })
+  if (_memo.size > MEMO_MAX) _memo.delete(_memo.keys().next().value)
+  return result
 }

@@ -268,23 +268,27 @@ function onInput() {
   }
 }
 
+let searchSeq = 0
 async function doSearch(resetPage = true) {
   if (!query.value.trim()) return
   if (resetPage === true) { page.value = 1; activeFilter.value = 'all' }
+  const seq = ++searchSeq // debounced keystrokes can land out of order
   loading.value = true
   searched.value = true
   lastQuery.value = query.value
   try {
     const data = await multiSearch(query.value, { page: page.value, pageSize })
+    if (seq !== searchSeq) return
     allResults.value = data.cards || []
     results.value = data.cards || []
     totalCount.value = data.totalCount || 0
   } catch (e) {
+    if (seq !== searchSeq) return
     allResults.value = []
     results.value = []
     totalCount.value = 0
   } finally {
-    loading.value = false
+    if (seq === searchSeq) loading.value = false
   }
 }
 

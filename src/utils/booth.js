@@ -350,7 +350,8 @@ export async function directoryFromLocation(hashOrUrl) {
  *  RESOLVE codes (CORS * on /coshorten), which is what makes compact
  *  directories possible. Returns the short code (not the full URL). */
 export async function dagdShorten(url) {
-  const resp = await fetch('https://da.gd/shorten?url=' + encodeURIComponent(url))
+  // half-dead venue Wi-Fi hangs fetches for minutes — fail fast instead
+  const resp = await fetch('https://da.gd/shorten?url=' + encodeURIComponent(url), { signal: AbortSignal.timeout(8000) })
   const text = (await resp.text()).trim()
   if (!resp.ok || !text.startsWith('https://da.gd/')) throw new Error('shorten failed')
   return text.slice('https://da.gd/'.length)
@@ -358,7 +359,7 @@ export async function dagdShorten(url) {
 
 /** da.gd short code → destination URL (CORS-open, fragment preserved). */
 export async function dagdResolve(code) {
-  const resp = await fetch('https://da.gd/coshorten/' + encodeURIComponent(code))
+  const resp = await fetch('https://da.gd/coshorten/' + encodeURIComponent(code), { signal: AbortSignal.timeout(8000) })
   const text = (await resp.text()).trim()
   if (!resp.ok || !/^https?:\/\//.test(text)) throw new Error('resolve failed')
   return text

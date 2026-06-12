@@ -46,6 +46,9 @@
           <button class="bt-deal bt-deal-trade" @click="openTrade(i)"><RbIcon name="swap" :size="15" /> Trade</button>
         </div>
       </div>
+      <button v-if="hiddenCount" class="btn btn-secondary bt-show-more" @click="listLimit += 160">
+        Show more ({{ hiddenCount }} hidden)
+      </button>
     </div>
 
     <!-- Today's log + running ledger -->
@@ -292,7 +295,7 @@ import BoothLiveQr from '../components/BoothLiveQr.vue'
 import RbIcon from '../components/icons/RbIcon.vue'
 import { loadJournal, addEntry, removeEntry, todayEntries, boothEntries, journalTotals, generateJournalId } from '../utils/boothJournal'
 import { exportBoothLedger } from '../utils/boothExcel'
-import { smartSearch } from '../utils/searchIntel'
+import { smartSearch, warmSearchIntel } from '../utils/searchIntel'
 import { searchGradedProducts } from '../services/priceServer'
 import { tokenMatch } from '../utils/search'
 import { generateSecret, displayUrl, deriveChannel, deriveSigChannel, publishState, subscribeSig } from '../utils/remoteQr'
@@ -314,15 +317,32 @@ const today = computed(() => todayEntries(journal.value, booth.value?.id))
 const totals = computed(() => journalTotals(today.value))
 const allBoothEntries = computed(() => boothEntries(journal.value, booth.value?.id))
 
-const visibleItems = computed(() => {
+// Typing debounce: filtering is cheap, but each keystroke re-rendering a
+// 600-card DOM is not — let the input settle first
+const filterDebounced = ref('')
+let filterTimer = null
+watch(filter, (v) => {
+  clearTimeout(filterTimer)
+  filterTimer = setTimeout(() => { filterDebounced.value = v }, 160)
+})
+
+const matchedItems = computed(() => {
   const items = booth.value?.items || []
-  const q = filter.value.trim()
+  const q = filterDebounced.value.trim()
   const out = []
   for (let i = 0; i < items.length; i++) {
     if (!q || tokenMatch(q, items[i].name, items[i].setName, items[i].number)) out.push({ it: items[i], i })
   }
   return out
 })
+
+// Windowed rendering: 600 image cards at once chokes mid phones — render
+// in slabs of 80 with a Show-more; the window resets when the filter moves
+const LIST_WINDOW = 80
+const listLimit = ref(LIST_WINDOW)
+watch(filterDebounced, () => { listLimit.value = LIST_WINDOW })
+const visibleItems = computed(() => matchedItems.value.slice(0, listLimit.value))
+const hiddenCount = computed(() => Math.max(0, matchedItems.value.length - listLimit.value))
 
 function fmtMoney(n) {
   // table cash can run negative — buying hard mid-show is normal dealering
@@ -585,20 +605,23 @@ async function openSearch() {
   searchInput.value?.focus()
 }
 
+let searchSeq = 0
 async function runSearch() {
   const q = searchQuery.value.trim()
   if (q.length < 2) return
+  const seq = ++searchSeq
   searchBusy.value = true
   try {
     const { cards, sealed, understood } = await smartSearch(q, { pageSize: 24, sealedLimit: 12 })
+    if (seq !== searchSeq) return // a newer search superseded this one
     searchResults.value = [...cards, ...sealed]
     searchUnderstood.value = understood
   } catch {
+    if (seq !== searchSeq) return
     searchResults.value = []
     searchUnderstood.value = []
   } finally {
-    searchBusy.value = false
-    searched.value = true
+    if (seq === searchSeq) { searchBusy.value = false; searched.value = true }
   }
   gradedFor = ''
   gradedResults.value = []
@@ -751,7 +774,7 @@ watch(() => booth.value && JSON.stringify(booth.value.items), () => {
   }
 })
 
-onMounted(() => { filterInput.value?.focus() })
+onMounted(() => { filterInput.value?.focus(); warmSearchIntel() })
 onBeforeUnmount(() => {
   document.removeEventListener('visibilitychange', onVisible)
   peer?.stop()
@@ -951,4 +974,5 @@ onBeforeUnmount(() => {
   padding: 2px 9px;
   background: var(--accent-dim); border: 1.5px solid var(--ink); border-radius: 99px;
 }
+.bt-show-more { width: 100%; margin-top: 10px; }
 </style>

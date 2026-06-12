@@ -16,13 +16,17 @@
 }
 </script>
 <script type="module">
-import { parseQuery, smartSearch } from '/src/utils/searchIntel.js'
+import { parseQuery, smartSearch, warmSearchIntel, searchIntelReady } from '/src/utils/searchIntel.js'
 
 const R = { checks: [], done: false }
 window.__R = R
 const ok = (cond, label) => R.checks.push({ ok: !!cond, label })
 
 try {
+  // the views warm the index when a search UI opens; tests assert
+  // set-code resolution, so wait for the build like a warmed session
+  warmSearchIntel()
+  await searchIntelReady()
   // ── parsing ──
   let p = await parseQuery('mega charizard ex JP')
   ok(p.lang === 'ja', `"…JP" → Japanese (got ${p.lang})`)

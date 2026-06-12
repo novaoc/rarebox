@@ -772,6 +772,12 @@ function stopScan() {
 
 onMounted(() => {
   checkIncoming()
+  // /booth?scan=1 — step 1 of the kiosk's camera ramp: a buyer scanned the
+  // "get the scanner" QR with their plain camera; open the scanner for them
+  if (new URLSearchParams(window.location.search).get('scan') === '1') {
+    history.replaceState(null, '', window.location.pathname)
+    startScan()
+  }
   // opening a booth/directory link while already on /booth only changes
   // the hash — no remount, so watch for it
   window.addEventListener('hashchange', checkIncoming)

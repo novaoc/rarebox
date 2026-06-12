@@ -123,6 +123,15 @@ watch(scope, () => {
   prepare()
 })
 
+function onShareOnline() {
+  if (frameCount.value > 1) {
+    if (frameTimer) { clearInterval(frameTimer); frameTimer = null }
+    building.value = true
+    prepare()
+  }
+}
+window.addEventListener('online', onShareOnline)
+
 async function prepare() {
   shareUrl.value = await boothToUrl(sharedBooth.value)
   urlSize.value = shareUrl.value.length < 1024 ? `${shareUrl.value.length} chars` : `${(shareUrl.value.length / 1024).toFixed(1)}k chars`
@@ -142,6 +151,7 @@ async function prepare() {
   // anyone's phone opens it, no Rarebox needed. Animated frames are only
   // the offline fallback (shortener unreachable).
   try {
+    if (navigator.onLine === false) throw new Error('offline')
     const code = await dagdShorten(shareUrl.value)
     qrShortUrl.value = 'https://da.gd/' + code
     frames = []
@@ -339,7 +349,10 @@ async function copyLink() {
 }
 
 onMounted(prepare)
-onBeforeUnmount(() => { if (frameTimer) clearInterval(frameTimer) })
+onBeforeUnmount(() => {
+  window.removeEventListener('online', onShareOnline)
+  if (frameTimer) clearInterval(frameTimer)
+})
 </script>
 
 <style scoped>
