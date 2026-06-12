@@ -130,6 +130,13 @@
               {{ cat.label }}<span class="be-cat-n">{{ pickerCatCount(cat.id) }}</span>
             </button>
           </div>
+          <div class="be-pick-all">
+            <button class="btn btn-secondary btn-sm" :disabled="!pickerItems.length" @click="selectAllVisible">
+              Select all {{ pickerItems.length }}{{ pickerCat !== 'all' ? ' ' + pickerCat : '' }}{{ pickerFilter ? ' shown' : '' }}
+            </button>
+            <button v-if="picked.length" class="btn btn-ghost btn-sm" @click="picked = []">Clear ({{ picked.length }})</button>
+            <span v-if="pickerCapped" class="be-pick-cap">QR cap: {{ MAX_BOOTH_ITEMS }} listings per booth</span>
+          </div>
           <div class="picker-list">
             <label v-for="item in pickerItems" :key="item.id" class="picker-row">
               <input type="checkbox" v-model="picked" :value="item.id" />
@@ -353,6 +360,24 @@ function openPicker() {
 }
 
 const pickerCat = ref('all')
+const pickerCapped = ref(false)
+const pickerRoom = computed(() => Math.max(0, MAX_BOOTH_ITEMS - (booth.value?.items.length || 0)))
+
+/** One tap lists a whole shelf (or the filtered slice of it) — hundreds of
+ *  singles without hundreds of taps. Selection stops at the QR cap. */
+function selectAllVisible() {
+  const ids = new Set(picked.value)
+  pickerCapped.value = false
+  for (const item of pickerItems.value) {
+    if (ids.size >= pickerRoom.value) { pickerCapped.value = true; break }
+    ids.add(item.id)
+  }
+  picked.value = [...ids]
+}
+
+// switching shelves drops the old shelf's selection — addPicked resolves
+// ids against the CURRENT shelf, stale picks would silently vanish
+watch(pickerShelfId, () => { picked.value = []; pickerCapped.value = false })
 const pickerItems = computed(() => {
   const shelf = store.portfolios.find(p => p.id === pickerShelfId.value)
   if (!shelf) return []
@@ -701,4 +726,6 @@ function clearLoc() {
 .be-sync-row { display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 13px; cursor: pointer; }
 .be-sync-row input { width: 16px; height: 16px; accent-color: var(--accent); }
 .be-sync-note { font-size: 12px; color: var(--text-secondary); line-height: 1.5; margin-top: 6px; }
+.be-pick-all { display: flex; align-items: center; gap: 8px; margin: 2px 0 10px; flex-wrap: wrap; }
+.be-pick-cap { font-size: 11.5px; font-weight: 700; color: var(--text-secondary); }
 </style>
