@@ -90,7 +90,34 @@
       <button class="btn btn-primary btn-sm" :disabled="atCap" @click="openPicker">+ From shelf</button>
       <button class="btn btn-secondary btn-sm" :disabled="atCap" @click="openSearch"><RbIcon name="magnifier" :size="15" /> Search cards</button>
     </div>
-    <p v-if="atCap" class="be-cap-note">Booth is full ({{ MAX_BOOTH_ITEMS }} listings) — that keeps the QR scannable. Split into a second booth for more.</p>
+    <p v-if="atCap" class="be-cap-note">Booth is full ({{ MAX_BOOTH_ITEMS }} listings). Split into a second booth and share both with a directory QR.</p>
+
+    <!-- Binders: saved lenses buyers browse by — auto-suggested or custom -->
+    <div class="be-binders card" v-if="booth.items.length >= 6 || booth.binders?.length">
+      <div class="be-binders-head">
+        <h3>🗂 Binders <span class="text-muted be-binders-sub">how buyers browse your table</span></h3>
+        <button class="btn btn-secondary btn-sm" @click="autoBinders">✨ Suggest from listings</button>
+      </div>
+      <div v-if="booth.binders?.length" class="be-binder-list">
+        <span v-for="b in booth.binders" :key="b.id" class="be-binder-chip">
+          {{ b.icon }} {{ b.name }}
+          <span class="be-binder-n">{{ binderCount(b) }}</span>
+          <button class="be-binder-x" @click="removeBinder(b.id)" :aria-label="`Remove binder ${b.name}`">✕</button>
+        </span>
+      </div>
+      <p v-else class="be-sync-note">No binders yet — buyers get one big grid. Suggest some from what you've listed, or build your own.</p>
+      <details class="be-binder-custom">
+        <summary>Custom binder</summary>
+        <div class="be-binder-form">
+          <input v-model.trim="binderForm.name" class="input input-sm" placeholder="Name — e.g. Vintage WOTC" maxlength="40" />
+          <select v-model="binderForm.type" class="select input-sm"><option value="">Any type</option><option value="card">Singles</option><option value="sealed">Sealed</option><option value="graded">Graded</option></select>
+          <select v-model="binderForm.set" class="select input-sm"><option value="">Any set</option><option v-for="sn in listedSets" :key="sn" :value="sn">{{ sn }}</option></select>
+          <input v-model.number="binderForm.pmin" class="input input-sm" type="number" min="0" placeholder="Min $" />
+          <input v-model.number="binderForm.pmax" class="input input-sm" type="number" min="0" placeholder="Max $" />
+          <button class="btn btn-primary btn-sm" :disabled="!binderForm.name" @click="addCustomBinder">Add</button>
+        </div>
+      </details>
+    </div>
 
     <div v-if="!booth.items.length" class="empty-state">
       <p>Nothing listed yet. Pull items straight from your shelves, or search the card database for things you haven't tracked.</p>
@@ -318,6 +345,42 @@ function fmtMoney(n) {
 
 function persist() {
   saveBooths(booths.value)
+}
+
+// ── Binders ──
+const binderForm = ref({ name: '', type: '', set: '', pmin: null, pmax: null })
+const listedSets = computed(() => [...new Set((booth.value?.items || []).map(i => i.setName).filter(Boolean))].sort())
+
+function binderCount(b) { return binderItems(booth.value, b).length }
+
+function autoBinders() {
+  if (!booth.value.binders) booth.value.binders = []
+  const have = new Set(booth.value.binders.map(b => b.name.toLowerCase()))
+  for (const b of suggestBinders(booth.value)) {
+    if (booth.value.binders.length >= MAX_BINDERS) break
+    if (!have.has(b.name.toLowerCase())) { booth.value.binders.push(b); have.add(b.name.toLowerCase()) }
+  }
+  persist()
+}
+
+function addCustomBinder() {
+  const f = binderForm.value
+  if (!f.name || (booth.value.binders?.length || 0) >= MAX_BINDERS) return
+  const rule = {}
+  if (f.type) rule.type = f.type
+  if (f.set) rule.set = f.set
+  if (f.pmin != null && f.pmin !== '') rule.pmin = +f.pmin
+  if (f.pmax != null && f.pmax !== '') rule.pmax = +f.pmax
+  if (!Object.keys(rule).length) rule.pmin = 0 // name-only binder: match everything priced
+  if (!booth.value.binders) booth.value.binders = []
+  booth.value.binders.push({ id: 'bn-' + Math.random().toString(36).slice(2, 8), name: f.name, icon: '🗂', rule })
+  binderForm.value = { name: '', type: '', set: '', pmin: null, pmax: null }
+  persist()
+}
+
+function removeBinder(id) {
+  booth.value.binders = (booth.value.binders || []).filter(b => b.id !== id)
+  persist()
 }
 
 function toggleSync(on) {
@@ -728,4 +791,20 @@ function clearLoc() {
 .be-sync-note { font-size: 12px; color: var(--text-secondary); line-height: 1.5; margin-top: 6px; }
 .be-pick-all { display: flex; align-items: center; gap: 8px; margin: 2px 0 10px; flex-wrap: wrap; }
 .be-pick-cap { font-size: 11.5px; font-weight: 700; color: var(--text-secondary); }
+.be-binders { padding: 14px 16px; margin: 12px 0; }
+.be-binders-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
+.be-binders-head h3 { font-size: 15px; font-weight: 900; }
+.be-binders-sub { font-size: 11.5px; font-weight: 600; }
+.be-binder-list { display: flex; gap: 8px; flex-wrap: wrap; margin: 6px 0; }
+.be-binder-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 12.5px; font-weight: 800; padding: 5px 10px;
+  background: var(--bg-secondary); border: 1.5px solid var(--ink); border-radius: 99px;
+}
+.be-binder-n { font-size: 10.5px; opacity: 0.7; }
+.be-binder-x { border: none; background: none; cursor: pointer; font-size: 12px; font-weight: 900; color: var(--text-secondary); padding: 0 2px; }
+.be-binder-custom { margin-top: 8px; }
+.be-binder-custom summary { font-size: 12.5px; font-weight: 700; color: var(--text-secondary); cursor: pointer; }
+.be-binder-form { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+.be-binder-form .input, .be-binder-form .select { flex: 1; min-width: 90px; }
 </style>

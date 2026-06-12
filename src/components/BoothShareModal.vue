@@ -16,6 +16,13 @@
         <div v-if="building" class="share-building"><div class="spinner"></div></div>
 
         <template v-else>
+          <div v-if="(booth.binders || []).length" class="share-scope">
+            <label>QR for</label>
+            <select v-model="scope" class="select select-sm">
+              <option value="all">Whole booth ({{ booth.items.length }})</option>
+              <option v-for="b in booth.binders" :key="b.id" :value="b.id">{{ b.icon }} {{ b.name }} ({{ binderItems(booth, b).length }})</option>
+            </select>
+          </div>
           <div class="qr-container">
             <canvas ref="qrCanvas" class="qr-canvas"></canvas>
           </div>
@@ -63,9 +70,9 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onBeforeUnmount, nextTick } from 'vue'
+import { ref, onMounted, onBeforeUnmount, nextTick, watch, computed } from 'vue'
 import QRCode from 'qrcode'
-import { encodeBoothBytes, boothToUrl, boothTotal, fmtBoothDate, dagdShorten } from '../utils/booth'
+import { encodeBoothBytes, boothToUrl, boothTotal, fmtBoothDate, dagdShorten, binderItems } from '../utils/booth'
 import { buildFrames } from '../utils/qrTransfer'
 
 const props = defineProps({ booth: { type: Object, required: true } })
@@ -85,7 +92,17 @@ const posterError = ref('')
 const frameCount = ref(0)
 const currentFrame = ref(0)
 const qrShortUrl = ref('')
-const total = boothTotal(props.booth)
+// Per-binder QR: share one lens of the table as its own code — the
+// buyer side just sees a smaller booth, no new share format needed
+const scope = ref('all')
+const sharedBooth = computed(() => {
+  const b = props.booth
+  if (scope.value === 'all') return b
+  const binder = (b.binders || []).find(x => x.id === scope.value)
+  if (!binder) return b
+  return { ...b, name: `${b.name} — ${binder.name}`, items: binderItems(b, binder), binders: [] }
+})
+const total = computed(() => boothTotal(sharedBooth.value))
 
 // A URL QR up to ~2.3KB stays comfortably scannable by native cameras;
 // bigger booths switch to the animated RBX2 code (in-app scanner).
@@ -98,8 +115,16 @@ function fmtMoney(n) {
   return '$' + (n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
+watch(scope, () => {
+  if (frameTimer) { clearInterval(frameTimer); frameTimer = null }
+  qrShortUrl.value = ''
+  shortUrl.value = ''
+  building.value = true
+  prepare()
+})
+
 async function prepare() {
-  shareUrl.value = await boothToUrl(props.booth)
+  shareUrl.value = await boothToUrl(sharedBooth.value)
   urlSize.value = shareUrl.value.length < 1024 ? `${shareUrl.value.length} chars` : `${(shareUrl.value.length / 1024).toFixed(1)}k chars`
   building.value = false
   await nextTick()
@@ -128,7 +153,7 @@ async function prepare() {
     })
     return
   } catch { /* offline / da.gd down — animate below */ }
-  const bytes = await encodeBoothBytes(props.booth)
+  const bytes = await encodeBoothBytes(sharedBooth.value)
   frames = buildFrames(bytes)
   frameCount.value = frames.length
   drawFrame(0)
@@ -224,11 +249,11 @@ async function downloadPoster() {
 
     // booth name chip (rotated sticker) — painted in the booth's brand
     // color when one is set, Rarebox yellow otherwise
-    const brandHex = /^#[0-9a-f]{6}$/i.test(props.booth.brand?.color || '') ? props.booth.brand.color : ''
+    const brandHex = /^#[0-9a-f]{6}$/i.test(sharedBooth.value.brand?.color || '') ? sharedBooth.value.brand.color : ''
     const chipBg = brandHex || YELLOW
     const [cr, cg, cb] = [1, 3, 5].map(i => parseInt(chipBg.slice(i, i + 2), 16))
     const chipInk = (0.299 * cr + 0.587 * cg + 0.114 * cb) > 140 ? INK : '#ffffff'
-    const name = (props.booth.name || 'Card booth').slice(0, 34)
+    const name = (sharedBooth.value.name || 'Card booth').slice(0, 34)
     ctx.font = `900 50px ${FONT}`
     const nameW = ctx.measureText(name).width + 72
     ctx.save()
@@ -245,7 +270,7 @@ async function downloadPoster() {
     ctx.restore()
 
     // venue / table / date
-    const meta = [props.booth.venue, props.booth.table && `Table ${props.booth.table}`, fmtBoothDate(props.booth.date)].filter(Boolean).join('  ·  ')
+    const meta = [sharedBooth.value.venue, sharedBooth.value.table && `Table ${sharedBooth.value.table}`, fmtBoothDate(sharedBooth.value.date)].filter(Boolean).join('  ·  ')
     if (meta) {
       ctx.fillStyle = '#5f5a51'
       ctx.font = `700 34px ${FONT}`
@@ -267,10 +292,10 @@ async function downloadPoster() {
     ctx.font = `700 32px ${FONT}`
     ctx.textAlign = 'center'
     ctx.fillText('Scan to browse this booth', W / 2, matY + matSize + 68)
-    const count = props.booth.items?.length || 0
+    const count = sharedBooth.value.items?.length || 0
     ctx.fillStyle = INK
     ctx.font = `900 42px ${FONT}`
-    ctx.fillText(`${count} listing${count !== 1 ? 's' : ''}  ·  ${fmtMoney(total)} full table`, W / 2, matY + matSize + 128)
+    ctx.fillText(`${count} listing${count !== 1 ? 's' : ''}  ·  ${fmtMoney(total.value)} full table`, W / 2, matY + matSize + 128)
 
     // marketing line + games band
     ctx.font = `900 40px ${FONT}`
@@ -285,7 +310,7 @@ async function downloadPoster() {
     const blob = await new Promise(res => canvas.toBlob(res, 'image/png'))
     const a = document.createElement('a')
     a.href = URL.createObjectURL(blob)
-    a.download = `${(props.booth.name || 'booth').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}-qr.png`
+    a.download = `${(sharedBooth.value.name || 'booth').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}-qr.png`
     a.click()
     setTimeout(() => URL.revokeObjectURL(a.href), 5000)
   } catch {
@@ -337,4 +362,6 @@ onBeforeUnmount(() => { if (frameTimer) clearInterval(frameTimer) })
 .share-short-error { color: var(--danger); font-weight: 600; }
 .share-link-input { flex: 1; font-family: monospace; font-size: 11px; }
 .share-info { text-align: center; }
+.share-scope { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; font-size: 12.5px; font-weight: 800; }
+.share-scope .select { flex: 1; }
 </style>

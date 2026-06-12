@@ -111,14 +111,37 @@
         </button>
       </div>
 
+      <!-- Binders: browse the table the way the seller organized it —
+           for the curious buyer, not just the one hunting a specific card -->
+      <div v-if="shopBinders.length && !activeBinder" class="shop-binders">
+        <button v-for="b in shopBinders" :key="b.id" class="shop-binder card" @click="activeBinder = b">
+          <span class="shop-binder-fan">
+            <img v-for="(img, fi) in b.thumbs" :key="fi" :src="img" :style="{ transform: `rotate(${(fi - 1) * 7}deg)` }" loading="lazy" @error="$event.target.style.display='none'" />
+            <span v-if="!b.thumbs.length" class="shop-binder-icon">{{ b.icon || '🗂' }}</span>
+          </span>
+          <span class="shop-binder-name">{{ b.icon }} {{ b.name }}</span>
+          <span class="shop-binder-meta">{{ b.count }} item{{ b.count !== 1 ? 's' : '' }} · {{ fmtMoney(b.total) }}</span>
+        </button>
+        <button class="shop-binder shop-binder-all card" @click="activeBinder = ALL_BINDER">
+          <span class="shop-binder-icon">🗃</span>
+          <span class="shop-binder-name">Everything</span>
+          <span class="shop-binder-meta">{{ viewing.booth.items.length }} items · {{ fmtMoney(boothTotal(viewing.booth)) }}</span>
+        </button>
+      </div>
+      <div v-if="activeBinder" class="shop-binder-bar card">
+        <button class="btn btn-secondary btn-sm" @click="activeBinder = null">← All binders</button>
+        <strong>{{ activeBinder.icon }} {{ activeBinder.name }}</strong>
+        <span class="text-muted">{{ binderPairs.length }} item{{ binderPairs.length !== 1 ? 's' : '' }}</span>
+      </div>
+
       <div v-if="boughtIdx.size" class="shop-pickups card">
         <span><strong>{{ boughtIdx.size }}</strong> pickup{{ boughtIdx.size !== 1 ? 's' : '' }} from this booth saved to
           <strong>“{{ pickupsShelfName }}”</strong> — move them to any shelf later (or just leave them there).</span>
         <router-link class="btn btn-primary btn-sm" :to="'/portfolio/' + pickupsShelfId">View shelf</router-link>
       </div>
 
-      <div class="shop-grid">
-        <div v-for="{ it, i } in displayItems" :key="i" v-show="!matchesOnly || viewMatches?.idx.has(i)"
+      <div class="shop-grid" v-if="!shopBinders.length || activeBinder">
+        <div v-for="{ it, i } in binderPairs" :key="i" v-show="!matchesOnly || viewMatches?.idx.has(i)"
              class="shop-item card-sm card" :class="{ 'shop-item-want': viewMatches?.idx.has(i) }">
           <span v-if="viewMatches?.idx.has(i)" class="shop-want-tag">ON YOUR LIST</span>
           <div class="shop-item-img">
@@ -290,7 +313,7 @@ import BoothShareListModal from '../components/BoothShareListModal.vue'
 import WantlistPanel from '../components/WantlistPanel.vue'
 import {
   loadBooths, saveBooths, loadSavedShops, saveSavedShops,
-  boothFromLocation, directoryFromLocation, boothFromDirectoryRef, dagdResolve,
+  boothFromLocation, directoryFromLocation, boothFromDirectoryRef, dagdResolve, binderMatch, binderItems,
   decodeBoothBytes, decodeDirectoryBytes, boothTotal, generateBoothId,
   directionsUrl, fmtBoothDate,
 } from '../utils/booth'
@@ -375,6 +398,31 @@ watch(viewing, (v) => {
 // Sort pairs of (item, original index) — market deltas and want-highlights
 // are keyed by original index, so sorting must never renumber them.
 const shopSortMode = ref('listed')
+const ALL_BINDER = { id: 'all', name: 'Everything', icon: '🗃', rule: null }
+const activeBinder = ref(null)
+
+const shopBinders = computed(() => {
+  const b = viewing.value?.booth
+  if (!b?.binders?.length) return []
+  return b.binders.map((bn) => {
+    const items = binderItems(b, bn)
+    return {
+      ...bn,
+      count: items.length,
+      total: items.reduce((s2, it) => s2 + (it.qty || 1) * (it.price || 0), 0),
+      thumbs: items.map(it => it.img).filter(Boolean).slice(0, 3),
+    }
+  }).filter(bn => bn.count > 0)
+})
+
+// the grid through the active binder lens (indices stay original — bought
+// marks and wantlist hits are keyed by them)
+const binderPairs = computed(() => {
+  const pairs = displayItems.value
+  const b = activeBinder.value
+  if (!b || !b.rule) return pairs
+  return pairs.filter(p => binderMatch(b.rule, p.it))
+})
 const displayItems = computed(() => {
   const items = viewing.value?.booth.items || []
   const pairs = items.map((it, i) => ({ it, i }))
@@ -503,7 +551,7 @@ const snapshotAge = computed(() => {
   return { label, stale: mins >= 24 * 60 }
 })
 
-watch(viewing, () => { boughtIdx.value = new Set(); pickupsShelfId.value = '' })
+watch(viewing, () => { boughtIdx.value = new Set(); pickupsShelfId.value = ''; activeBinder.value = null })
 
 function itemDelta(i) {
   const m = viewing.value?.market
@@ -884,4 +932,19 @@ onBeforeUnmount(() => {
   padding: 10px 14px; margin-bottom: 12px;
   background: var(--accent-dim); font-size: 13px;
 }
+.shop-binders { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; margin-bottom: 14px; }
+.shop-binder {
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  padding: 14px 10px; cursor: pointer; font: inherit; text-align: center;
+}
+.shop-binder:hover { transform: translate(-1px, -1px); }
+.shop-binder-fan { position: relative; width: 64px; height: 76px; }
+.shop-binder-fan img {
+  position: absolute; inset: 0; width: 54px; height: 74px; object-fit: cover; margin: auto;
+  border: 1.5px solid var(--ink); border-radius: 6px; background: #fff;
+}
+.shop-binder-icon { font-size: 38px; line-height: 76px; }
+.shop-binder-name { font-size: 13.5px; font-weight: 900; line-height: 1.25; }
+.shop-binder-meta { font-size: 11.5px; font-weight: 700; color: var(--text-secondary); }
+.shop-binder-bar { display: flex; align-items: center; gap: 10px; padding: 10px 14px; margin-bottom: 12px; flex-wrap: wrap; }
 </style>

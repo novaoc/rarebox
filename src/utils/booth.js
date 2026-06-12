@@ -23,16 +23,20 @@
  * device expands each entry itself). A 40-booth hall fits a single
  * camera-scannable QR.
  */
-import { gzip, gunzip } from './qrTransfer'
+import { gzip, gunzip } from './qrTransfer.js'
 
 const BOOTHS_KEY = 'rarebox_booths'
 const SAVED_SHOPS_KEY = 'rarebox_saved_shops'
 export const SHARE_VERSION = 1
 export const DIR_VERSION = 1
 
-/** Hard cap on listings per booth — keeps QRs scannable, posters
- *  shortenable, and links pasteable everywhere. */
-export const MAX_BOOTH_ITEMS = 250
+/** Hard cap on listings per booth. Since live/big QRs ride da.gd short
+ *  links (measured: 32KB URLs accepted, 64KB rejected), the envelope is
+ *  ~24KB of share bytes — 600 items clears that even at worst-case item
+ *  entropy. The animated offline fallback still works past 250, just
+ *  slower (~35 frames). */
+export const MAX_BOOTH_ITEMS = 600
+export const MAX_BINDERS = 24
 
 // ── Local storage ──────────────────────────────────────────────────────
 
@@ -90,6 +94,13 @@ function packBooth(booth) {
   if (booth.brand?.color) packed.ac = booth.brand.color
   if (booth.brand?.mark) packed.mk = String(booth.brand.mark).slice(0, 12)
   if (booth.brand?.logo) packed.lg = booth.brand.logo
+  if (booth.binders?.length) {
+    // additive: [[name, icon, game, set, type, pmin|-1, pmax|-1], ...]
+    packed.bnd = booth.binders.slice(0, MAX_BINDERS).map(b => [
+      b.name || '', b.icon || '', b.rule?.game || '', b.rule?.set || '',
+      b.rule?.type || '', b.rule?.pmin ?? -1, b.rule?.pmax ?? -1,
+    ])
+  }
   if (booth.loc?.length === 2) {
     // 5 decimals ≈ 1m precision — plenty for "find the venue"
     packed.loc = [+booth.loc[0].toFixed(5), +booth.loc[1].toFixed(5)]
@@ -136,6 +147,16 @@ function unpackBooth(packed) {
     },
     loc: Array.isArray(packed.loc) && packed.loc.length === 2 ? [num(packed.loc[0] + 90, 180) - 90, num(packed.loc[1] + 180, 360) - 180] : null,
     locName: str(packed.locName, 120),
+    binders: Array.isArray(packed.bnd) ? packed.bnd.slice(0, MAX_BINDERS).map((b, idx) => {
+      const [name, icon, game, set, type, pmin, pmax] = Array.isArray(b) ? b : []
+      const rule = {}
+      if (str(game, 20)) rule.game = str(game, 20)
+      if (str(set, 120)) rule.set = str(set, 120)
+      if (str(type, 20)) rule.type = str(type, 20)
+      if (Number(pmin) >= 0) rule.pmin = num(pmin)
+      if (Number(pmax) >= 0) rule.pmax = num(pmax)
+      return { id: 'bn-' + idx, name: str(name, 40), icon: str(icon, 4), rule }
+    }).filter(b => b.name && Object.keys(b.rule).length) : [],
     items: packed.items.slice(0, MAX_BOOTH_ITEMS).map((it) => {
       const [type, game, cardId, name, setName, number, qty, price, img] = Array.isArray(it) ? it : []
       return {
@@ -193,6 +214,59 @@ export async function boothFromLocation(hashOrUrl) {
   const m = String(hashOrUrl).match(/[#&]b=([A-Za-z0-9_-]+)/)
   if (!m) return null
   return decodeBoothBytes(base64UrlToBytes(m[1]))
+}
+
+// ── Binders — rules-based lenses over the listings ─────────────────────
+// Same philosophy as master sets: pure view-layer grouping, items are
+// never mutated or assigned. A binder is a saved filter; counts and
+// contents stay live as the table churns. Lenses may overlap.
+
+function normGame(g) { return g && g !== 'pokemon' ? g : 'pokemon' }
+
+export function binderMatch(rule, it) {
+  if (!rule) return false
+  if (rule.type && (it.type || 'card') !== rule.type) return false
+  if (rule.game && normGame(it.game) !== rule.game) return false
+  if (rule.set && (it.setName || '') !== rule.set) return false
+  if (rule.pmin != null && !((it.price || 0) >= rule.pmin)) return false
+  if (rule.pmax != null && !((it.price || 0) > 0 && it.price <= rule.pmax)) return false
+  return true
+}
+
+export function binderItems(booth, binder) {
+  return (booth?.items || []).filter(it => binderMatch(binder?.rule, it))
+}
+
+const GAME_LABELS = { pokemon: 'Pokémon', mtg: 'Magic', yugioh: 'Yu-Gi-Oh!', lorcana: 'Lorcana', 'one-piece': 'One Piece', riftbound: 'Riftbound' }
+
+/** Auto-suggest binders from what's actually listed: graded slabs, sealed,
+ *  per-TCG when multi-game, the dominant sets, and price bands. */
+export function suggestBinders(booth) {
+  const items = booth?.items || []
+  const out = []
+  const push = (name, icon, rule) => out.push({ id: 'bn-' + Math.random().toString(36).slice(2, 8), name, icon, rule })
+
+  if (items.filter(i => i.type === 'graded').length >= 3) push('Graded slabs', '🏆', { type: 'graded' })
+  if (items.filter(i => i.type === 'sealed').length >= 3) push('Sealed', '📦', { type: 'sealed' })
+
+  const games = new Map()
+  for (const it of items) games.set(normGame(it.game), (games.get(normGame(it.game)) || 0) + 1)
+  if (games.size >= 2) {
+    for (const [g, n] of [...games.entries()].sort((a, b) => b[1] - a[1])) {
+      if (n >= 6) push(GAME_LABELS[g] || g, '🃏', { game: g })
+    }
+  }
+
+  const sets = new Map()
+  for (const it of items) if ((it.type || 'card') === 'card' && it.setName) sets.set(it.setName, (sets.get(it.setName) || 0) + 1)
+  for (const [set, n] of [...sets.entries()].sort((a, b) => b[1] - a[1]).slice(0, 6)) {
+    if (n >= 8) push(set, '📚', { set, type: 'card' })
+  }
+
+  if (items.filter(i => i.price > 0 && i.price <= 5).length >= 10) push('Bargain bin — under $5', '🪙', { pmax: 5 })
+  if (items.filter(i => i.price >= 50).length >= 4) push('Heavy hitters — $50+', '💎', { pmin: 50 })
+
+  return out.slice(0, 12)
 }
 
 export function boothTotal(booth) {
