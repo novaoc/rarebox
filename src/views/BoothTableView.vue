@@ -37,12 +37,12 @@
           <div class="bt-item-meta">
             <span class="bt-price">$<input type="number" min="0" step="0.01" class="bt-price-input" v-model.number="it.price" @change="persist" /></span>
             <span v-if="(it.qty || 1) > 1" class="badge badge-info">×{{ it.qty }}</span>
+            <button class="btn btn-ghost btn-icon" aria-label="Remove listing (not a sale)" @click="removeQuiet(i)">✕</button>
           </div>
         </div>
         <div class="bt-item-actions">
           <button class="bt-deal bt-deal-cash" @click="deal(i, 'cash')">💵 Sold</button>
           <button class="bt-deal bt-deal-trade" @click="deal(i, 'trade')">🔁 Trade</button>
-          <button class="btn btn-ghost btn-icon bt-remove" aria-label="Remove listing (not a sale)" @click="removeQuiet(i)">✕</button>
         </div>
       </div>
     </div>
@@ -343,12 +343,14 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-.bt-page { max-width: 720px; margin: 0 auto; padding: 0 14px 90px; }
+.bt-page { max-width: 720px; margin: 0 auto; padding: 0 14px calc(90px + env(safe-area-inset-bottom, 0px)); }
 
+/* bare route = no app chrome, so the header pads for the device status bar
+   itself (clock/battery on notched phones) plus breathing room everywhere */
 .bt-head {
   position: sticky; top: 0; z-index: 20;
   display: flex; align-items: center; gap: 10px;
-  padding: 12px 0 10px;
+  padding: calc(18px + env(safe-area-inset-top, 0px)) 0 10px;
   background: var(--bg-body, var(--bg-secondary));
   border-bottom: var(--bw) solid var(--ink);
 }
@@ -377,7 +379,7 @@ onBeforeUnmount(() => {
 .bt-item-meta { display: flex; align-items: center; gap: 8px; margin-top: 4px; }
 .bt-price { font-weight: 800; font-size: 13px; display: inline-flex; align-items: center; }
 .bt-price-input {
-  width: 76px; font: inherit; font-weight: 800;
+  width: 88px; font: inherit; font-weight: 800;
   border: 1.5px solid var(--border-subtle); border-radius: 7px;
   padding: 4px 6px; margin-left: 2px;
   background: var(--bg-card); color: inherit;
@@ -394,7 +396,6 @@ onBeforeUnmount(() => {
 .bt-deal:active { box-shadow: none; transform: translate(1px, 1px); }
 .bt-deal-cash { background: var(--accent); color: var(--on-accent); }
 .bt-deal-trade { background: var(--bg-card); }
-.bt-remove { align-self: center; }
 
 .bt-log { margin-top: 20px; }
 .bt-log-toggle {
@@ -407,7 +408,7 @@ onBeforeUnmount(() => {
 .bt-log-name { flex: 1; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .bt-toast {
-  position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%);
+  position: fixed; left: 50%; bottom: calc(22px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%);
   z-index: 120;
   display: flex; align-items: center; gap: 12px;
   padding: 10px 14px;
@@ -437,7 +438,7 @@ onBeforeUnmount(() => {
   position: fixed; inset: 0; z-index: 400;
   background: var(--bg-secondary, #faf6ef);
   display: flex; align-items: center; justify-content: center;
-  padding: 24px;
+  padding: calc(24px + env(safe-area-inset-top, 0px)) 24px calc(24px + env(safe-area-inset-bottom, 0px));
 }
 .bt-kiosk-inner { display: flex; flex-direction: column; align-items: center; gap: 14px; text-align: center; max-width: 92vw; }
 .bt-kiosk-name { font-size: clamp(20px, 4vw, 30px); font-weight: 900; }
@@ -453,7 +454,12 @@ onBeforeUnmount(() => {
 @keyframes bt-pulse { 50% { opacity: 0.45; } }
 
 @media (max-width: 480px) {
-  .bt-item-actions { flex-direction: column; }
   .bt-deal { min-width: 84px; padding: 9px 10px; }
+  /* Narrow phones & foldable cover screens: the one-row header truncates
+     the booth name into "Wren'…" — wrap instead: buttons up top, then the
+     full title + recap chips on their own line */
+  .bt-head { flex-wrap: wrap; justify-content: space-between; }
+  .bt-head-main { order: 3; flex-basis: 100%; }
+  .bt-title { white-space: normal; }
 }
 </style>
