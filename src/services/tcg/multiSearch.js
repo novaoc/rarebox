@@ -119,7 +119,10 @@ async function getOptCards() {
 
 async function searchOnePiece(query) {
   const [cards, priceMap] = await Promise.all([getOptCards(), getOpPriceMap()])
-  const matches = cards.filter(c => tokenMatch(query, c.card_name, c.card_set_id)).slice(0, 50) // cap at 50 to avoid huge payloads
+  // Cap to avoid huge payloads — but generously: popular names ("Monkey.D.Luffy")
+  // span 50+ printings, and smartSearch may post-filter to one set, so a tight
+  // cap can drop the exact card the user asked for.
+  const matches = cards.filter(c => tokenMatch(query, c.card_name, c.card_set_id)).slice(0, 150)
   return {
     cards: matches.map(c => {
       const variant = opVariantSlug(c.card_name)
@@ -372,7 +375,14 @@ async function searchSealed(query) {
 // ── Yu-Gi-Oh: YGOPRODeck ────────────────────────────────────────────────────
 async function searchYugioh(query) {
   const url = `https://db.ygoprodeck.com/api/v7/cardinfo.php?fname=${encodeURIComponent(query)}`
-  const [d, priceMap] = await Promise.all([fetchJson(url), getYgoPriceMap()])
+  // some multi-word fname queries 400 — the hyphenated form succeeds
+  // ("blue eyes white dragon" → "blue-eyes-white-dragon")
+  const fetchYgo = () => fetchJson(url).catch(() => {
+    const alt = query.trim().replace(/\s+/g, '-')
+    if (alt === query.trim()) throw new Error('ygo_search_failed')
+    return fetchJson(`https://db.ygoprodeck.com/api/v7/cardinfo.php?fname=${encodeURIComponent(alt)}`)
+  })
+  const [d, priceMap] = await Promise.all([fetchYgo(), getYgoPriceMap()])
   const arr = d.data || []
   return {
     cards: arr.map(c => {

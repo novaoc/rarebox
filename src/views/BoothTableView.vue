@@ -21,7 +21,14 @@
     <p v-if="atCap" class="bt-cap-note">Booth is full ({{ MAX_BOOTH_ITEMS }}) — remove something or split into a second booth.</p>
 
     <div v-if="!visibleItems.length" class="empty-state">
-      <p v-if="filter.trim()">No listings match.</p>
+      <template v-if="filter.trim()">
+        <p>No listings match.</p>
+        <!-- The real table flow: check inventory first, then the catalog -->
+        <p v-if="catalogHint" class="bt-catalog-hint">
+          Not in your booth — search the catalog →
+          <button class="btn btn-secondary btn-sm" @click="searchCatalogFromFilter">Search "{{ filterDebounced.trim() }}"</button>
+        </p>
+      </template>
       <p v-else>Nothing listed. Hit <strong>+ Add</strong> to put cards or sealed on the table.</p>
     </div>
 
@@ -111,7 +118,8 @@
             <span v-for="u in searchUnderstood" :key="u" class="bt-understood-chip">{{ u }}</span>
           </div>
           <div class="bt-search-list">
-            <div v-for="c in visibleResults" :key="(c.graded ? 'g' : c.sealed ? 's' : 'c') + (c.game || '') + c.id" class="bt-search-row">
+            <div v-for="(c, ri) in visibleResults" :key="(c.graded ? 'g' : c.sealed ? 's' : 'c') + (c.game || '') + c.id" class="bt-search-row" :class="{ 'bt-top-match': ri === 0 && searchCat !== 'graded' }">
+              <span v-if="ri === 0 && searchCat !== 'graded'" class="bt-top-chip">Top match</span>
               <img v-if="c.image" :src="c.image" class="bt-search-img" loading="lazy" @error="$event.target.style.display='none'" />
               <span v-else class="bt-search-img bt-search-noimg"><RbIcon name="card" :size="22" /></span>
               <span class="bt-search-name">{{ c.name }} <span v-if="c.sealed" class="badge badge-info bt-sealed">Sealed</span><span v-else-if="c.jp" class="badge badge-info bt-sealed">JP</span>
@@ -296,6 +304,7 @@ import RbIcon from '../components/icons/RbIcon.vue'
 import { loadJournal, addEntry, removeEntry, todayEntries, boothEntries, journalTotals, generateJournalId } from '../utils/boothJournal'
 import { exportBoothLedger } from '../utils/boothExcel'
 import { smartSearch, warmSearchIntel } from '../utils/searchIntel'
+import { rankForTable, dedupeForTable } from '../utils/tableSearchRank'
 import { searchGradedProducts } from '../services/priceServer'
 import { tokenMatch } from '../utils/search'
 import { generateSecret, displayUrl, deriveChannel, deriveSigChannel, publishState, subscribeSig } from '../utils/remoteQr'
@@ -343,6 +352,17 @@ const listLimit = ref(LIST_WINDOW)
 watch(filterDebounced, () => { listLimit.value = LIST_WINDOW })
 const visibleItems = computed(() => matchedItems.value.slice(0, listLimit.value))
 const hiddenCount = computed(() => Math.max(0, matchedItems.value.length - listLimit.value))
+
+// Filter found nothing on the table → offer the catalog (debounced value so
+// the hint can't flash while the list is still narrowing)
+const catalogHint = computed(() =>
+  filterDebounced.value.trim().length >= 2 && matchedItems.value.length === 0)
+
+async function searchCatalogFromFilter() {
+  searchQuery.value = filterDebounced.value.trim()
+  await openSearch() // opens the modal + focuses the input
+  runSearch()
+}
 
 function fmtMoney(n) {
   // table cash can run negative — buying hard mid-show is normal dealering
@@ -417,20 +437,22 @@ function openTrade(i) {
 }
 function closeTrade() { trade.value = null }
 
+let tradeSeq = 0
 async function runTradeSearch() {
   const q = tradeQuery.value.trim()
   if (q.length < 2) return
+  const seq = ++tradeSeq
   tradeBusy.value = true
   try {
-    const [cardsRes, sealedRes] = await Promise.allSettled([
-      multiSearch(q, { page: 1, pageSize: 16 }),
-      searchSealed(q, { limit: 10 }),
-    ])
-    tradeResults.value = [
-      ...(cardsRes.status === 'fulfilled' ? cardsRes.value.cards : []),
-      ...(sealedRes.status === 'fulfilled' ? sealedRes.value : []),
-    ]
-  } catch { tradeResults.value = [] } finally { tradeBusy.value = false }
+    const { cards, sealed } = await smartSearch(q, { pageSize: 16, sealedLimit: 10 })
+    if (seq !== tradeSeq) return
+    tradeResults.value = dedupeForTable(rankForTable([...cards, ...sealed], q))
+  } catch {
+    if (seq !== tradeSeq) return
+    tradeResults.value = []
+  } finally {
+    if (seq === tradeSeq) tradeBusy.value = false
+  }
 }
 
 function takeIncoming(c) {
@@ -614,7 +636,9 @@ async function runSearch() {
   try {
     const { cards, sealed, understood } = await smartSearch(q, { pageSize: 24, sealedLimit: 12 })
     if (seq !== searchSeq) return // a newer search superseded this one
-    searchResults.value = [...cards, ...sealed]
+    // table mode: precision re-rank (exact id/number/set/variant first,
+    // price-desc tiebreak) + collapse duplicate rows before they render
+    searchResults.value = dedupeForTable(rankForTable([...cards, ...sealed], q))
     searchUnderstood.value = understood
   } catch {
     if (seq !== searchSeq) return
@@ -879,6 +903,28 @@ onBeforeUnmount(() => {
 .bt-search-price { font-weight: 800; font-size: 12.5px; white-space: nowrap; }
 .bt-search-msg { font-size: 13px; text-align: center; padding: 16px 0; }
 .bt-sealed { font-size: 9.5px; vertical-align: 2px; }
+
+/* best-match affordance: the seller's eye lands on row one instantly */
+.bt-search-row.bt-top-match {
+  position: relative;
+  border: 2px solid var(--accent);
+  background: var(--accent-dim, transparent);
+  margin-top: 8px; /* room for the chip riding the border */
+}
+.bt-top-chip {
+  position: absolute; top: -9px; right: 10px;
+  font-size: 9.5px; font-weight: 900; letter-spacing: 0.04em; text-transform: uppercase;
+  padding: 1px 8px;
+  background: var(--accent); color: var(--on-accent);
+  border: 1.5px solid var(--ink); border-radius: 99px;
+  pointer-events: none;
+}
+
+/* inventory miss → catalog handoff */
+.bt-catalog-hint {
+  display: flex; align-items: center; justify-content: center; gap: 8px; flex-wrap: wrap;
+  font-size: 13px; font-weight: 700; margin-top: 8px;
+}
 
 /* buy mode + trade sheet */
 .bt-buy-toggle { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 700; margin: -4px 0 10px; cursor: pointer; }

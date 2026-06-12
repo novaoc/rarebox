@@ -29,6 +29,10 @@ async function loadIndex() {
   return _loading
 }
 
+function stripZeros(s) {
+  return s.replace(/^0+(?=\d)/, '')
+}
+
 function jpImage(setId, localId) {
   const series = jpSetToSeries(setId)
   return series ? `https://assets.tcgdex.net/ja/${series}/${setId}/${localId}/low.webp` : ''
@@ -42,15 +46,19 @@ function jpSetLabel(setId) {
 
 /**
  * Search JP cards by English name. Optional setIds restricts to specific
- * tcgdex sets (case-insensitive). Returns booth-search-shaped results.
+ * tcgdex sets (case-insensitive); optional number matches the localId with
+ * zero-padding tolerance ("110" hits "110", "012" hits "12").
+ * Returns booth-search-shaped results.
  */
-export async function searchJapanese(query, { limit = 24, setIds = null } = {}) {
+export async function searchJapanese(query, { limit = 24, setIds = null, number = null } = {}) {
   const idx = await loadIndex()
   const q = (query || '').trim()
   const wantSets = setIds ? new Set(setIds.map(s => String(s).toLowerCase())) : null
+  const wantNum = number != null && number !== '' ? stripZeros(String(number)) : null
   const out = []
   for (const [setId, localId, name, price] of idx) {
     if (wantSets && !wantSets.has(setId.toLowerCase())) continue
+    if (wantNum && stripZeros(String(localId)) !== wantNum) continue
     if (q && !tokenMatch(q, name)) continue
     out.push({
       id: `${setId}-${localId}`,
