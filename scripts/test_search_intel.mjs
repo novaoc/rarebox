@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// WebRTC P2P loopback test — real RTCPeerConnections in real Chrome.
+// Search-intelligence test — parseQuery/smartSearch in real Chrome against live APIs + the real jp-index.
 //
 // Drives the system Chrome (headless) via puppeteer-core, serves the repo
 // over a throwaway local HTTP server so src modules load as ES modules,
@@ -20,7 +20,7 @@ import puppeteer from 'puppeteer-core'
 const ROOT = new URL('..', import.meta.url).pathname
 const CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
 const MIME = { '.js': 'text/javascript', '.mjs': 'text/javascript', '.html': 'text/html', '.json': 'application/json' }
-const PAGE_FILE = 'scripts/p2p_loopback_page.html'
+const PAGE_FILE = 'scripts/search_intel_page.html'
 
 
 const server = http.createServer(async (req, res) => {
@@ -30,7 +30,9 @@ const server = http.createServer(async (req, res) => {
     : join(ROOT, clean)
   if (clean === '/test') res.setHeader('content-type', 'text/html')
   try {
-    const data = await readFile(path)
+    let data
+    try { data = await readFile(path) }
+    catch { data = await readFile(join(ROOT, 'public', clean)) }  // /jp-index.json, /sealed-index/*
     res.setHeader('content-type', MIME[extname(path)] || 'application/octet-stream')
     res.end(data)
   } catch { res.statusCode = 404; res.end('nope') }
@@ -43,7 +45,7 @@ const page = await browser.newPage()
 page.on('console', m => /FAIL|EXCEPTION/.test(m.text()) && console.log('[page]', m.text()))
 page.on('pageerror', e => console.log('[pageerror]', e.message))
 await page.goto(`http://127.0.0.1:${port}/test`)
-await page.waitForFunction('window.__R && window.__R.done', { timeout: 60000 })
+await page.waitForFunction('window.__R && window.__R.done', { timeout: 120000 })
 const { checks } = await page.evaluate('window.__R')
 
 let failures = 0
@@ -53,5 +55,5 @@ for (const c of checks) {
 }
 await browser.close()
 server.close()
-console.log(failures ? `\n✗ ${failures} failure(s)` : '\n✓ WebRTC loopback: all checks passed')
+console.log(failures ? `\n✗ ${failures} failure(s)` : '\n✓ search intelligence: all checks passed')
 process.exit(failures ? 1 : 0)

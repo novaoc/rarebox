@@ -121,6 +121,27 @@ function priceForGrade(product, grade) {
  * @param {string} query  - e.g. "Gengar VMAX Fusion Strike"
  * @param {string} grade  - "ungraded", "9", "10", "psa10", etc.
  */
+/**
+ * Graded-market search for the booth pickers: products that actually have
+ * graded prices, mapped to { name, set, image, psa9, psa10 }. psa9 ≈
+ * PriceCharting's mid-grade band (PSA 8-9), psa10 = gem mint.
+ */
+export async function searchGradedProducts(query, { limit = 12 } = {}) {
+  const products = await searchPC(query)
+  return products
+    .map(p => ({
+      id: String(p.id ?? p.productName ?? ''),
+      name: p.productName || '',
+      set: p.consoleName || '',
+      image: p.imageUri || '',
+      psa9: parsePrice(p.price2),
+      psa10: parsePrice(p.price3),
+      graded: true,
+    }))
+    .filter(p => p.name && (p.psa9 || p.psa10))
+    .slice(0, limit)
+}
+
 export async function fetchPrice(query, grade = 'ungraded') {
   const q = query.trim()
   if (!q) throw new Error('empty_query')

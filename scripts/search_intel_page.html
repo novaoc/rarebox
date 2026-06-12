@@ -1,0 +1,71 @@
+<!doctype html><meta charset="utf-8">
+<script type="importmap">
+{
+  "imports": {
+    "dexie": "/node_modules/dexie/dist/dexie.mjs",
+    "/src/db": "/src/db.js",
+    "/src/utils/search": "/src/utils/search.js",
+    "/src/services/pokemonApi": "/src/services/pokemonApi.js",
+    "/src/services/jpSearch": "/src/services/jpSearch.js",
+    "/src/services/sealedIndex": "/src/services/sealedIndex.js",
+    "/src/services/tcg/multiSearch": "/src/services/tcg/multiSearch.js",
+    "/src/services/tcg/providers": "/src/services/tcg/providers.js",
+    "/src/services/tcg/cardCache": "/src/services/tcg/cardCache.js",
+    "/src/services/tcg/cardCache.js": "/src/services/tcg/cardCache.js"
+  }
+}
+</script>
+<script type="module">
+import { parseQuery, smartSearch } from '/src/utils/searchIntel.js'
+
+const R = { checks: [], done: false }
+window.__R = R
+const ok = (cond, label) => R.checks.push({ ok: !!cond, label })
+
+try {
+  // ── parsing ──
+  let p = await parseQuery('mega charizard ex JP')
+  ok(p.lang === 'ja', `"…JP" → Japanese (got ${p.lang})`)
+  ok(p.clean === 'mega charizard ex', `language token stripped ("${p.clean}")`)
+
+  p = await parseQuery('pikachu ENG')
+  ok(p.lang === 'en', '"…ENG" → English')
+
+  p = await parseQuery('charizard M2')
+  ok(p.sets.some(s => s.lang === 'ja' && /^m2/i.test(s.setId)), `"M2" → JP M2 sets (${p.sets.map(s => s.setId).join(',')})`)
+  ok(p.lang === 'ja', 'JP-only set code implies Japanese')
+
+  p = await parseQuery('luffy OP-05')
+  ok(p.sets.some(s => s.game === 'one-piece' && s.setId === 'OP-05'), `"OP-05" → One Piece set (${p.sets.map(s => s.setId).join(',')})`)
+
+  p = await parseQuery('zoro OP05')
+  ok(p.sets.some(s => s.game === 'one-piece' && s.setId === 'OP-05'), '"OP05" (no dash) resolves too')
+
+  p = await parseQuery('pikachu SV8 ENG')
+  ok(p.lang === 'en' && p.sets.length && p.sets.every(s => s.lang !== 'ja'), `"SV8 ENG" → EN sets only (${p.sets.map(s => s.setId).join(',')})`)
+
+  p = await parseQuery('blue-eyes MRD')
+  ok(p.sets.some(s => s.game === 'yugioh'), `"MRD" → YGO set (${p.sets.map(s => `${s.game}:${s.setId}`).join(',')})`)
+
+  p = await parseQuery('ice charizard')   // "ice" must NOT be eaten as a set code
+  ok(p.clean === 'ice charizard' && p.sets.length === 0, 'lowercase words never treated as set codes')
+
+  // ── the user's exact scenario ──
+  const r1 = await smartSearch('mega charizard ex JP')
+  ok(r1.cards.length > 0, `"mega charizard ex JP" finds cards (${r1.cards.length})`)
+  ok(r1.cards.every(c => c.jp), 'all results are Japanese')
+  ok(r1.cards.some(c => /inferno x|\(M2/i.test(c.set) || /^M2/i.test(c.id)), `includes Inferno X / M2 (top: ${r1.cards[0]?.name} — ${r1.cards[0]?.set})`)
+  ok(r1.understood.includes('Japanese only'), `understood badges: ${r1.understood.join(' · ')}`)
+
+  const r2 = await smartSearch('charizard M2')
+  ok(r2.cards.length > 0 && r2.cards.every(c => /^M2/i.test(String(c.id))), `"charizard M2" → only M2-family cards (${r2.cards.length})`)
+
+  const r3 = await smartSearch('pikachu SV8 ENG')
+  ok(r3.cards.length > 0, `"pikachu SV8 ENG" finds cards (${r3.cards.length})`)
+  ok(r3.cards.every(c => c.game === 'pokemon' && !c.jp), 'all English Pokémon')
+  ok(r3.cards.every(c => /^sv8/i.test(String(c.id))), `all from the SV8 family (top: ${r3.cards[0]?.name} ${r3.cards[0]?.id})`)
+} catch (e) {
+  R.checks.push({ ok: false, label: 'EXCEPTION: ' + (e?.message || e) })
+}
+R.done = true
+</script>

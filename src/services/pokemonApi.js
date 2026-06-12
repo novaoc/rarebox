@@ -112,7 +112,7 @@ export async function getSets() {
       return JSON.parse(cached) // stale sets beat an offline error
     }
   } catch { /* corrupt cache — refetch */ }
-  const url = `${BASE_URL}/sets?orderBy=-releaseDate&select=id,name,series,total,printedTotal,releaseDate,images`
+  const url = `${BASE_URL}/sets?orderBy=-releaseDate&select=id,name,series,ptcgoCode,total,printedTotal,releaseDate,images`
   const data = await fetchWithCache(url)
   const sets = data.data
   localStorage.setItem(LS_KEY, JSON.stringify(sets))

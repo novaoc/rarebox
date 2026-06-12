@@ -97,14 +97,31 @@
             <input type="checkbox" v-model="buyMode" />
             <RbIcon name="coin" :size="15" /> I'm buying these — log what I paid &amp; deduct it from table cash
           </label>
+          <!-- Type chips — narrow without retyping; counts come from the
+               results already fetched, Graded fetches its own market lazily -->
+          <div class="bt-cats">
+            <button v-for="cat in CATS" :key="cat.id" class="bt-cat" :class="{ active: searchCat === cat.id }" @click="setCat(cat.id)">
+              {{ cat.label }}<span v-if="searched && catCount(cat.id) !== null" class="bt-cat-n">{{ catCount(cat.id) }}</span>
+            </button>
+          </div>
+          <div v-if="searchUnderstood.length" class="bt-understood">
+            <span v-for="u in searchUnderstood" :key="u" class="bt-understood-chip">{{ u }}</span>
+          </div>
           <div class="bt-search-list">
-            <div v-for="c in searchResults" :key="(c.sealed ? 's' : 'c') + c.game + c.id" class="bt-search-row">
+            <div v-for="c in visibleResults" :key="(c.graded ? 'g' : c.sealed ? 's' : 'c') + (c.game || '') + c.id" class="bt-search-row">
               <img v-if="c.image" :src="c.image" class="bt-search-img" loading="lazy" @error="$event.target.style.display='none'" />
               <span v-else class="bt-search-img bt-search-noimg"><RbIcon name="card" :size="22" /></span>
-              <span class="bt-search-name">{{ c.name }} <span v-if="c.sealed" class="badge badge-info bt-sealed">Sealed</span>
+              <span class="bt-search-name">{{ c.name }} <span v-if="c.sealed" class="badge badge-info bt-sealed">Sealed</span><span v-else-if="c.jp" class="badge badge-info bt-sealed">JP</span>
                 <span class="bt-search-sub">{{ [c.set, c.number ? '#' + c.number : ''].filter(Boolean).join(' · ') }}</span>
               </span>
-              <template v-if="buyMode">
+              <template v-if="c.graded">
+                <span v-if="buyMode" class="bt-cost-wrap">paid $<input type="number" min="0" step="0.01" class="bt-cost" v-model.number="c._cost" /></span>
+                <span class="bt-grade-btns">
+                  <button v-if="c.psa9" class="btn btn-secondary btn-sm" :disabled="atCap" @click="addGraded(c, 'PSA 9', c.psa9, buyMode)">9 · {{ fmtMoney(c.psa9) }}</button>
+                  <button v-if="c.psa10" class="btn btn-primary btn-sm" :disabled="atCap" @click="addGraded(c, 'PSA 10', c.psa10, buyMode)">10 · {{ fmtMoney(c.psa10) }}</button>
+                </span>
+              </template>
+              <template v-else-if="buyMode">
                 <span class="bt-cost-wrap">paid $<input type="number" min="0" step="0.01" class="bt-cost" v-model.number="c._cost" :placeholder="c.price ? c.price.toFixed(2) : '0'" /></span>
                 <button class="btn btn-primary btn-sm" :disabled="atCap" @click="addFromSearch(c, true)"><RbIcon name="coin" :size="14" /> Buy</button>
               </template>
@@ -113,8 +130,9 @@
                 <button class="btn btn-primary btn-sm" :disabled="atCap" @click="addFromSearch(c)">+ Add</button>
               </template>
             </div>
-            <p v-if="searchBusy" class="text-muted bt-search-msg">Searching…</p>
-            <p v-else-if="searched && !searchResults.length" class="text-muted bt-search-msg">No matches — try fewer words.</p>
+            <p v-if="searchBusy || gradedBusy" class="text-muted bt-search-msg">Searching…</p>
+            <p v-else-if="searched && searchCat === 'graded' && !visibleResults.length" class="text-muted bt-search-msg">No graded market found — graded prices come from PriceCharting and need a connection.</p>
+            <p v-else-if="searched && !visibleResults.length" class="text-muted bt-search-msg">No {{ searchCat === 'all' ? 'matches' : searchCat }} — try fewer words or another type.</p>
             <p v-else-if="!searched" class="text-muted bt-search-msg">Singles and sealed, all six games. Bought a collection mid-show? Flip the toggle and the cost comes off your table cash.</p>
           </div>
         </div>
@@ -154,7 +172,7 @@
             <div v-for="c in tradeResults" :key="(c.sealed ? 's' : 'c') + c.game + c.id" class="bt-search-row">
               <img v-if="c.image" :src="c.image" class="bt-search-img" loading="lazy" @error="$event.target.style.display='none'" />
               <span v-else class="bt-search-img bt-search-noimg"><RbIcon name="card" :size="22" /></span>
-              <span class="bt-search-name">{{ c.name }} <span v-if="c.sealed" class="badge badge-info bt-sealed">Sealed</span>
+              <span class="bt-search-name">{{ c.name }} <span v-if="c.sealed" class="badge badge-info bt-sealed">Sealed</span><span v-else-if="c.jp" class="badge badge-info bt-sealed">JP</span>
                 <span class="bt-search-sub">{{ [c.set, c.number ? '#' + c.number : ''].filter(Boolean).join(' · ') }}</span>
               </span>
               <span class="bt-search-price">{{ c.price ? fmtMoney(c.price) : '—' }}</span>
@@ -274,8 +292,8 @@ import BoothLiveQr from '../components/BoothLiveQr.vue'
 import RbIcon from '../components/icons/RbIcon.vue'
 import { loadJournal, addEntry, removeEntry, todayEntries, boothEntries, journalTotals, generateJournalId } from '../utils/boothJournal'
 import { exportBoothLedger } from '../utils/boothExcel'
-import { multiSearch } from '../services/tcg/multiSearch'
-import { searchSealed } from '../services/sealedIndex'
+import { smartSearch } from '../utils/searchIntel'
+import { searchGradedProducts } from '../services/priceServer'
 import { tokenMatch } from '../utils/search'
 import { generateSecret, displayUrl, deriveChannel, deriveSigChannel, publishState, subscribeSig } from '../utils/remoteQr'
 import { phonePeer } from '../utils/remoteP2p'
@@ -487,6 +505,62 @@ const searchOpen = ref(false)
 const searchInput = ref(null)
 const searchQuery = ref('')
 const searchResults = ref([])
+const searchUnderstood = ref([])
+// ── Type chips: singles/sealed filter the fetched results instantly;
+//    graded lazily searches PriceCharting (the only graded-price source)
+const CATS = [
+  { id: 'all', label: 'All' },
+  { id: 'singles', label: 'Singles' },
+  { id: 'sealed', label: 'Sealed' },
+  { id: 'graded', label: 'Graded' },
+]
+const searchCat = ref('all')
+const gradedResults = ref([])
+const gradedBusy = ref(false)
+let gradedFor = ''
+
+const visibleResults = computed(() => {
+  if (searchCat.value === 'graded') return gradedResults.value
+  if (searchCat.value === 'singles') return searchResults.value.filter(c => !c.sealed)
+  if (searchCat.value === 'sealed') return searchResults.value.filter(c => c.sealed)
+  return searchResults.value
+})
+
+function catCount(id) {
+  if (id === 'all') return searchResults.value.length
+  if (id === 'singles') return searchResults.value.filter(c => !c.sealed).length
+  if (id === 'sealed') return searchResults.value.filter(c => c.sealed).length
+  return gradedFor === searchQuery.value.trim() ? gradedResults.value.length : null
+}
+
+function setCat(id) {
+  searchCat.value = id
+  if (id === 'graded') ensureGraded()
+}
+
+async function ensureGraded() {
+  const q = searchQuery.value.trim()
+  if (q.length < 2 || gradedFor === q) return
+  gradedBusy.value = true
+  try {
+    gradedResults.value = await searchGradedProducts(q, { limit: 14 })
+    gradedFor = q
+  } catch { gradedResults.value = [] } finally { gradedBusy.value = false }
+}
+
+function addGraded(c, gradeLabel, price, asBuy = false) {
+  addFromSearch({
+    gradedAs: gradeLabel,
+    game: '',
+    id: c.id,
+    name: `${c.name} · ${gradeLabel}`,
+    set: c.set,
+    number: '',
+    price,
+    image: c.image,
+    _cost: c._cost,
+  }, asBuy)
+}
 const searchBusy = ref(false)
 const searched = ref(false)
 const addedFlash = ref(false)
@@ -503,26 +577,25 @@ async function runSearch() {
   if (q.length < 2) return
   searchBusy.value = true
   try {
-    const [cardsRes, sealedRes] = await Promise.allSettled([
-      multiSearch(q, { page: 1, pageSize: 24 }),
-      searchSealed(q, { limit: 12 }),
-    ])
-    searchResults.value = [
-      ...(cardsRes.status === 'fulfilled' ? cardsRes.value.cards : []),
-      ...(sealedRes.status === 'fulfilled' ? sealedRes.value : []),
-    ]
+    const { cards, sealed, understood } = await smartSearch(q, { pageSize: 24, sealedLimit: 12 })
+    searchResults.value = [...cards, ...sealed]
+    searchUnderstood.value = understood
   } catch {
     searchResults.value = []
+    searchUnderstood.value = []
   } finally {
     searchBusy.value = false
     searched.value = true
   }
+  gradedFor = ''
+  gradedResults.value = []
+  if (searchCat.value === 'graded') ensureGraded()
 }
 
 function addFromSearch(c, asBuy = false) {
   if (atCap.value) return
   booth.value.items.unshift({
-    type: c.sealed ? 'sealed' : 'card',
+    type: c.gradedAs ? 'graded' : (c.sealed ? 'sealed' : 'card'),
     game: c.game || 'pokemon',
     cardId: c.id || '',
     name: c.name || '',
@@ -843,4 +916,23 @@ onBeforeUnmount(() => {
 .bt-tip-deep { margin-top: 12px; border-top: 1.5px dashed var(--ink); padding-top: 10px; }
 .bt-tip-deep h4 { font-size: 12px; font-weight: 900; letter-spacing: 0.4px; text-transform: uppercase; margin: 10px 0 4px; }
 .bt-tip-deep p { font-size: 12.5px; line-height: 1.55; color: var(--text-secondary); margin-bottom: 8px; }
+.bt-cats { display: flex; gap: 6px; margin: 8px 0 2px; flex-wrap: wrap; }
+.bt-cat {
+  font: inherit; font-size: 12px; font-weight: 800;
+  padding: 5px 11px; cursor: pointer;
+  color: var(--ink); background: var(--bg-card);
+  border: 1.5px solid var(--ink); border-radius: 99px;
+  box-shadow: var(--shadow-pressed);
+}
+.bt-cat:active { box-shadow: none; transform: translate(1px, 1px); }
+.bt-cat.active { background: var(--accent); color: var(--on-accent); }
+.bt-cat-n { margin-left: 5px; font-size: 10.5px; opacity: 0.75; }
+.bt-grade-btns { display: flex; gap: 5px; flex-shrink: 0; }
+.bt-grade-btns .btn { font-size: 11px; padding: 5px 8px; white-space: nowrap; }
+.bt-understood { display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap; }
+.bt-understood-chip {
+  font-size: 11px; font-weight: 800;
+  padding: 2px 9px;
+  background: var(--accent-dim); border: 1.5px solid var(--ink); border-radius: 99px;
+}
 </style>

@@ -114,6 +114,11 @@
             <option v-for="p in store.portfolios" :key="p.id" :value="p.id">{{ p.name }} ({{ p.items.length }})</option>
           </select>
           <input v-model="pickerFilter" class="input" placeholder="Filter by name…" style="margin-bottom: 12px" />
+          <div class="be-cats">
+            <button v-for="cat in CATS" :key="cat.id" class="be-cat" :class="{ active: pickerCat === cat.id }" @click="pickerCat = cat.id">
+              {{ cat.label }}<span class="be-cat-n">{{ pickerCatCount(cat.id) }}</span>
+            </button>
+          </div>
           <div class="picker-list">
             <label v-for="item in pickerItems" :key="item.id" class="picker-row">
               <input type="checkbox" v-model="picked" :value="item.id" />
@@ -147,16 +152,33 @@
               {{ searchBusy ? '…' : 'Search' }}
             </button>
           </form>
+          <div v-if="searchUnderstood.length" class="be-understood">
+            <span v-for="u in searchUnderstood" :key="u" class="be-understood-chip">{{ u }}</span>
+          </div>
+          <div class="be-cats">
+            <button v-for="cat in CATS" :key="cat.id" class="be-cat" :class="{ active: searchCat === cat.id }" @click="setCat(cat.id)">
+              {{ cat.label }}<span v-if="searched && catCount(cat.id) !== null" class="be-cat-n">{{ catCount(cat.id) }}</span>
+            </button>
+          </div>
           <div class="search-list">
-            <div v-for="c in searchResults" :key="c.game + c.id" class="picker-row search-row">
+            <div v-for="c in visibleResults" :key="(c.graded ? 'g' : '') + (c.game || '') + c.id" class="picker-row search-row">
               <img v-if="c.image" :src="c.image" class="search-img" loading="lazy" @error="$event.target.style.display='none'" />
               <span v-else class="search-img search-noimg">🃏</span>
-              <span class="picker-name">{{ c.name }} <span v-if="c.sealed" class="badge badge-info be-sealed-badge">Sealed</span><span class="picker-sub" style="display:block">{{ [gameLabel(c.game), c.set, c.number ? '#' + c.number : ''].filter(Boolean).join(' · ') }}</span></span>
-              <span class="picker-price">{{ c.price ? fmtMoney(c.price) : '—' }}</span>
-              <button class="btn btn-primary btn-sm" :disabled="atCap" @click="addFromSearch(c)">+ Add</button>
+              <span class="picker-name">{{ c.name }} <span v-if="c.sealed" class="badge badge-info be-sealed-badge">Sealed</span><span v-else-if="c.jp" class="badge badge-info be-sealed-badge">JP</span><span class="picker-sub" style="display:block">{{ [gameLabel(c.game), c.set, c.number ? '#' + c.number : ''].filter(Boolean).join(' · ') }}</span></span>
+              <template v-if="c.graded">
+                <span class="be-grade-btns">
+                  <button v-if="c.psa9" class="btn btn-secondary btn-sm" :disabled="atCap" @click="addGraded(c, 'PSA 9', c.psa9)">9 · {{ fmtMoney(c.psa9) }}</button>
+                  <button v-if="c.psa10" class="btn btn-primary btn-sm" :disabled="atCap" @click="addGraded(c, 'PSA 10', c.psa10)">10 · {{ fmtMoney(c.psa10) }}</button>
+                </span>
+              </template>
+              <template v-else>
+                <span class="picker-price">{{ c.price ? fmtMoney(c.price) : '—' }}</span>
+                <button class="btn btn-primary btn-sm" :disabled="atCap" @click="addFromSearch(c)">+ Add</button>
+              </template>
             </div>
-            <p v-if="searchBusy" class="text-muted search-msg">Searching all games…</p>
-            <p v-else-if="searched && !searchResults.length" class="text-muted search-msg">No matches — try fewer words.</p>
+            <p v-if="searchBusy || gradedBusy" class="text-muted search-msg">Searching…</p>
+            <p v-else-if="searched && searchCat === 'graded' && !visibleResults.length" class="text-muted search-msg">No graded market found — graded prices come from PriceCharting and need a connection.</p>
+            <p v-else-if="searched && !visibleResults.length" class="text-muted search-msg">No {{ searchCat === 'all' ? 'matches' : searchCat }} — try fewer words or another type.</p>
             <p v-else-if="!searched" class="text-muted search-msg">Search singles and sealed (boxes, ETBs, decks) across all six games — list things that aren't on your shelves yet.</p>
           </div>
         </div>
@@ -206,8 +228,8 @@ import { useRoute } from 'vue-router'
 import { usePortfolioStore } from '../stores/portfolio'
 import BoothShareModal from '../components/BoothShareModal.vue'
 import { loadBooths, saveBooths, boothTotal, MAX_BOOTH_ITEMS } from '../utils/booth'
-import { multiSearch } from '../services/tcg/multiSearch'
-import { searchSealed } from '../services/sealedIndex'
+import { smartSearch } from '../utils/searchIntel'
+import { searchGradedProducts } from '../services/priceServer'
 import { uploadLogo, logoUploadAvailable } from '../services/imageHost'
 import RbIcon from '../components/icons/RbIcon.vue'
 
@@ -304,12 +326,25 @@ function openPicker() {
   pickerOpen.value = true
 }
 
+const pickerCat = ref('all')
 const pickerItems = computed(() => {
   const shelf = store.portfolios.find(p => p.id === pickerShelfId.value)
   if (!shelf) return []
   const q = pickerFilter.value.trim().toLowerCase()
-  return shelf.items.filter(it => !q || itemName(it).toLowerCase().includes(q))
+  return shelf.items.filter((it) => {
+    if (pickerCat.value !== 'all' && pickerTypeOf(it) !== pickerCat.value) return false
+    return !q || itemName(it).toLowerCase().includes(q)
+  })
 })
+function pickerTypeOf(it) {
+  return it.type === 'graded' ? 'graded' : it.type === 'sealed' ? 'sealed' : 'singles'
+}
+function pickerCatCount(id) {
+  const shelf = store.portfolios.find(p => p.id === pickerShelfId.value)
+  if (!shelf) return 0
+  if (id === 'all') return shelf.items.length
+  return shelf.items.filter(it => pickerTypeOf(it) === id).length
+}
 
 function itemName(item) {
   return item.cardData?.name || item.name || 'Item'
@@ -359,6 +394,49 @@ const searchOpen = ref(false)
 const searchInput = ref(null)
 const searchQuery = ref('')
 const searchResults = ref([])
+const searchUnderstood = ref([])
+const CATS = [
+  { id: 'all', label: 'All' },
+  { id: 'singles', label: 'Singles' },
+  { id: 'sealed', label: 'Sealed' },
+  { id: 'graded', label: 'Graded' },
+]
+const searchCat = ref('all')
+const gradedResults = ref([])
+const gradedBusy = ref(false)
+let gradedFor = ''
+
+const visibleResults = computed(() => {
+  if (searchCat.value === 'graded') return gradedResults.value
+  if (searchCat.value === 'singles') return searchResults.value.filter(c => !c.sealed)
+  if (searchCat.value === 'sealed') return searchResults.value.filter(c => c.sealed)
+  return searchResults.value
+})
+function catCount(id) {
+  if (id === 'all') return searchResults.value.length
+  if (id === 'singles') return searchResults.value.filter(c => !c.sealed).length
+  if (id === 'sealed') return searchResults.value.filter(c => c.sealed).length
+  return gradedFor === searchQuery.value.trim() ? gradedResults.value.length : null
+}
+function setCat(id) {
+  searchCat.value = id
+  if (id === 'graded') ensureGraded()
+}
+async function ensureGraded() {
+  const q = searchQuery.value.trim()
+  if (q.length < 2 || gradedFor === q) return
+  gradedBusy.value = true
+  try {
+    gradedResults.value = await searchGradedProducts(q, { limit: 14 })
+    gradedFor = q
+  } catch { gradedResults.value = [] } finally { gradedBusy.value = false }
+}
+function addGraded(c, gradeLabel, price) {
+  addFromSearch({
+    gradedAs: gradeLabel, game: '', id: c.id,
+    name: `${c.name} · ${gradeLabel}`, set: c.set, number: '', price, image: c.image,
+  })
+}
 const searchBusy = ref(false)
 const searched = ref(false)
 const addedFlash = ref(false)
@@ -374,16 +452,11 @@ async function runSearch() {
   if (q.length < 2) return
   searchBusy.value = true
   try {
-    // Singles from the live providers; sealed (boxes, ETBs, decks) from the
+    // Singles + sealed through the query-understanding layer (set codes,
     // static TCGplayer index — one search box covers the whole table.
-    const [cardsRes, sealedRes] = await Promise.allSettled([
-      multiSearch(q, { page: 1, pageSize: 30 }),
-      searchSealed(q, { limit: 16 }),
-    ])
-    searchResults.value = [
-      ...(cardsRes.status === 'fulfilled' ? cardsRes.value.cards : []),
-      ...(sealedRes.status === 'fulfilled' ? sealedRes.value : []),
-    ]
+    const { cards, sealed, understood } = await smartSearch(q, { pageSize: 30, sealedLimit: 16 })
+    searchResults.value = [...cards, ...sealed]
+    searchUnderstood.value = understood
   } catch {
     searchResults.value = []
   } finally {
@@ -394,7 +467,7 @@ async function runSearch() {
 
 function addFromSearch(c) {
   const ok = pushItem({
-    type: c.sealed ? 'sealed' : 'card',
+    type: c.gradedAs ? 'graded' : (c.sealed ? 'sealed' : 'card'),
     game: c.game || 'pokemon',
     cardId: c.id || '',
     name: c.name,
@@ -573,4 +646,23 @@ function clearLoc() {
 .picker-name { font-weight: 700; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .picker-sub { font-size: 11.5px; color: var(--text-muted); font-weight: 600; }
 .picker-price { font-weight: 800; font-size: 12.5px; white-space: nowrap; }
+.be-cats { display: flex; gap: 6px; margin: 8px 0 4px; flex-wrap: wrap; }
+.be-cat {
+  font: inherit; font-size: 12px; font-weight: 800;
+  padding: 5px 11px; cursor: pointer;
+  color: var(--ink); background: var(--bg-card);
+  border: 1.5px solid var(--ink); border-radius: 99px;
+  box-shadow: var(--shadow-pressed);
+}
+.be-cat:active { box-shadow: none; transform: translate(1px, 1px); }
+.be-cat.active { background: var(--accent); color: var(--on-accent); }
+.be-cat-n { margin-left: 5px; font-size: 10.5px; opacity: 0.75; }
+.be-grade-btns { display: flex; gap: 5px; flex-shrink: 0; }
+.be-grade-btns .btn { font-size: 11px; padding: 5px 8px; white-space: nowrap; }
+.be-understood { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+.be-understood-chip {
+  font-size: 11px; font-weight: 800;
+  padding: 2px 9px;
+  background: var(--accent-dim); border: 1.5px solid var(--ink); border-radius: 99px;
+}
 </style>
