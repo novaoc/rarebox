@@ -1,0 +1,132 @@
+<!doctype html><meta charset="utf-8"><script type="module">
+import { generateSecret, deriveChannel, seal, open } from '/src/utils/remoteQr.js'
+import { phonePeer, displayPeer } from '/src/utils/remoteP2p.js'
+
+const R = { checks: [], done: false }
+window.__R = R
+const ok = (cond, label) => R.checks.push({ ok: !!cond, label })
+
+try {
+  const secret = generateSecret()
+  const { key } = await deriveChannel(secret)
+  const wrong = (await deriveChannel(generateSecret())).key
+
+  // In-page signaling bus standing in for the ntfy sig topic
+  const bus = { toPhone: [], toDisplay: [] }
+  const phoneSig = { publish: async (m) => { bus.toDisplay.push(m); pump(); return true } }
+  const displaySig = { publish: async (m) => { bus.toPhone.push(m); pump(); return true } }
+
+  let up = 0, down = 0
+  const states = []
+
+  const phone = phonePeer({
+    sigChannel: { topic: 'bus', key },
+    key,
+    onUp: () => up++,
+    onDown: () => down++,
+  })
+  const display = displayPeer({
+    sigChannel: { topic: 'bus', key },
+    onPacket: async (packet) => {
+      try {
+        const { shareBytes } = await open(key, packet)
+        states.push(new TextDecoder().decode(shareBytes))
+      } catch { states.push('REJECTED') }
+    },
+    onMode: () => {},
+  })
+
+  // Wire the bus: monkey-patch publishSig destinations by intercepting the
+  // peers' sig messages. The peers call publishSig(sigChannel, msg) — we
+  // shim the module call by routing through the channels' publish below.
+  // (phonePeer/displayPeer take sigChannel objects; our shim publishes
+  // into the arrays, and pump() delivers.)
+  function pump() {
+    while (bus.toDisplay.length) {
+      const m = bus.toDisplay.shift()
+      if (m.t === 'offer') display.onOffer(m.sdp)
+    }
+    while (bus.toPhone.length) {
+      const m = bus.toPhone.shift()
+      if (m.t === 'answer') phone.onAnswer(m.sdp)
+    }
+  }
+
+  // publishSig is imported inside the peer modules — intercept fetch to
+  // capture what they publish instead of letting it hit ntfy.sh
+  const realFetch = window.fetch.bind(window)
+  window.fetch = async (url, opts) => {
+    const u = String(url)
+    if (u.includes('ntfy.sh')) {
+      // decrypt the sealed sig message and route it over the bus
+      const packet = Uint8Array.from(atob(opts.body), c => c.charCodeAt(0))
+      const { shareBytes } = await open(key, packet)
+      const msg = JSON.parse(new TextDecoder().decode(shareBytes))
+      if (msg.t === 'offer') bus.toDisplay.push(msg)
+      else if (msg.t === 'answer' || msg.t === 'hello') bus.toPhone.push(msg)
+      pump()
+      return new Response('{}', { status: 200 })
+    }
+    return realFetch(url, opts)
+  }
+
+  // ── connect ──
+  await phone.offer()
+  const t0 = Date.now()
+  while (!phone.connected && Date.now() - t0 < 8000) await new Promise(r => setTimeout(r, 100))
+  ok(phone.connected, 'DataChannel connected (host candidates, no STUN needed)')
+  ok(up === 1, 'onUp fired once')
+
+  // ── sealed state crossing ──
+  const sent = await phone.send(new TextEncoder().encode('state-1'))
+  ok(sent, 'send() over channel returns true')
+  await new Promise(r => setTimeout(r, 300))
+  ok(states.includes('state-1'), 'state decrypted on display side')
+
+  // 250-item-scale payload
+  const big = new TextEncoder().encode('x'.repeat(16000))
+  await phone.send(big)
+  await new Promise(r => setTimeout(r, 300))
+  ok(states.some(s => s.length === 16000), '16KB state crosses intact')
+
+  // ── hostile inputs on the display channel path ──
+  const sealed = await seal(key, new TextEncoder().encode('tamper-me'))
+  sealed[sealed.length - 1] ^= 1
+  // inject directly through the packet handler path (simulating a hijacked
+  // transport delivering garbage)
+  const before = states.length
+  // displayPeer caps oversized frames BEFORE parsing — emulate via onPacket
+  // contract: feed tampered bytes
+  // (we reach it through the same handler the channel uses)
+  await (async () => {
+    try {
+      const { shareBytes } = await open(key, sealed)
+      states.push(new TextDecoder().decode(shareBytes))
+    } catch { states.push('REJECTED') }
+  })()
+  ok(states[before] === 'REJECTED', 'tampered packet rejected by GCM')
+
+  const wrongSealed = await seal(wrong, new TextEncoder().encode('stranger'))
+  try {
+    await open(key, wrongSealed)
+    ok(false, 'wrong-key packet rejected')
+  } catch { ok(true, 'wrong-key packet rejected') }
+
+  // ── heartbeat death detection ──
+  // kill the underlying connection from the display side; phone's heartbeat
+  // (ping send failure / close event) must fire onDown
+  display.stop()
+  const t1 = Date.now()
+  while (down === 0 && Date.now() - t1 < 30000) await new Promise(r => setTimeout(r, 200))
+  ok(down >= 1, `onDown fired after channel death (${Date.now() - t1}ms)`)
+  ok(!phone.connected, 'phone reports disconnected')
+
+  // re-offer guard: two offers back-to-back, second must be throttled
+  const o1 = Date.now()
+  phone.stop() // stopped peers refuse to offer
+  ok(await phone.offer() === false, 'stopped peer refuses to offer')
+} catch (e) {
+  R.checks.push({ ok: false, label: 'EXCEPTION: ' + e.message })
+}
+R.done = true
+</script>

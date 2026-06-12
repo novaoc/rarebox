@@ -14,7 +14,7 @@
       <div class="bd-actions">
         <button class="btn btn-secondary btn-sm" @click="goFullscreen">⛶ Fullscreen — always-on stand mode</button>
       </div>
-      <p class="bd-note">Updates arrive end-to-end encrypted via ntfy.sh — the relay only ever sees scrambled bytes; the key stayed inside the pairing code. Screen is kept awake while this page is visible.</p>
+      <p class="bd-note">DIRECT = device-to-device (WebRTC, works on a hotspot with no internet). RELAY = end-to-end encrypted via ntfy.sh, which only ever sees scrambled bytes; the key stayed inside the pairing code. Screen is kept awake while this page is visible.</p>
     </template>
   </div>
 </template>
@@ -23,7 +23,8 @@
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import RbIcon from '../components/icons/RbIcon.vue'
 import BoothLiveQr from '../components/BoothLiveQr.vue'
-import { secretFromLocation, deriveChannel, subscribeState } from '../utils/remoteQr'
+import { secretFromLocation, deriveChannel, deriveSigChannel, subscribeState, subscribeSig, publishSig, open as openPacket } from '../utils/remoteQr'
+import { displayPeer } from '../utils/remoteP2p'
 import { decodeBoothBytes } from '../utils/booth'
 
 const secret = ref(secretFromLocation(window.location.hash))
@@ -67,6 +68,8 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
   stop?.()
+  stopSig?.()
+  peer?.stop()
   try { wakeLock?.release() } catch { /* gone */ }
 })
 </script>

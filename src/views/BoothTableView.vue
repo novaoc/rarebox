@@ -200,7 +200,7 @@
               <canvas ref="pairCanvas" class="bt-pair-qr"></canvas>
               <div class="bt-remote-hint">Scan with the display device's camera — its QR follows this table live.
                 <span class="bt-remote-status"><RbIcon name="antenna" :size="13" /> {{ remoteStatus }}</span></div>
-              <p class="bt-remote-note">Updates travel through ntfy.sh end-to-end encrypted — the relay only sees scrambled bytes; the key lives in this pairing code.</p>
+              <p class="bt-remote-note">Devices link directly when the network allows (tip: a phone hotspot works with no internet at all); otherwise updates relay through ntfy.sh end-to-end encrypted — it only ever sees scrambled bytes; the key lives in this pairing code.</p>
               <button class="btn btn-ghost btn-sm" @click="disarmRemote">Stop broadcasting</button>
             </template>
           </div>
@@ -224,7 +224,8 @@ import { exportBoothLedger } from '../utils/boothExcel'
 import { multiSearch } from '../services/tcg/multiSearch'
 import { searchSealed } from '../services/sealedIndex'
 import { tokenMatch } from '../utils/search'
-import { generateSecret, displayUrl, deriveChannel, publishState } from '../utils/remoteQr'
+import { generateSecret, displayUrl, deriveChannel, deriveSigChannel, publishState, subscribeSig } from '../utils/remoteQr'
+import { phonePeer } from '../utils/remoteP2p'
 
 const route = useRoute()
 const booths = ref(loadBooths())
@@ -525,6 +526,10 @@ const remoteStatus = ref('starting…')
 const pairCanvas = ref(null)
 let remoteChannel = null
 let publishDebounce = null
+// P2P leg: live updates go phone→display directly when WebRTC connects;
+// ntfy stays for the handshake, the initial state, and as the fallback.
+let peer = null
+let sigStop = null
 
 async function armRemote() {
   if (!booth.value.remoteSecret) {
@@ -532,6 +537,21 @@ async function armRemote() {
     persist()
   }
   remoteChannel = await deriveChannel(booth.value.remoteSecret)
+  const sigChannel = await deriveSigChannel(booth.value.remoteSecret)
+  peer = phonePeer({
+    sigChannel,
+    key: remoteChannel.key,
+    onUp: () => { remoteStatus.value = 'broadcasting · direct'; publishNow() },
+    onDown: () => {
+      remoteStatus.value = 'broadcasting · relay'
+      publishNow() // make sure the display has the latest via ntfy
+      setTimeout(() => { if (remoteArmed.value && !peer?.connected) peer?.offer() }, 5500)
+    },
+  })
+  sigStop = subscribeSig(sigChannel, (msg) => {
+    if (msg.t === 'hello') peer?.offer()        // a display just paired/reloaded
+    else if (msg.t === 'answer') peer?.onAnswer(msg.sdp)
+  })
   remoteArmed.value = true
   await nextTick()
   if (pairCanvas.value) {
@@ -540,20 +560,36 @@ async function armRemote() {
     })
   }
   publishNow()
+  peer.offer()
 }
 
 function disarmRemote() {
   remoteArmed.value = false
   remoteChannel = null
+  peer?.stop(); peer = null
+  sigStop?.(); sigStop = null
   clearTimeout(publishDebounce)
 }
 
 async function publishNow() {
-  if (!remoteChannel || !booth.value) return
+  if (!booth.value) return
+  const bytes = await encodeBoothBytes(booth.value)
+  // Direct first: free, instant, works offline on a hotspot
+  if (peer?.connected && await peer.send(bytes)) {
+    remoteStatus.value = 'broadcasting · direct'
+    return
+  }
+  if (!remoteChannel) return
   remoteStatus.value = 'sending…'
-  const ok = await publishState(remoteChannel, await encodeBoothBytes(booth.value))
-  remoteStatus.value = ok ? 'broadcasting' : (navigator.onLine ? 'send failed — retrying on next change' : 'offline — will send when back')
+  const ok = await publishState(remoteChannel, bytes)
+  remoteStatus.value = ok ? 'broadcasting · relay' : (navigator.onLine ? 'send failed — retrying on next change' : 'offline — will send when back')
 }
+
+// iOS suspends WebRTC when Safari backgrounds; coming back, reconnect fast
+function onVisible() {
+  if (document.visibilityState === 'visible' && remoteArmed.value && peer && !peer.connected) peer.offer()
+}
+document.addEventListener('visibilitychange', onVisible)
 
 // Inventory changed → push to the paired display (debounced: a burst of
 // taps publishes once). The on-screen kiosk re-renders itself.
@@ -566,6 +602,9 @@ watch(() => booth.value && JSON.stringify(booth.value.items), () => {
 
 onMounted(() => { filterInput.value?.focus() })
 onBeforeUnmount(() => {
+  document.removeEventListener('visibilitychange', onVisible)
+  peer?.stop()
+  sigStop?.()
   clearTimeout(publishDebounce)
   clearTimeout(toastTimer)
   try { wakeLock?.release() } catch { /* already gone */ }

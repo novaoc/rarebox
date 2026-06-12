@@ -74,8 +74,20 @@ export async function deriveChannel(secret) {
   return { topic, key }
 }
 
+/** Same secret → a SEPARATE topic for WebRTC signaling (same AES key).
+ *  Keeping handshakes off the state topic means the relay fallback's wire
+ *  format never changes and old displays ignore signaling entirely. */
+export async function deriveSigChannel(secret) {
+  const raw = b64UrlToBytes(secret)
+  const topicHash = new Uint8Array(await crypto.subtle.digest('SHA-256', new Uint8Array([...raw, ...te.encode(':sig')])))
+  const keyHash = await crypto.subtle.digest('SHA-256', new Uint8Array([...raw, ...te.encode(':key')]))
+  const topic = 'rbx-' + bytesToB64Url(topicHash).slice(0, 32)
+  const key = await crypto.subtle.importKey('raw', keyHash, 'AES-GCM', false, ['encrypt', 'decrypt'])
+  return { topic, key }
+}
+
 /** Encrypt share bytes (already gzipped) with a freshness stamp. */
-async function seal(key, shareBytes) {
+export async function seal(key, shareBytes) {
   const iv = crypto.getRandomValues(new Uint8Array(12))
   const stamped = new Uint8Array(8 + shareBytes.length)
   new DataView(stamped.buffer).setFloat64(0, Date.now())
@@ -86,7 +98,7 @@ async function seal(key, shareBytes) {
   return out
 }
 
-async function open(key, packet) {
+export async function open(key, packet) {
   const iv = packet.slice(0, 12)
   const plain = new Uint8Array(await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, packet.slice(12)))
   return {
@@ -132,6 +144,50 @@ export function subscribeState({ topic, key }, onState, onStatus = () => {}) {
       lastTs = state.ts
       onState(state)
     } catch { /* not ours / garbage on a public topic — ignore */ }
+  }
+  return () => { stopped = true; es.close() }
+}
+
+// ── WebRTC signaling over the sig topic ────────────────────────────────
+// Tiny sealed-JSON messages: {t:'hello'} from a display announcing itself,
+// {t:'offer'|'answer', sdp} for the handshake. Everything rides the same
+// AES-GCM envelope, so strangers on the world-writable topic can't inject
+// offers (auth tag fails) and replays are dropped by the freshness stamp.
+
+const MAX_SIG_BYTES = 32 * 1024   // a full non-trickle SDP is ~2-6KB
+const MAX_SDP_CHARS = 20000
+
+export async function publishSig({ topic, key }, msg) {
+  try {
+    const body = bytesToB64(await seal(key, te.encode(JSON.stringify(msg))))
+    const resp = await fetch(`${NTFY}/${topic}`, { method: 'POST', body })
+    return resp.ok
+  } catch { return false }
+}
+
+/** Subscribe to signaling messages. Only future messages (no replay window —
+ *  a stale offer is worse than none; the hello/re-offer dance recovers).
+ *  onMsg({t, sdp, ts}) fires for fresh, authentic, well-formed messages. */
+export function subscribeSig({ topic, key }, onMsg, onStatus = () => {}) {
+  let lastTs = 0
+  let stopped = false
+  const es = new EventSource(`${NTFY}/${topic}/sse`)
+  es.onopen = () => onStatus('connected')
+  es.onerror = () => onStatus('reconnecting')
+  es.onmessage = async (ev) => {
+    if (stopped) return
+    try {
+      const m = JSON.parse(ev.data)
+      if (!m.message || m.message.length > MAX_SIG_BYTES) return
+      const { ts, shareBytes } = await open(key, b64ToBytes(m.message))
+      if (ts <= lastTs) return
+      lastTs = ts
+      const msg = JSON.parse(new TextDecoder().decode(shareBytes))
+      // Clamp BEFORE the message reaches any WebRTC API
+      if (!['hello', 'offer', 'answer', 'bye'].includes(msg.t)) return
+      if (msg.sdp !== undefined && (typeof msg.sdp !== 'string' || msg.sdp.length > MAX_SDP_CHARS || !msg.sdp.startsWith('v='))) return
+      onMsg({ t: msg.t, sdp: msg.sdp, ts })
+    } catch { /* not ours / garbage — ignore */ }
   }
   return () => { stopped = true; es.close() }
 }
