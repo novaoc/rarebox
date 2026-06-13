@@ -43,7 +43,7 @@
         </button>
         <router-link to="/search" class="btn btn-primary btn-sm add-card-btn">+ Add Card</router-link>
         <router-link to="/settings" class="btn btn-ghost btn-icon settings-btn" aria-label="Settings">
-          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
         </router-link>
       </div>
     </header>
@@ -190,6 +190,7 @@
 import { ref, computed, watch, onMounted, onErrorCaptured } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { usePortfolioStore } from './stores/portfolio'
+import { useDeckStore } from './stores/decks'
 import InstallPrompt from './components/InstallPrompt.vue'
 import TourModal from './components/TourModal.vue'
 import CardDatabaseLoader from './components/CardDatabaseLoader.vue'
@@ -199,6 +200,7 @@ import { preloadGames } from './services/tcg/cardPreloader.js'
 import { applyTheme, setThemePref, getThemePref, resolvedTheme } from './utils/theme.js'
 
 const store = usePortfolioStore()
+const deckStore = useDeckStore()
 const route = useRoute()
 const router = useRouter()
 
@@ -297,21 +299,15 @@ const portfolioColors = [
 ]
 
 const currentPageTitle = computed(() => {
-  if (route.name === 'Dashboard') return 'Dashboard'
-  if (route.name === 'Search') return 'Search Cards'
-  if (route.name === 'Browse') return 'Browse Sets'
-  if (route.name === 'Sets') return 'Pokémon Sets'
-  if (route.name === 'TcgSets') return 'Browse Sets'
-  if (route.name === 'Booth') return 'Card Booth'
-  if (route.name === 'BoothEdit') return 'Edit Booth'
-  if (route.name === 'Settings') return 'Settings'
-  if (route.name === 'Terms') return 'Terms & Conditions'
-  if (route.name === 'TradeAnalyzer' || route.name === 'TradeLanding') return 'Trade Analyzer'
   if (route.name === 'Portfolio') {
     const p = store.portfolios.find(p => p.id === route.params.id)
     return p?.name || 'Shelf'
   }
-  return 'Rarebox'
+  if (route.name === 'DeckBuilder') {
+    const d = deckStore.decks.find(d => d.id === route.params.id)
+    return d?.name || 'Deck Builder'
+  }
+  return route.meta.title || 'Rarebox'
 })
 
 function hardRefresh() {
