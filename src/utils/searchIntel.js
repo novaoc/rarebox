@@ -454,13 +454,24 @@ export async function smartSearch(q, { pageSize = 24, sealedLimit = 12, provider
 
   const jobs = []
 
-  // EN Pokémon set codes (or a bare collector number) get a TARGETED
-  // query — post-filtering a paged newest-first search would miss old sets
   const enPkmSets = parsed.sets.filter(s => s.game === 'pokemon' && s.lang === 'en')
   const pokemonOk = !provSet || provSet.has('pokemon')
+  const pkmText = parsed.clean && parsed.clean.length >= 2
+
+  // EN Pokémon set codes (or a bare collector number) get a TARGETED API
+  // query — post-filtering a paged newest-first search would miss old sets.
   if (!wantJa && pokemonOk && (enPkmSets.length || (parsed.number && !parsed.sets.length))) {
     jobs.push(leg(searchPokemonInSets(parsed.clean, enPkmSets.map(s => s.setId), fetchSize, parsed.number)
       .then(cards => ({ kind: 'cards', cards })).catch(() => ({ kind: 'cards', cards: [] })), { kind: 'cards', cards: [] }))
+  } else if (!wantJa && pokemonOk && pkmText && !parsed.sets.length) {
+    // A plain Pokémon name needs a FAST English leg to keep pace with the
+    // always-on local JP leg — otherwise EN arrived only via the slow
+    // all-six-providers generic leg, lost the 4s race, and the JP leg
+    // crowded English off the page (the regression this fixes). Route it
+    // through a Pokémon-only multiSearch, which serves the preloaded local
+    // card cache first: instant, and immune to the live API's rate limits.
+    jobs.push(leg(multiSearch(parsed.clean, { page: 1, pageSize: fetchSize, providers: ['pokemon'] })
+      .then(r => ({ kind: 'cards', cards: r.cards || [] })).catch(() => ({ kind: 'cards', cards: [] })), { kind: 'cards', cards: [] }))
   }
 
   // Japanese leg — its own index, a LOCAL file (zero API cost), so it rides
