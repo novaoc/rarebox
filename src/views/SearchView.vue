@@ -190,9 +190,10 @@
 
 <script setup>
 import RbIcon from '../components/icons/RbIcon.vue'
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { getMarketPrice, formatVariantLabel } from '../services/pokemonApi'
 import { multiSearch } from '../services/tcg/multiSearch'
+import { smartSearch, warmSearchIntel } from '../utils/searchIntel'
 import { getAlertsForCard, addAlert, removeAlert, requestNotificationPermission } from '../utils/alerts'
 import PriceChart from '../components/PriceChart.vue'
 import AddItemModal from '../components/AddItemModal.vue'
@@ -269,6 +270,7 @@ function onInput() {
 }
 
 let searchSeq = 0
+const understood = ref([])
 async function doSearch(resetPage = true) {
   if (!query.value.trim()) return
   if (resetPage === true) { page.value = 1; activeFilter.value = 'all' }
@@ -277,20 +279,33 @@ async function doSearch(resetPage = true) {
   searched.value = true
   lastQuery.value = query.value
   try {
-    const data = await multiSearch(query.value, { page: page.value, pageSize })
-    if (seq !== searchSeq) return
-    allResults.value = data.cards || []
-    results.value = data.cards || []
-    totalCount.value = data.totalCount || 0
+    // Page 1 goes through the full query brain (nicknames, set codes,
+    // numbers, rarity, typo rescue); deeper pages keep the legacy pager
+    if (page.value === 1) {
+      const r = await smartSearch(query.value, { pageSize })
+      if (seq !== searchSeq) return
+      allResults.value = r.cards || []
+      results.value = r.cards || []
+      totalCount.value = r.understood.length ? (r.cards || []).length : (r.total || (r.cards || []).length)
+      understood.value = r.understood
+    } else {
+      const data = await multiSearch(query.value, { page: page.value, pageSize })
+      if (seq !== searchSeq) return
+      allResults.value = data.cards || []
+      results.value = data.cards || []
+      totalCount.value = data.totalCount || 0
+    }
   } catch (e) {
     if (seq !== searchSeq) return
     allResults.value = []
     results.value = []
     totalCount.value = 0
+    understood.value = []
   } finally {
     if (seq === searchSeq) loading.value = false
   }
 }
+onMounted(() => warmSearchIntel())
 
 async function goPage(p) {
   page.value = p

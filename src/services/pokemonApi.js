@@ -300,8 +300,9 @@ function sortJapaneseSets(sets) {
 
 export async function getJapaneseSets() {
   // Persist to localStorage — JP sets rarely change
-  const LS_KEY = 'rarebox_ja_sets'
-  const LS_TS = 'rarebox_ja_sets_ts'
+  // v2: logos + EN names from jp-index — old cached lists lack them
+  const LS_KEY = 'rarebox_ja_sets_v2'
+  const LS_TS = 'rarebox_ja_sets_v2_ts'
   const cached = localStorage.getItem(LS_KEY)
   const ts = localStorage.getItem(LS_TS)
   try {

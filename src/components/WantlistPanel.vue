@@ -76,8 +76,7 @@
 <script setup>
 import { ref, nextTick } from 'vue'
 import RbIcon from './icons/RbIcon.vue'
-import { multiSearch } from '../services/tcg/multiSearch'
-import { searchSealed } from '../services/sealedIndex'
+import { smartSearch } from '../utils/searchIntel'
 import { loadWantlist, saveWantlist, generateWantId, wantKey } from '../utils/wantlist'
 
 const emit = defineEmits(['changed'])
@@ -128,12 +127,8 @@ async function runSearch() {
   if (q.length < 2) return
   searchBusy.value = true
   try {
-    const [cardsRes, sealed] = await Promise.allSettled([
-      multiSearch(q, { page: 1, pageSize: 24 }),
-      searchSealed(q, { limit: 16 }),
-    ])
-    const cards = cardsRes.status === 'fulfilled' ? cardsRes.value.cards : []
-    searchResults.value = [...cards, ...(sealed.status === 'fulfilled' ? sealed.value : [])]
+    const { cards, sealed } = await smartSearch(q, { pageSize: 24, sealedLimit: 16 })
+    searchResults.value = [...cards, ...sealed]
   } catch {
     searchResults.value = []
   } finally {

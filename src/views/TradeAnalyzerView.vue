@@ -3,7 +3,7 @@ import { ref, computed, onMounted } from 'vue'
 import CameraViewfinder from '../components/scanner/CameraViewfinder.vue'
 import RbIcon from '../components/icons/RbIcon.vue'
 import { useTradeStore } from '../stores/trade'
-import { multiSearch } from '../services/tcg/multiSearch'
+import { smartSearch } from '../utils/searchIntel'
 import { scanCard } from '../utils/scanPipeline'
 import { preloadOcrWorker } from '../utils/ocrService'
 import { preloadScanIndexes } from '../utils/scanMatch'
@@ -233,10 +233,10 @@ async function doSearch() {
   if (q.length < 2) return
   searchBusy.value = true
   try {
-    const res = await multiSearch(q, { page: 1, pageSize: 30, category: cat })
+    const res = await smartSearch(q, { pageSize: 30, sealedLimit: 30 })
     // Guard: discard if query or category changed while we were fetching
     if (searchQuery.value.trim() !== q || searchCategory.value !== cat) return
-    const cards = (res.cards || []) as SearchResult[]
+    const cards = ((cat === 'sealed' ? res.sealed : res.cards) || []) as SearchResult[]
     searchCache.set(`${cat}:${q}`, cards)
     if (searchCache.size > 50) {
       const first = searchCache.keys().next().value

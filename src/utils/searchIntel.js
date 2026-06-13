@@ -54,7 +54,7 @@ async function buildCodeIndex() {
   const jobs = [
     getPokemonSets().then((sets) => {
       for (const s of sets || []) {
-        const e = { game: 'pokemon', lang: 'en', setId: s.id, name: s.name }
+        const e = { game: 'pokemon', lang: 'en', setId: s.id, name: s.name, total: s.total || s.printedTotal || 0 }
         addCode(index, s.id, e)
         addCode(index, s.ptcgoCode, e)
         addName(names, s.name, e)
@@ -62,7 +62,7 @@ async function buildCodeIndex() {
     }),
     getJapaneseSets().then((sets) => {
       for (const s of sets || []) {
-        const e = { game: 'pokemon', lang: 'ja', setId: s.id, name: JP_EN_NAMES[s.id] || s.name || s.id }
+        const e = { game: 'pokemon', lang: 'ja', setId: s.id, name: JP_EN_NAMES[s.id] || s.name || s.id, total: s.total || 0 }
         addCode(index, s.id, e)
         addName(names, JP_EN_NAMES[s.id] || '', e)
       }
@@ -70,7 +70,7 @@ async function buildCodeIndex() {
     ...['mtg', 'yugioh', 'lorcana', 'one-piece', 'riftbound'].map(g =>
       getProvider(g)?.getSets().then((sets) => {
         for (const s of sets || []) {
-          const e = { game: g, lang: null, setId: s.id, name: s.name }
+          const e = { game: g, lang: null, setId: s.id, name: s.name, total: s.total || 0 }
           addCode(index, s.code, e)
           addCode(index, s.id, e)
           addName(names, s.name, e)
@@ -250,6 +250,11 @@ export async function parseQuery(q) {
     rest.push(TEXT_EXPAND[tl] || t)
   }
 
+  // ambiguous codes resolve to multiple sets across games ("OP05" is both
+  // One Piece's main set and YGO's OTS Tournament Pack 5) — the biggest
+  // set is almost always the intent, and downstream order matters (badges,
+  // sealed query, browse lane)
+  sets.sort((a, b) => (b.total || 0) - (a.total || 0))
   // a JP-only set code implies Japanese even without the JP token
   if (!lang && sets.length && sets.every(s => s.lang === 'ja')) lang = 'ja'
   // language narrows ambiguous codes (e.g. a code matching both EN and JP)
@@ -408,8 +413,9 @@ const _memo = new Map()
 const MEMO_TTL = 5 * 60_000
 const MEMO_MAX = 40
 
-export async function smartSearch(q, { pageSize = 24, sealedLimit = 12 } = {}) {
-  const memoKey = `v2|${q.trim().toLowerCase()}|${pageSize}`
+export async function smartSearch(q, { pageSize = 24, sealedLimit = 12, providers = null } = {}) {
+  const provSet = providers?.length ? new Set(providers) : null
+  const memoKey = `v2|${q.trim().toLowerCase()}|${pageSize}|${providers ? [...providers].sort().join(',') : ''}`
   const hit = _memo.get(memoKey)
   if (hit && Date.now() - hit.ts < MEMO_TTL) return hit.result
   // community slang: "moonbreon" → the canonical query, resolved by the
@@ -451,19 +457,20 @@ export async function smartSearch(q, { pageSize = 24, sealedLimit = 12 } = {}) {
   // EN Pokémon set codes (or a bare collector number) get a TARGETED
   // query — post-filtering a paged newest-first search would miss old sets
   const enPkmSets = parsed.sets.filter(s => s.game === 'pokemon' && s.lang === 'en')
-  if (!wantJa && (enPkmSets.length || (parsed.number && !parsed.sets.length))) {
+  const pokemonOk = !provSet || provSet.has('pokemon')
+  if (!wantJa && pokemonOk && (enPkmSets.length || (parsed.number && !parsed.sets.length))) {
     jobs.push(leg(searchPokemonInSets(parsed.clean, enPkmSets.map(s => s.setId), fetchSize, parsed.number)
       .then(cards => ({ kind: 'cards', cards })).catch(() => ({ kind: 'cards', cards: [] })), { kind: 'cards', cards: [] }))
   }
 
   // Japanese leg — its own index; included on JP intent
-  if (wantJa || jaSets.length) {
+  if ((wantJa || jaSets.length) && pokemonOk) {
     jobs.push(leg(searchJapanese(parsed.clean, { limit: fetchSize, setIds: jaSets.length ? jaSets : null, number: parsed.number })
       .then(cards => ({ kind: 'cards', cards })).catch(() => ({ kind: 'cards', cards: [] })), { kind: 'cards', cards: [] }))
   }
 
   // Bare set browse ("OP05" with no card name): pull the set's own cards
-  const browseSets = parsed.sets.filter(s => s.game !== 'pokemon')
+  const browseSets = parsed.sets.filter(s => s.game !== 'pokemon' && (!provSet || provSet.has(s.game)))
   if (!text && !wantJa && browseSets.length) {
     for (const s of browseSets.slice(0, 2)) {
       jobs.push(leg((async () => {
@@ -476,13 +483,19 @@ export async function smartSearch(q, { pageSize = 24, sealedLimit = 12 } = {}) {
 
   // Everything else — skipped entirely when the seller said "JP"
   if (!wantJa && (text || !jobs.length)) {
-    const games = [...new Set(parsed.sets.filter(s => s.lang !== 'ja').map(s => s.game))]
+    let games = [...new Set(parsed.sets.filter(s => s.lang !== 'ja').map(s => s.game))]
+    if (provSet) games = games.length ? games.filter(g => provSet.has(g)) : [...provSet]
+    if (provSet && !games.length) games = [...provSet]
     jobs.push(leg(multiSearch(text, { page: 1, pageSize: fetchSize, providers: games.length ? games : undefined })
-      .then(r => ({ kind: 'cards', cards: r.cards || [] })).catch(() => ({ kind: 'cards', cards: [] })), { kind: 'cards', cards: [] }))
+      .then(r => ({ kind: 'cards', cards: r.cards || [], total: r.totalCount || 0 })).catch(() => ({ kind: 'cards', cards: [] })), { kind: 'cards', cards: [] }))
   }
 
-  // Sealed rides along, filtered by the same understanding
-  jobs.push(leg(searchSealed(text, { limit: sealedFetch })
+  // Sealed rides along, filtered by the same understanding. The set name
+  // joins the query: a bare "OP05" searches its set's boxes, and
+  // "surging sparks etb" can't get drowned by newer sets' ETBs in the
+  // recency-sorted index.
+  const sealedQuery = [text, parsed.sets[0]?.name].filter(Boolean).join(' ') || ''
+  jobs.push(leg(searchSealed(sealedQuery, { limit: sealedFetch })
     .then(items => ({ kind: 'sealed', items: items || [] })).catch(() => ({ kind: 'sealed', items: [] })), { kind: 'sealed', items: [] }))
 
   let results = await Promise.all(jobs)
@@ -504,9 +517,11 @@ export async function smartSearch(q, { pageSize = 24, sealedLimit = 12 } = {}) {
       const { rescueByName, hydratePokemonRescues, rescueMtg } = await import('../services/nameSearch.js')
       const [byName, mtg] = await Promise.all([
         rescueByName(text, { limit: 12 }),
-        rescueMtg(text),
+        (!provSet || provSet.has('mtg')) ? rescueMtg(text) : Promise.resolve([]),
       ])
-      cards = await hydratePokemonRescues([...mtg, ...byName])
+      let rescued = [...mtg, ...byName]
+      if (provSet) rescued = rescued.filter(c => provSet.has(c.game))
+      cards = await hydratePokemonRescues(rescued)
     } catch { /* rescue is best-effort */ }
   }
 
@@ -539,7 +554,8 @@ export async function smartSearch(q, { pageSize = 24, sealedLimit = 12 } = {}) {
   cards = cards.slice(0, Math.max(pageSize, 30))
   sealed = sealed.slice(0, sealedLimit)
 
-  const result = { cards, sealed, understood: parsed.understood }
+  const total = Math.max(cards.length, ...results.filter(r => r.kind === 'cards').map(r => r.total || 0))
+  const result = { cards, sealed, understood: parsed.understood, total }
   // never memoize emptiness: a flaky API or case-variant retry must get a
   // real second chance, not 5 minutes of cached nothing
   if (cards.length || sealed.length) {

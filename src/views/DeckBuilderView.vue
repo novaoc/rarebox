@@ -159,7 +159,7 @@ import { ref, computed, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useDeckStore } from '../stores/decks'
 import { usePortfolioStore } from '../stores/portfolio'
-import { multiSearch } from '../services/tcg/multiSearch'
+import { smartSearch } from '../utils/searchIntel'
 import { getMarketPrice } from '../services/pokemonApi'
 
 const route = useRoute()
@@ -224,8 +224,7 @@ async function doSearch() {
   searching.value = true
   searched.value = true
   try {
-    const result = await multiSearch(query.value, {
-      page: 1,
+    const result = await smartSearch(query.value, {
       pageSize: 20,
       providers: [deck.value?.game || 'pokemon'],
     })
