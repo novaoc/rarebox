@@ -463,9 +463,14 @@ export async function smartSearch(q, { pageSize = 24, sealedLimit = 12, provider
       .then(cards => ({ kind: 'cards', cards })).catch(() => ({ kind: 'cards', cards: [] })), { kind: 'cards', cards: [] }))
   }
 
-  // Japanese leg — its own index; included on JP intent
-  if ((wantJa || jaSets.length) && pokemonOk) {
-    jobs.push(leg(searchJapanese(parsed.clean, { limit: fetchSize, setIds: jaSets.length ? jaSets : null, number: parsed.number })
+  // Japanese leg — its own index, a LOCAL file (zero API cost), so it rides
+  // along on every Pokémon-eligible query instead of hiding behind explicit
+  // "JP" intent: half the hobby collects Japanese printings and they simply
+  // never appeared. Plain queries cap the leg and rank it under the EN
+  // exact hits; the JP token or a JP set code makes it primary as before.
+  if (pokemonOk && (wantJa || jaSets.length || text)) {
+    const jpLimit = (wantJa || jaSets.length) ? fetchSize : Math.min(10, fetchSize)
+    jobs.push(leg(searchJapanese(parsed.clean, { limit: jpLimit, setIds: jaSets.length ? jaSets : null, number: parsed.number })
       .then(cards => ({ kind: 'cards', cards })).catch(() => ({ kind: 'cards', cards: [] })), { kind: 'cards', cards: [] }))
   }
 
@@ -501,7 +506,12 @@ export async function smartSearch(q, { pageSize = 24, sealedLimit = 12, provider
   let results = await Promise.all(jobs)
   let cards = results.filter(r => r.kind === 'cards').flatMap(r => r.cards)
   let sealed = results.find(r => r.kind === 'sealed')?.items || []
-  if (!cards.length && rawJobs.length) {
+  // The JP leg reads a local file and always answers instantly, so on a
+  // plain (non-JP) query it can mask a slow EN leg: cards.length > 0 from JP
+  // alone would skip the slow-leg wait and drop the English results the user
+  // actually came for. Gate the retry on the leg that's actually pending.
+  const fastPassEmpty = wantJa ? !cards.length : cards.filter(c => !c.jp).length === 0
+  if (fastPassEmpty && rawJobs.length) {
     // empty fast pass — wait out the slow legs before giving up
     results = await Promise.race([
       Promise.all(rawJobs),
@@ -545,11 +555,14 @@ export async function smartSearch(q, { pageSize = 24, sealedLimit = 12, provider
   if (parsed.rarity) cards = softFilter(cards, c => matchesRarity(c, parsed.rarity))
   if (parsed.lang === 'ja') sealed = sealed.filter(s => /japan|jp\b/i.test(`${s.set} ${s.name}`))
 
-  // exact name hits above fuzzy-assisted ones, then trim the overfetch
+  // exact name hits above fuzzy-assisted ones; JP printings politely after
+  // their EN twins on plain queries (still above EN fuzzy noise) — unless
+  // the user ASKED for Japanese, which makes them first-class
   if (parsed.clean) {
     const toks = parsed.clean.toLowerCase().split(/\s+/).filter(Boolean)
     const exact = (c) => { const n = (c.name || '').toLowerCase(); return toks.every(t => n.includes(t)) ? 0 : 1 }
-    cards = cards.map((c, i) => [exact(c), i, c]).sort((a, b) => a[0] - b[0] || a[1] - b[1]).map(x => x[2])
+    const jpAfter = (c) => (c.jp && !wantJa ? 1 : 0)
+    cards = cards.map((c, i) => [exact(c), jpAfter(c), i, c]).sort((a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2]).map(x => x[3])
   }
   cards = cards.slice(0, Math.max(pageSize, 30))
   sealed = sealed.slice(0, sealedLimit)
