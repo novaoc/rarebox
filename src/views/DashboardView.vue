@@ -38,6 +38,27 @@
         </div>
       </div>
 
+      <!-- ── Product Hunt ──────────────────────────────────────────── -->
+      <section class="ld-product-hunt" aria-labelledby="product-hunt-title">
+        <a
+          class="ld-ph-card"
+          href="https://www.producthunt.com/products/rarebox?embed=true&utm_source=badge-featured&utm_medium=badge&utm_campaign=badge-rarebox"
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="Find Rarebox on Product Hunt"
+        >
+          <span class="ld-ph-icon" aria-hidden="true">
+            <RbIcon name="sparkle" size="28" />
+            <span class="ld-ph-p">P</span>
+          </span>
+          <span class="ld-ph-copy">
+            <span id="product-hunt-title" class="ld-ph-title">Find Rarebox on Product Hunt</span>
+            <span class="ld-ph-sub">Back the free TCG tracker that keeps your data yours</span>
+          </span>
+          <span class="ld-ph-arrow" aria-hidden="true">→</span>
+        </a>
+      </section>
+
       <!-- ── Features ──────────────────────────────────────────────── -->
       <section class="ld-features" ref="featuresRef">
         <h2 class="ld-h2">Built for the <span class="marker">pull</span></h2>
@@ -251,6 +272,7 @@ function hideIfOnline(e) {
   if (navigator.onLine) e.target.style.display = 'none'
 }
 import PortfolioChart from '../components/PortfolioChart.vue'
+import RbIcon from '../components/icons/RbIcon.vue'
 
 const store = usePortfolioStore()
 const featuresRef = ref(null)
@@ -823,6 +845,74 @@ async function refreshAllPrices() {
 .ld-marquee-track { display: flex; white-space: nowrap; animation: ld-scroll 28s linear infinite; padding: 10px 0; }
 .ld-marquee-seg { font-weight: 900; font-size: 13.5px; letter-spacing: 0.06em; color: var(--on-accent); }
 @keyframes ld-scroll { to { transform: translateX(-50%); } }
+
+.ld-product-hunt {
+  display: flex;
+  justify-content: center;
+  padding: clamp(22px, 4vw, 36px) 0 0;
+}
+.ld-ph-card {
+  width: min(100%, 520px);
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  color: var(--text-primary);
+  text-decoration: none;
+  background: var(--bg-card);
+  border: var(--bw) solid var(--ink);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  transform: rotate(-1deg);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.ld-ph-card:hover,
+.ld-ph-card:focus-visible {
+  color: var(--text-primary);
+  text-decoration: none;
+  transform: translate(-2px, -2px) rotate(-1deg);
+  box-shadow: var(--shadow);
+  outline: none;
+}
+.ld-ph-icon {
+  position: relative;
+  width: 52px;
+  height: 52px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--pink-dim);
+  border: var(--bw) solid var(--ink);
+  border-radius: 14px;
+  box-shadow: var(--shadow-pressed);
+  flex-shrink: 0;
+}
+.ld-ph-icon .rb-icon { position: absolute; left: -10px; top: -12px; transform: rotate(-12deg); }
+.ld-ph-p {
+  position: relative;
+  z-index: 1;
+  font-size: 30px;
+  font-weight: 950;
+  line-height: 1;
+  color: var(--ink);
+}
+.ld-ph-copy { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.ld-ph-title { font-size: clamp(15px, 2.6vw, 18px); font-weight: 900; letter-spacing: -0.02em; }
+.ld-ph-sub { font-size: 12.5px; line-height: 1.35; color: var(--text-secondary); }
+.ld-ph-arrow {
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--accent);
+  border: var(--bw) solid var(--on-accent);
+  border-radius: 10px;
+  color: var(--on-accent);
+  font-weight: 900;
+  box-shadow: var(--shadow-pressed);
+}
 
 .ld-h2 { font-size: clamp(1.6rem, 4.5vw, 2.4rem); font-weight: 900; letter-spacing: -0.02em; text-align: center; }
 .ld-features { padding: clamp(30px, 6vw, 64px) 0 0; }
