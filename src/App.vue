@@ -167,6 +167,7 @@
     </transition>
 
     <InstallPrompt />
+    <XFollowPrompt v-if="!isBoothRoute" />
 
     <!-- Tour videos (replayable via info icon; theme-matched) -->
     <transition name="fade">
@@ -191,6 +192,7 @@ import { ref, computed, watch, onMounted, onErrorCaptured } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { usePortfolioStore } from './stores/portfolio'
 import InstallPrompt from './components/InstallPrompt.vue'
+import XFollowPrompt from './components/XFollowPrompt.vue'
 import TourModal from './components/TourModal.vue'
 import CardDatabaseLoader from './components/CardDatabaseLoader.vue'
 import CardLoadIndicator from './components/CardLoadIndicator.vue'
