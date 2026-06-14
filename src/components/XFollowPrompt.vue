@@ -19,16 +19,20 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
 
-const DISMISSED_KEY = 'rarebox_x_follow_dismissed_until'
+const NEXT_ELIGIBLE_KEY = 'rarebox_x_follow_next_eligible_at'
+const LEGACY_DISMISSED_KEY = 'rarebox_x_follow_dismissed_until'
 const CLICKED_KEY = 'rarebox_x_follow_clicked'
 const SESSION_KEY = 'rarebox_x_follow_seen_session'
 const INSTALL_DISMISSED_KEY = 'rarebox_install_dismissed'
 const SHOW_DELAY_MS = 45_000
-const DISMISS_COOLDOWN_MS = 14 * 24 * 60 * 60 * 1000
+const AUTO_HIDE_MS = 12_000
+const PASSIVE_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000
+const DISMISS_COOLDOWN_MS = 30 * 24 * 60 * 60 * 1000
 
 const show = ref(false)
 const route = useRoute()
 let timer = null
+let autoHideTimer = null
 
 function isSuppressedRoute() {
   return route.path.startsWith('/booth') || route.meta?.bare
@@ -40,42 +44,64 @@ function hasActiveSetupPrompt() {
   return !localStorage.getItem(INSTALL_DISMISSED_KEY) && /iphone|ipad|ipod|android/i.test(navigator.userAgent)
 }
 
+function cooldownActive() {
+  const nextEligible = Number(localStorage.getItem(NEXT_ELIGIBLE_KEY) || 0)
+  const legacyDismissed = Number(localStorage.getItem(LEGACY_DISMISSED_KEY) || 0)
+  return Math.max(nextEligible, legacyDismissed) > Date.now()
+}
+
 function shouldShow() {
   if (show.value) return false
   if (isSuppressedRoute()) return false
   if (sessionStorage.getItem(SESSION_KEY)) return false
   if (localStorage.getItem(CLICKED_KEY)) return false
   if (hasActiveSetupPrompt()) return false
-
-  const dismissedUntil = Number(localStorage.getItem(DISMISSED_KEY) || 0)
-  if (dismissedUntil && Date.now() < dismissedUntil) return false
+  if (cooldownActive()) return false
 
   return true
 }
 
-function dismiss() {
+function setCooldown(ms) {
+  localStorage.setItem(NEXT_ELIGIBLE_KEY, String(Date.now() + ms))
+}
+
+function hide() {
   show.value = false
+  if (autoHideTimer) {
+    window.clearTimeout(autoHideTimer)
+    autoHideTimer = null
+  }
+}
+
+function dismiss() {
+  hide()
   sessionStorage.setItem(SESSION_KEY, '1')
-  localStorage.setItem(DISMISSED_KEY, String(Date.now() + DISMISS_COOLDOWN_MS))
+  setCooldown(DISMISS_COOLDOWN_MS)
 }
 
 function markClicked() {
-  show.value = false
+  hide()
   sessionStorage.setItem(SESSION_KEY, '1')
   localStorage.setItem(CLICKED_KEY, '1')
 }
 
+function reveal() {
+  show.value = true
+  sessionStorage.setItem(SESSION_KEY, '1')
+  // Even if the user ignores it, do not show again for a week.
+  setCooldown(PASSIVE_COOLDOWN_MS)
+  autoHideTimer = window.setTimeout(hide, AUTO_HIDE_MS)
+}
+
 onMounted(() => {
   timer = window.setTimeout(() => {
-    if (shouldShow()) {
-      show.value = true
-      sessionStorage.setItem(SESSION_KEY, '1')
-    }
+    if (shouldShow()) reveal()
   }, SHOW_DELAY_MS)
 })
 
 onUnmounted(() => {
   if (timer) window.clearTimeout(timer)
+  if (autoHideTimer) window.clearTimeout(autoHideTimer)
 })
 </script>
 
