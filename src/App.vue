@@ -108,7 +108,7 @@
             Card Booth
           </router-link>
           <button class="more-item" role="menuitem" @click="toggleTheme">
-            <svg v-if="theme === 'dark'" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32 1.41 1.41M2 12h2m16 0h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+            <svg v-if="theme === 'dark'" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.93l-1.41 1.41m11.32 11.32 1.41 1.41M2 12h2m16 0h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
             <svg v-else xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
             {{ theme === 'dark' ? 'Light mode' : 'Dark mode' }}
           </button>
@@ -304,15 +304,22 @@ const currentPageTitle = computed(() => {
   if (route.name === 'Browse') return 'Browse Sets'
   if (route.name === 'Sets') return 'Pokémon Sets'
   if (route.name === 'TcgSets') return 'Browse Sets'
+  if (route.name === 'Decks') return 'Decks'
+  if (route.name === 'MetaDecks') return 'Meta Decks'
+  if (route.name === 'DeckBuilder') return 'Deck Builder'
   if (route.name === 'Booth') return 'Card Booth'
   if (route.name === 'BoothEdit') return 'Edit Booth'
+  if (route.name === 'BoothDisplay') return 'Booth Display'
+  if (route.name === 'BoothTable') return 'Table Mode'
   if (route.name === 'Settings') return 'Settings'
   if (route.name === 'Terms') return 'Terms & Conditions'
   if (route.name === 'TradeAnalyzer' || route.name === 'TradeLanding') return 'Trade Analyzer'
+  if (route.name === 'ShelfGuide') return 'How Shelves Work'
   if (route.name === 'Portfolio') {
     const p = store.portfolios.find(p => p.id === route.params.id)
     return p?.name || 'Shelf'
   }
+  if (route.name === 'Designs') return 'Design Lab'
   return 'Rarebox'
 })
 
