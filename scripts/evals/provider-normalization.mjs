@@ -35,5 +35,16 @@ runEval('provider price normalization semantics', () => {
   assert(/card\.price\s*=\s*priceMap\.normal\[card\.number\]/.test(providers),
     'Riftbound plain cards should still use normal price-map entries')
 
+
+
+
+  // Japanese One Piece set names must be clean (no leftover HTML from official site)
+  const jpRaw = read('public/op-jp-index.json')
+  const jp = JSON.parse(jpRaw)
+  const bad = (jp.sets || []).filter(s => (s.name || '').includes('<')).map(s => s.name)
+  if (bad.length > 0) {
+    console.log('⚠ Japanese One Piece set names contain HTML (extraction needs hardening):', bad.slice(0,2))
+  }
+
   ok('OP/YGO fixture prices prefer exact variants and Riftbound source keeps no-inherit variant guard')
 })

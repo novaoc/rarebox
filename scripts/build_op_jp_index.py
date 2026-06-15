@@ -38,7 +38,7 @@ def fetch_cardlist(data: dict[str, str] | None = None) -> str:
 
 
 def clean(raw: str) -> str:
-    raw = re.sub(r"<br\s*/?>", " ", raw, flags=re.I)
+    raw = re.sub(r"<br[^>]*>", " ", raw, flags=re.I)
     raw = re.sub(r"<[^>]+>", " ", raw)
     raw = html.unescape(raw)
     return re.sub(r"\s+", " ", raw).strip()
