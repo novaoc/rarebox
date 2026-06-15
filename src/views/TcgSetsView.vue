@@ -546,7 +546,7 @@ onMounted(loadSets)
 .card-img-wrap { position: relative; overflow: hidden; background: #fff; aspect-ratio: 2.5/3.5; border: var(--bw) solid var(--ink); border-radius: 10px; padding: 4px; }
 :root[data-theme='dark'] .card-img-wrap { background: var(--bg-card); }
 .card-img { width: 100%; height: 100%; object-fit: contain; display: block; }
-.card-img-ph { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; padding: 8px; text-align: center; font-size: 11px; font-weight: 600; color: var(--text-secondary); background: var(--bg-secondary); border: var(--bw) dashed var(--border-subtle); }
+.card-img-ph { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; padding: 8px; text-align: center; font-size: 12px; font-weight: 600; color: var(--text-secondary); background: var(--bg-secondary); border: var(--bw) dashed var(--border-subtle); }
 .card-overlay { position: absolute; inset: 0; background: rgba(20,20,20,0.55); display: flex; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.2s; }
 .card-result:hover .card-overlay { opacity: 1; }
 /* Touch: buttons stay hidden until the card is tapped once — art first.
