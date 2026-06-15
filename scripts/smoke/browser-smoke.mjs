@@ -142,7 +142,14 @@ async function main() {
   }
 }
 
-main().catch(err => {
-  console.error(err?.stack || err)
-  process.exit(1)
-})
+main()
+  .then(() => {
+    // In CI, browser/preview wrappers can leave open handles even after the
+    // smoke contract has passed. Exit explicitly so the job cannot burn the
+    // full workflow timeout after printing "Browser smoke tests passed".
+    process.exit(0)
+  })
+  .catch(err => {
+    console.error(err?.stack || err)
+    process.exit(1)
+  })
