@@ -23,7 +23,7 @@ async function getJson(url, { signal } = {}) {
   return res.json()
 }
 
-import db from '../../db'
+import db from '../../db.js'
 
 // Two-layer cache: memory (TTL-fresh) + IndexedDB (durable, no TTL).
 // The durable layer is what makes Browse work offline — the card database

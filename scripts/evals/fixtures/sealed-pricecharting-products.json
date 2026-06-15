@@ -1,0 +1,46 @@
+{
+  "products": [
+    {
+      "id": "sealed-booster-box",
+      "productName": "Pokemon Obsidian Flames Booster Box",
+      "consoleName": "Pokemon Obsidian Flames",
+      "price1": "$139.99",
+      "imageUri": "https://example.test/booster-box.jpg"
+    },
+    {
+      "id": "sealed-case",
+      "productName": "Pokemon Surging Sparks Booster Box Case",
+      "consoleName": "Pokemon Surging Sparks",
+      "price1": "$899.95",
+      "imageUri": "https://example.test/case.jpg"
+    },
+    {
+      "id": "single-card-number",
+      "productName": "Mega Charizard X ex #125",
+      "consoleName": "Pokemon Mega Evolution",
+      "price1": "$75.00",
+      "imageUri": "https://example.test/card-number.jpg"
+    },
+    {
+      "id": "single-ygo-code",
+      "productName": "Blue-Eyes White Dragon -LOB-001",
+      "consoleName": "Yu-Gi-Oh Legend of Blue Eyes White Dragon",
+      "price1": "$48.00",
+      "imageUri": "https://example.test/ygo-single.jpg"
+    },
+    {
+      "id": "accessory-binder",
+      "productName": "Pokemon Charizard 9-Pocket Binder Portfolio",
+      "consoleName": "Pokemon Accessories",
+      "price1": "$19.99",
+      "imageUri": "https://example.test/binder.jpg"
+    },
+    {
+      "id": "fractional-collector-number",
+      "productName": "Mickey Mouse Brave Little Tailor 1/204",
+      "consoleName": "Disney Lorcana The First Chapter",
+      "price1": "$699.99",
+      "imageUri": "https://example.test/lorcana-single.jpg"
+    }
+  ]
+}

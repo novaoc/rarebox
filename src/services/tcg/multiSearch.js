@@ -337,7 +337,7 @@ const SEALED_HINTS = [
   'starter deck', 'theme deck', 'gift set', 'premium', 'deck', 'trove',
   'build & battle', 'battle deck', 'fat pack', 'booster',
 ]
-function isSealed(name) {
+export function isSealedProductName(name) {
   const n = (name || '').toLowerCase()
   return SEALED_HINTS.some(h => n.includes(h))
 }
@@ -345,30 +345,34 @@ function isSealed(name) {
 // Accessories to skip in sealed search results
 const SKIP_ACCESSORIES = ['sleeve', 'portfolio', 'binder', 'dice', 'coin', 'playmat']
 
-async function searchSealed(query) {
-  const url = `${PC_BASE}?type=prices&q=${encodeURIComponent(query)}`
-  const d = await fetchJson(url)
-  const products = (d.products || []).filter(p => {
+export function normalizeSealedProducts(products) {
+  return (products || []).filter(p => {
     const name = `${p.productName || ''} ${p.consoleName || ''}`
     const pn = p.productName || ''
     if (/#\d/.test(pn)) return false
     if (/\d+\/\d+/.test(pn)) return false
     if (/-\w{3,6}-\d{3,4}/i.test(pn)) return false
     if (SKIP_ACCESSORIES.some(s => name.toLowerCase().includes(s))) return false
-    return isSealed(name)
-  })
+    return isSealedProductName(name)
+  }).map(p => ({
+    id: p.id || '',
+    name: `${p.productName || ''} — ${p.consoleName || ''}`,
+    number: '',
+    set: p.consoleName || '',
+    image: p.imageUri || '',
+    price: num(p.price1),
+    rarity: '',
+    game: 'sealed',
+  }))
+}
+
+async function searchSealed(query) {
+  const url = `${PC_BASE}?type=prices&q=${encodeURIComponent(query)}`
+  const d = await fetchJson(url)
+  const cards = normalizeSealedProducts(d.products || [])
   return {
-    cards: products.map(p => ({
-      id: p.id || '',
-      name: `${p.productName || ''} — ${p.consoleName || ''}`,
-      number: '',
-      set: p.consoleName || '',
-      image: p.imageUri || '',
-      price: num(p.price1),
-      rarity: '',
-      game: 'sealed',
-    })),
-    total: products.length,
+    cards,
+    total: cards.length,
   }
 }
 

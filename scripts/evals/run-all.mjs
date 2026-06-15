@@ -2,6 +2,8 @@ import { spawnSync } from 'node:child_process'
 
 const evals = [
   'scripts/evals/provider-shape.mjs',
+  'scripts/evals/provider-normalization.mjs',
+  'scripts/evals/sealed-filter.mjs',
   'scripts/evals/price-parser.mjs',
   'scripts/evals/route-safety.mjs',
   'scripts/evals/backup-roundtrip.mjs',
