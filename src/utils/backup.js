@@ -1,4 +1,4 @@
-import { loadState, saveState, loadTradeState, saveTradeState } from '../db'
+import { loadState, saveState, loadTradeState, saveTradeState } from '../db.js'
 
 const STORAGE_KEYS = {
   portfolios: 'rarebox_portfolios',
@@ -100,13 +100,84 @@ export function validateBackup(data) {
   return null // valid
 }
 
+export function sanitizeBackupData(data) {
+  return JSON.parse(JSON.stringify(data), (key, value) =>
+    key === '__proto__' || key === 'constructor' || key === 'prototype' ? undefined : value
+  )
+}
+
+function localStorageKeys(storage) {
+  if (typeof storage.length === 'number' && typeof storage.key === 'function') {
+    return Array.from({ length: storage.length }, (_, i) => storage.key(i)).filter(Boolean)
+  }
+  return Object.keys(storage)
+}
+
+export async function restoreBackupData(data, {
+  storage = localStorage,
+  saveAppState = saveState,
+  saveImportedTradeState = saveTradeState,
+  reload = () => window.location.replace(window.location.pathname),
+} = {}) {
+  const result = { portfolios: 0, snapshots: 0, caches: 0, decks: 0 }
+
+  for (const key of Object.values(STORAGE_KEYS)) storage.removeItem(key)
+  localStorageKeys(storage)
+    .filter(k => k.startsWith('ph_cache_'))
+    .forEach(k => storage.removeItem(k))
+
+  const state = data.data.portfolios || { portfolios: [], activePortfolioId: null, settings: { currency: 'USD' } }
+  if (data.data.settings) state.settings = { ...(state.settings || {}), ...data.data.settings }
+  if (data.data.snapshots) {
+    state.snapshots = data.data.snapshots
+    result.snapshots = Object.values(data.data.snapshots).reduce((s, arr) => s + (arr?.length || 0), 0)
+  } else if (state.snapshots) {
+    result.snapshots = Object.values(state.snapshots).reduce((s, arr) => s + (arr?.length || 0), 0)
+  }
+  result.portfolios = state.portfolios?.length || 0
+  await saveAppState(state)
+
+  await saveImportedTradeState(data.data.trade || { sideA: { items: [], totalValue: 0 }, sideB: { items: [], totalValue: 0 } })
+
+  if (data.data.decks) {
+    try {
+      storage.setItem(DECKS_KEY, JSON.stringify(data.data.decks))
+      result.decks = Array.isArray(data.data.decks) ? data.data.decks.length : 0
+    } catch { /* quota */ }
+  }
+
+  if (data.data.priceCache) {
+    for (const [key, val] of Object.entries(data.data.priceCache)) {
+      if (!key.startsWith('ph_cache_')) continue
+      storage.setItem(key, typeof val === 'string' ? val : JSON.stringify(val))
+      result.caches++
+    }
+  }
+
+  if (data.data.booths) {
+    try { storage.setItem(BOOTHS_KEY, JSON.stringify(data.data.booths)) } catch { /* quota */ }
+  }
+  if (data.data.savedShops) {
+    try { storage.setItem(SAVED_SHOPS_KEY, JSON.stringify(data.data.savedShops)) } catch { /* quota */ }
+  }
+  if (data.data.wantlist) {
+    try { storage.setItem(WANTLIST_KEY, JSON.stringify(data.data.wantlist)) } catch { /* quota */ }
+  }
+  if (data.data.journal) {
+    try { storage.setItem(JOURNAL_KEY, JSON.stringify(data.data.journal)) } catch { /* quota */ }
+  }
+
+  reload()
+  return result
+}
+
 /**
  * Restore a backup and reload the page.
  *
- * Rarebox now stores state in IndexedDB (Dexie), with localStorage as a
- * fallback migration path.  This function writes to both, then clears IDB
- * so that on reload the store's `init()` falls through to the localStorage
- * data and migrates it back into IDB.
+ * Rarebox now stores shelf state in IndexedDB (Dexie). This function writes
+ * imported shelf/trade state directly to IndexedDB, restores compatible
+ * localStorage-only side data (decks, booths, namespaced price cache), then
+ * reloads so stores re-init from the imported state.
  */
 export async function importBackup(data) {
   // Freeze store persistence for the rest of this page's life. Without
@@ -115,12 +186,7 @@ export async function importBackup(data) {
   // silently discarding every import.
   window.__rareboxImporting = true
 
-  // Deep-plain the payload: callers may hand us a Vue reactive proxy,
-  // which IndexedDB's structured clone refuses to serialize. The reviver
-  // drops prototype-pollution keys — imports are attacker-suppliable.
-  data = JSON.parse(JSON.stringify(data), (key, value) =>
-    key === '__proto__' || key === 'constructor' || key === 'prototype' ? undefined : value
-  )
+  data = sanitizeBackupData(data)
 
   try {
     return await importBackupInner(data)
@@ -133,64 +199,5 @@ export async function importBackup(data) {
 }
 
 async function importBackupInner(data) {
-  const result = { portfolios: 0, snapshots: 0, caches: 0, decks: 0 }
-
-  // 1. Clear legacy localStorage mirrors + stale price cache
-  for (const key of Object.values(STORAGE_KEYS)) {
-    localStorage.removeItem(key)
-  }
-  Object.keys(localStorage)
-    .filter(k => k.startsWith('ph_cache_'))
-    .forEach(k => localStorage.removeItem(k))
-
-  // 2. Write the imported state DIRECTLY to IndexedDB — the
-  // clear-IDB-and-remigrate-from-localStorage dance was racy
-  const state = data.data.portfolios || { portfolios: [], activePortfolioId: null, settings: { currency: 'USD' } }
-  if (data.data.settings) state.settings = { ...(state.settings || {}), ...data.data.settings }
-  if (data.data.snapshots) {
-    state.snapshots = data.data.snapshots
-    result.snapshots = Object.values(data.data.snapshots).reduce((s, arr) => s + (arr?.length || 0), 0)
-  }
-  result.portfolios = state.portfolios?.length || 0
-  await saveState(state)
-
-  // Trade: replace with the imported one, or clear so the old device's
-  // half-finished trade doesn't haunt the new collection
-  await saveTradeState(data.data.trade || { sideA: { items: [], totalValue: 0 }, sideB: { items: [], totalValue: 0 } })
-
-  if (data.data.decks) {
-    try {
-      localStorage.setItem(DECKS_KEY, JSON.stringify(data.data.decks))
-      result.decks = Array.isArray(data.data.decks) ? data.data.decks.length : 0
-    } catch { /* quota */ }
-  }
-
-  if (data.data.priceCache) {
-    for (const [key, val] of Object.entries(data.data.priceCache)) {
-      // Keys come from the imported file — only restore the price-cache
-      // namespace, never arbitrary localStorage keys (a crafted backup
-      // could otherwise overwrite settings/decks/booths).
-      if (!key.startsWith('ph_cache_')) continue
-      localStorage.setItem(key, typeof val === 'string' ? val : JSON.stringify(val))
-      result.caches++
-    }
-  }
-
-  if (data.data.booths) {
-    try { localStorage.setItem(BOOTHS_KEY, JSON.stringify(data.data.booths)) } catch { /* quota */ }
-  }
-  if (data.data.savedShops) {
-    try { localStorage.setItem(SAVED_SHOPS_KEY, JSON.stringify(data.data.savedShops)) } catch { /* quota */ }
-  }
-  if (data.data.wantlist) {
-    try { localStorage.setItem(WANTLIST_KEY, JSON.stringify(data.data.wantlist)) } catch { /* quota */ }
-  }
-  if (data.data.journal) {
-    try { localStorage.setItem(JOURNAL_KEY, JSON.stringify(data.data.journal)) } catch { /* quota */ }
-  }
-
-  // 3. Reload — stores re-init from the imported IDB state
-  window.location.replace(window.location.pathname)
-
-  return result
+  return restoreBackupData(data)
 }

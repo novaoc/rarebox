@@ -67,9 +67,9 @@ export function extractExportedArrayObjects(source, arrayName) {
   return objects
 }
 
-export function runEval(name, fn) {
+export async function runEval(name, fn) {
   try {
-    fn()
+    await fn()
     console.log(`\nPASS ${name}`)
   } catch (err) {
     console.error(`\nFAIL ${name}`)
