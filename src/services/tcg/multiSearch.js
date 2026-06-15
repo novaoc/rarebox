@@ -554,22 +554,28 @@ const ALL_PROVIDERS = {
   yugioh: (q) => searchYugioh(q),
 }
 
-export async function multiSearch(query, { page = 1, pageSize = 20, category = 'cards', providers } = {}) {
+export function createMultiSearch({
+  providerFns = ALL_PROVIDERS,
+  isGameCachedFn = isGameCached,
+  searchCacheFn = searchCache,
+  getOnline = () => (typeof navigator === 'undefined' ? true : navigator.onLine),
+} = {}) {
+  return async function runMultiSearch(query, { page = 1, pageSize = 20, category = 'cards', providers } = {}) {
   if (category === 'sealed') {
     const result = await searchSealed(query).catch(() => ({ cards: [], total: 0 }))
     return result
   }
 
-  const active = providers || Object.keys(ALL_PROVIDERS)
+  const active = providers || Object.keys(providerFns)
 
   // Per-game: try the local cache first, but fall through to the live API
   // when the cache has no hits — the cached snapshot can lag behind new sets
   // (and a cache-only miss used to make those cards unfindable entirely).
   const searches = active.map(async k => {
     let localHit = null
-    if (isGameCached(k)) {
+    if (isGameCachedFn(k)) {
       try {
-        const cached = searchCache(query, { page: 1, pageSize: 500, providers: [k] })
+        const cached = searchCacheFn(query, { page: 1, pageSize: 500, providers: [k] })
         localHit = cached
         // A hit set where NO card has a price means the cache predates the
         // price pass (Pokemon bulk data lands before prices) - the live API
@@ -581,8 +587,8 @@ export async function multiSearch(query, { page = 1, pageSize = 20, category = '
     // Offline (or live API down): unpriced local hits beat an empty page —
     // without this, on-device search returns "No cards found" whenever the
     // price pass hasn't finished before the connection dropped.
-    if (typeof navigator !== 'undefined' && !navigator.onLine && localHit?.cards.length) return localHit
-    return ALL_PROVIDERS[k](query, page, pageSize).catch(() => (localHit?.cards.length ? localHit : { cards: [], total: 0 }))
+    if (!getOnline() && localHit?.cards.length) return localHit
+    return providerFns[k](query, page, pageSize).catch(() => (localHit?.cards.length ? localHit : { cards: [], total: 0 }))
   })
 
   const results = await Promise.all(searches)
@@ -608,4 +614,7 @@ export async function multiSearch(query, { page = 1, pageSize = 20, category = '
   const paged = [...fullCards.slice(start, start + pageSize), ...serverPagedCards].sort(rank)
 
   return { cards: paged, totalCount }
+  }
 }
+
+export const multiSearch = createMultiSearch()

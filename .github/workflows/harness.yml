@@ -31,6 +31,11 @@ jobs:
       - name: Run harness evals
         run: npm run eval:harness
 
+      - name: Danger-zone tripwire
+        env:
+          DANGER_BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: npm run eval:danger
+
       - name: Build
         run: npm run build
 
