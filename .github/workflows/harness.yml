@@ -1,0 +1,45 @@
+name: Harness CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: harness-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  harness:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run harness evals
+        run: npm run eval:harness
+
+      - name: Build
+        run: npm run build
+
+      - name: Install Chromium for smoke tests
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y chromium
+
+      - name: Browser smoke tests
+        env:
+          PUPPETEER_EXECUTABLE_PATH: /usr/bin/chromium
+        run: npm run smoke:browser

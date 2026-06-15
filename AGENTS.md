@@ -45,13 +45,15 @@ Use:
 
 ```bash
 npm install
+npm run eval:harness
 npm run build
+npm run smoke:browser
 npm run dev
 ```
 
 `npm run build` runs `scripts/sync-ocr-assets.mjs` via `prebuild`, then Vite build.
 
-Run the narrowest meaningful verification for the task, but always run `npm run build` before claiming a code change is done unless a blocker is explicitly reported.
+Run the narrowest meaningful verification for the task, but always run `npm run eval:harness` and `npm run build` before claiming a code change is done unless a blocker is explicitly reported. Run `npm run smoke:browser` for route, layout, app-shell, or user-flow changes.
 
 ## Architecture Rules
 
