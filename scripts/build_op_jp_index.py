@@ -19,6 +19,13 @@ import urllib.parse
 import urllib.request
 from pathlib import Path
 
+# One Piece Japanese set logos (populated manually for best quality)
+# Add URLs here when available. Use official or high-quality hosted images.
+OP_JP_SET_LOGOS = {
+    # Example:
+    # "OP-01": "https://example.com/logos/romance-dawn.png",
+}
+
 BASE = "https://www.onepiece-cardgame.com"
 CARDLIST = f"{BASE}/cardlist/"
 OUT = Path(__file__).resolve().parent.parent / "public" / "op-jp-index.json"
@@ -74,10 +81,22 @@ def parse_sets(page: str) -> list[dict]:
             "name": set_name_from_label(label, code),
             "seriesId": val,
             "releaseDate": None,
-            "logo": "",
+            "logo": OP_JP_SET_LOGOS.get(code, ""),
         })
     return sets
 
+
+
+def get_limitless_jp_image(set_code: str, number: str) -> str:
+    """
+    Try to construct a Limitless One Piece image URL for Japanese cards.
+    Pattern is guessed and may need adjustment.
+    Example: https://limitlesstcg.com/images/cards/jp/op01/OP01-001.png
+    """
+    # Normalize set code (lowercase, remove dashes if needed)
+    set_lower = set_code.lower().replace("-", "")
+    num = number.split("_")[0]  # remove _p1, _p2 variants for base image
+    return f"https://limitlesstcg.com/images/cards/jp/{set_lower}/{num}.png"
 
 def absolute_image(src: str) -> str:
     src = html.unescape(src or "").split("?")[0]
@@ -103,7 +122,11 @@ def parse_cards(page: str, set_code: str, set_name: str) -> list[dict]:
         name_match = re.search(r'<div class="cardName">(.*?)</div>', block, re.S)
         name = clean(name_match.group(1)) if name_match else fallback_id
         img_match = re.search(r'<img[^>]+data-src="([^"]+)"', block)
-        image = absolute_image(img_match.group(1)) if img_match else ""
+        # Prefer Limitless images (better hotlinking support)
+        image = get_limitless_jp_image(set_code, number)
+        # Fallback to official site image if Limitless doesn't have it
+        if not image and img_match:
+            image = absolute_image(img_match.group(1))
         cards.append({
             "id": f"jp:{fallback_id}",
             "name": name,
