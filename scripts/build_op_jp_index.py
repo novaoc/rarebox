@@ -38,7 +38,7 @@ def fetch_cardlist(data: dict[str, str] | None = None) -> str:
 
 
 def clean(raw: str) -> str:
-    raw = re.sub(r"<br[^>]*>", " ", raw, flags=re.I)
+    # Aggressive HTML stripping first (handles <br class="..."> etc.)
     raw = re.sub(r"<[^>]+>", " ", raw)
     raw = html.unescape(raw)
     return re.sub(r"\s+", " ", raw).strip()
@@ -49,13 +49,16 @@ def set_name_from_label(label: str, code: str) -> str:
     text = re.sub(r"【[^】]+】", "", text).strip()
     # Keep product family for starter decks, but remove generic booster prefixes.
     text = re.sub(r"^(ブースターパック|エクストラブースター|プレミアムブースター)\s*", "", text)
+    # Final safety: remove any remaining HTML fragments
+    text = re.sub(r"<[^>]*>", "", text).strip()
+    text = re.sub(r"\s+", " ", text).strip()
     return text or code
 
 
 def parse_sets(page: str) -> list[dict]:
     sets: list[dict] = []
     seen: set[str] = set()
-    for val, label in re.findall(r'<option value="([^"]*)"[^>]*>(.*?)</option>', page, re.S):
+    for val, label in re.findall(r'<option value="([^"]*)"[^>]*>(.*?)</option>', page, re.S | re.DOTALL):
         if not val or val == "ALL":
             continue
         m = re.search(r"【([^】]+)】", html.unescape(label))
