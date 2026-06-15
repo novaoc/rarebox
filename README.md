@@ -13,6 +13,7 @@ As of v1.4.0 the entire app wears **Tactile** — a custom design system (cream 
 
 **Live at [rarebox.io](https://rarebox.io)** · **Docs at [docs.rarebox.io](https://docs.rarebox.io)**
 
+Built by [Nova](https://github.com/novaoc).
 
 ## Design — Tactile
 
@@ -270,7 +271,7 @@ Rarebox is developed with an agentic engineering workflow, but production change
 
 **Dedicated Rarebox agent**
 - `novaoc/rarebox-agent-harness` is the rebuild kit for the dedicated `rarebox` Hermes profile.
-- The profile has social/Telegram credentials removed. It exists for specs, evals, review checklists, and implementation workflows.
+- The profile is intentionally not Nova and has social/Telegram credentials removed. It exists for specs, evals, review checklists, and implementation workflows.
 - The kit stores profile identity, skills, `AGENTS.md`, evals, smoke tests, and templates — not tokens, session databases, logs, backups, or runtime state.
 
 **Expected local verification before claiming a code change is done**
