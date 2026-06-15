@@ -1,6 +1,5 @@
 <!--
   Rarebox — TCG Portfolio Tracker · Tactile shell
-  Built by Nova — GitHub: @novaoc
   https://rarebox.io
 -->
 <template>

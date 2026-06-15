@@ -1,7 +1,6 @@
 /**
  * Collectr → Rarebox import
  * Handles both CSV and Excel (.xlsx) exports from Collectr.
- * Built by Nova — GitHub: @novaoc
  */
 import * as XLSX from 'xlsx'
 
