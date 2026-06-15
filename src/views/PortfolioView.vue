@@ -76,7 +76,15 @@
           <div class="section-title">Items</div>
           <div class="section-subtitle">{{ filteredItems.length }} of {{ portfolio.items.length }}</div>
         </div>
-        <div class="flex gap-2">
+        <div class="flex gap-2 items-center">
+          <div class="sort-mini-wrap">
+            <select v-model="sortBy" class="input input-sm">
+              <option value="added">Recently Added</option>
+              <option value="value">Value (High-Low)</option>
+              <option value="gain">Gain (High-Low)</option>
+              <option value="name">Name (A-Z)</option>
+            </select>
+          </div>
           <div class="filter-tabs">
             <button
               v-for="f in filters"
@@ -133,7 +141,10 @@
                   />
                   <div class="item-sealed-icon" v-else>📦</div>
                   <div>
-                    <div class="item-name">{{ getItemName(item) }}</div>
+                    <div class="item-name">
+                      {{ getItemName(item) }}
+                      <span v-if="item.rating" class="item-rating text-accent ml-1">★{{ item.rating }}</span>
+                    </div>
                     <div class="item-sub">{{ getItemSub(item) }}</div>
                   </div>
                 </div>
@@ -183,6 +194,13 @@
               <div class="info-row"><span class="info-label">Type</span><span>{{ selectedItem.type }}</span></div>
               <div class="info-row" v-if="selectedItem.gradingCompany"><span class="info-label">Grade</span><span>{{ selectedItem.gradingCompany }} {{ selectedItem.grade }}</span></div>
               <div class="info-row" v-if="selectedItem.priceVariant"><span class="info-label">Variant</span><span>{{ selectedItem.priceVariant }}</span></div>
+              <div class="info-row">
+                <span class="info-label">Rating</span>
+                <div class="rating-picker">
+                  <button v-for="r in 5" :key="r" @click="setRating(selectedItem, r)" :class="{ active: (selectedItem.rating || 0) >= r }">★</button>
+                  <button @click="setRating(selectedItem, 0)" class="rating-clear" v-if="selectedItem.rating">✕</button>
+                </div>
+              </div>
               <div class="info-row"><span class="info-label">Quantity</span><span>{{ selectedItem.quantity || 1 }}</span></div>
               <div class="info-row"><span class="info-label">Paid (each)</span><span>${{ (selectedItem.purchasePrice || 0).toFixed(2) }}</span></div>
               <div class="info-row"><span class="info-label">Current Value</span><span class="text-accent">${{ getCurrentValue(selectedItem).toFixed(2) }}</span></div>
@@ -341,6 +359,7 @@ const stats = computed(() => store.getPortfolioStats(route.params.id) || { total
 
 const activeFilter = ref('all')
 const itemSearch = ref('')
+const sortBy = ref('added')
 const editingName = ref(false)
 const editName = ref('')
 const nameInputRef = ref(null)
@@ -409,8 +428,12 @@ const filters = [
 
 const filteredItems = computed(() => {
   if (!portfolio.value) return []
-  let items = portfolio.value.items
+  let items = [...portfolio.value.items]
+  
+  // Filter by type
   if (activeFilter.value !== 'all') items = items.filter(i => i.type === activeFilter.value)
+  
+  // Search
   if (itemSearch.value) {
     const q = itemSearch.value.toLowerCase()
     items = items.filter(i =>
@@ -418,6 +441,19 @@ const filteredItems = computed(() => {
       getItemSub(i).toLowerCase().includes(q)
     )
   }
+
+  // Sort
+  if (sortBy.value === 'value') {
+    items.sort((a, b) => (getCurrentValue(b) * (b.quantity || 1)) - (getCurrentValue(a) * (a.quantity || 1)))
+  } else if (sortBy.value === 'gain') {
+    items.sort((a, b) => getGain(b) - getGain(a))
+  } else if (sortBy.value === 'name') {
+    items.sort((a, b) => getItemName(a).localeCompare(getItemName(b)))
+  } else {
+    // default: added (desc)
+    items.sort((a, b) => new Date(b.addedAt || 0) - new Date(a.addedAt || 0))
+  }
+  
   return items
 })
 
@@ -503,6 +539,10 @@ function saveCurrentValue() {
     const key = selectedItem.value.type === 'card' ? 'currentMarketPrice' : 'currentValue'
     store.updateItem(portfolio.value.id, selectedItem.value.id, { [key]: editCurrentValue.value })
   }
+}
+
+function setRating(item, r) {
+  store.updateItem(portfolio.value.id, item.id, { rating: r })
 }
 
 function onBulkImported(count) {
@@ -655,6 +695,7 @@ function deletePortfolio() {
 
 .stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 24px; }
 
+.sort-mini-wrap { flex-shrink: 0; }
 .filter-tabs { display: flex; gap: 4px; }
 .filter-tab {
   background: none;
@@ -683,6 +724,7 @@ function deletePortfolio() {
 .item-sealed-icon { width: 36px; height: 50px; display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0; }
 .item-name { font-size: 13px; font-weight: 600; }
 .item-sub { font-size: 11px; color: var(--text-muted); margin-top: 1px; }
+.item-rating { font-size: 11px; font-weight: 700; }
 
 .gain-cell { display: flex; flex-direction: column; font-size: 13px; font-variant-numeric: tabular-nums; }
 .gain-pct { font-size: 11px; }
@@ -696,8 +738,15 @@ function deletePortfolio() {
 .panel-img { width: 120px; border-radius: 8px; pointer-events: none; -webkit-user-drag: none; user-drag: none; }
 .panel-right { flex: 1; }
 .panel-info-grid { display: flex; flex-direction: column; gap: 6px; }
-.info-row { display: flex; justify-content: space-between; font-size: 13px; padding: 4px 0; border-bottom: 1px solid var(--border-subtle); }
+.info-row { display: flex; justify-content: space-between; align-items: center; font-size: 13px; padding: 4px 0; border-bottom: 1px solid var(--border-subtle); }
 .info-label { color: var(--text-muted); }
+
+.rating-picker { display: flex; align-items: center; gap: 2px; }
+.rating-picker button { background: none; border: none; color: var(--text-muted); font-size: 18px; cursor: pointer; padding: 0 2px; line-height: 1; transition: color 0.1s; }
+.rating-picker button.active { color: var(--accent); }
+.rating-clear { font-size: 11px !important; margin-left: 6px; opacity: 0.6; }
+.rating-clear:hover { opacity: 1; }
+
 .panel-chart-section { border-top: 1px solid var(--border); padding-top: 20px; }
 
 /* eBay price fetch */
