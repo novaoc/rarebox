@@ -299,21 +299,11 @@ const portfolioColors = [
 ]
 
 const currentPageTitle = computed(() => {
-  if (route.name === 'Dashboard') return 'Dashboard'
-  if (route.name === 'Search') return 'Search Cards'
-  if (route.name === 'Browse') return 'Browse Sets'
-  if (route.name === 'Sets') return 'Pokémon Sets'
-  if (route.name === 'TcgSets') return 'Browse Sets'
-  if (route.name === 'Booth') return 'Card Booth'
-  if (route.name === 'BoothEdit') return 'Edit Booth'
-  if (route.name === 'Settings') return 'Settings'
-  if (route.name === 'Terms') return 'Terms & Conditions'
-  if (route.name === 'TradeAnalyzer' || route.name === 'TradeLanding') return 'Trade Analyzer'
   if (route.name === 'Portfolio') {
     const p = store.portfolios.find(p => p.id === route.params.id)
     return p?.name || 'Shelf'
   }
-  return 'Rarebox'
+  return route.meta.title || 'Rarebox'
 })
 
 function hardRefresh() {
@@ -441,8 +431,7 @@ onErrorCaptured((err, instance, info) => {
   text-align: center;
   font-size: 15px;
   font-weight: 800;
-  letter-spacing: -0.01em;
-  white-space: nowrap;
+  letter-spacing: -0.01em; white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   display: flex;
