@@ -254,6 +254,34 @@ getSetCards(id)  -> [{ id, name, number, image, price, rarity }]
 `cardPreloader.js`, an API endpoint in `multiSearch.js`, and a resolver in
 `resolveCard()`. No view changes needed.
 
+## Agentic engineering harness
+
+Rarebox is developed with an agentic engineering workflow, but production changes are verification-led rather than vibe-led. The repo includes project rules, executable evals, browser smoke tests, and CI gates so AI-assisted changes have to prove the behaviors that matter. See the full guide at [docs.rarebox.io/contributing/agentic-engineering](https://docs.rarebox.io/contributing/agentic-engineering).
+
+**Repo guardrails**
+- `AGENTS.md` defines the coding-agent contract: local-first data, no account wall, no preload-blocked search, respectful API usage, Tactile UI rules, and the required verification loop.
+- `.github/pull_request_template.md` asks for user impact, risk notes, screenshots for UI, and the exact checks run.
+- `.github/workflows/harness.yml` runs on PRs and pushes to `main` with a 15-minute job timeout.
+
+**Executable checks**
+- `npm run eval:harness` runs fixture-based evals for provider registry coverage, price normalization, sealed filtering, search fallback behavior, `$0` price parsing, route ordering, and backup/restore safety.
+- `npm run eval:danger` is a diff tripwire for high-risk files. It uses full git history in CI so it can compare the current change against the PR base or previous push.
+- `npm run smoke:browser` builds the app shell with Vite preview and drives Chromium through core routes at desktop and 280px mobile widths. It waits for `domcontentloaded`, not network idle, because Rarebox intentionally starts background data work from first render.
+- `npm run build` remains the production bundle check.
+
+**Dedicated Rarebox agent**
+- `novaoc/rarebox-agent-harness` is the rebuild kit for the dedicated `rarebox` Hermes profile.
+- The profile is intentionally not Nova and has social/Telegram credentials removed. It exists for specs, evals, review checklists, and implementation workflows.
+- The kit stores profile identity, skills, `AGENTS.md`, evals, smoke tests, and templates — not tokens, session databases, logs, backups, or runtime state.
+
+**Expected local verification before claiming a code change is done**
+```bash
+npm run eval:harness
+npm run eval:danger
+npm run build
+npm run smoke:browser   # required for route, layout, app-shell, or user-flow changes
+```
+
 ## Static data assets (daily CI refresh)
 
 The app is local-only: Vercel serves only code and static assets, and your
