@@ -54,10 +54,35 @@ function startPreview() {
   const child = spawn('npx', ['vite', 'preview', '--host', HOST, '--port', String(PORT), '--strictPort'], {
     stdio: ['ignore', 'pipe', 'pipe'],
     env: { ...process.env, BROWSER: 'none' },
+    detached: true,
   })
   child.stdout.on('data', d => process.stdout.write(`[preview] ${d}`))
   child.stderr.on('data', d => process.stderr.write(`[preview] ${d}`))
   return child
+}
+
+async function stopPreview(child) {
+  if (!child || child.exitCode != null || child.signalCode != null) return
+
+  const exited = new Promise(resolve => child.once('exit', resolve))
+  try {
+    // `npx vite preview` can leave the actual Vite node process alive after the
+    // wrapper exits. Start it in its own process group and terminate the group
+    // so CI does not sit around until the job timeout after tests already pass.
+    process.kill(-child.pid, 'SIGTERM')
+  } catch {
+    try { child.kill('SIGTERM') } catch {}
+  }
+
+  const timedOut = await Promise.race([
+    exited.then(() => false),
+    new Promise(resolve => setTimeout(() => resolve(true), 3000)),
+  ])
+  if (timedOut) {
+    try { process.kill(-child.pid, 'SIGKILL') } catch {
+      try { child.kill('SIGKILL') } catch {}
+    }
+  }
 }
 
 async function assertPage(page, route) {
@@ -113,7 +138,7 @@ async function main() {
       await browser.close()
     }
   } finally {
-    server.kill('SIGTERM')
+    await stopPreview(server)
   }
 }
 
