@@ -222,6 +222,7 @@ const OPT = 'https://optcgapi.com/api'
 // The /allSetCards/ endpoint returns ALL cards in one call (~3300 cards).
 // We cache aggressively because the data changes infrequently.
 let _allCards = null
+let _opJpIndex = null
 async function fetchAllOptCards(signal) {
   if (_allCards) return _allCards
   // signal comes from cached()'s merged controller — the ~3,300-card
@@ -231,6 +232,45 @@ async function fetchAllOptCards(signal) {
   return _allCards
 }
 
+async function fetchOpJpIndex(signal) {
+  if (_opJpIndex) return _opJpIndex
+  const d = await getJson('/op-jp-index.json', { signal })
+  _opJpIndex = d || { sets: [], cards: {} }
+  return _opJpIndex
+}
+
+function opCleanString(v, max = 160) {
+  return String(v ?? '').replace(/[\u0000-\u001f\u007f]/g, '').trim().slice(0, max)
+}
+
+export function opNormalizeJapaneseSet(s) {
+  const id = opCleanString(s?.id || s?.code, 32)
+  return {
+    id,
+    name: opCleanString(s?.name || id, 120),
+    code: opCleanString(s?.code || id, 32),
+    releaseDate: s?.releaseDate || null,
+    total: Number.isFinite(Number(s?.total)) ? Number(s.total) : null,
+    logo: opCleanString(s?.logo, 400),
+    _lang: 'ja',
+  }
+}
+
+export function opNormalizeJapaneseCard(c, set) {
+  const number = opCleanString(c?.number || c?.id, 40)
+  const id = opCleanString(c?.id || `jp:${set?.id || 'op'}:${number}`, 80)
+  return {
+    id,
+    name: opCleanString(c?.name || number, 160),
+    number,
+    image: opCleanString(c?.image, 400),
+    price: c?.price == null ? null : num(c.price),
+    rarity: opCleanString(c?.rarity, 40),
+    type: opCleanString(c?.type, 40),
+    _lang: 'ja',
+  }
+}
+
 const OPT_SET_ORDER = [
   'OP-01','OP-02','OP-03','OP-04','OP-05','OP-06','OP-07','OP-08','OP-09','OP-10',
   'OP-11','OP-12','OP-13','OP14-EB04','OP15-EB04','EB-01','EB-02','EB-03','PRB-01','PRB-02',
@@ -238,7 +278,17 @@ const OPT_SET_ORDER = [
 
 const onePiece = {
   id: 'one-piece',
-  async getSets() {
+  languages: [
+    { id: 'en', label: 'English' },
+    { id: 'ja', label: 'Japanese' },
+  ],
+  async getSets({ lang = 'en' } = {}) {
+    if (lang === 'ja') {
+      return cached('opt-ja:sets', 3600_000, async (signal) => {
+        const idx = await fetchOpJpIndex(signal)
+        return (idx.sets || []).map(opNormalizeJapaneseSet).filter(s => s.id)
+      })
+    }
     return cached('opt:sets', 3600_000, async (signal) => {
       const d = await getJson(`${OPT}/allSets/`, { signal })
       const sets = Array.isArray(d) ? d : []
@@ -256,11 +306,19 @@ const onePiece = {
         releaseDate: null, // API doesn't provide dates
         total: counts[s.set_id] || null,
         logo: '',
+        _lang: 'en',
         _order: OPT_SET_ORDER.indexOf(s.set_id),
       })).sort((a, b) => (a._order === -1 ? 99 : a._order) - (b._order === -1 ? 99 : b._order))
     })
   },
-  async getSetCards(setId, opts) {
+  async getSetCards(setId, { lang = 'en' } = {}) {
+    if (lang === 'ja') {
+      return cached(`opt-ja:cards:${setId}`, 600_000, async (signal) => {
+        const idx = await fetchOpJpIndex(signal)
+        const set = (idx.sets || []).find(s => s.id === setId || s.code === setId) || { id: setId }
+        return (idx.cards?.[setId] || []).map(c => opNormalizeJapaneseCard(c, set))
+      })
+    }
     return cached(`opt:cards:${setId}`, 600_000, async (signal) => {
       const allCards = await fetchAllOptCards(signal)
       return allCards
@@ -552,7 +610,7 @@ export const TCGS = [
     logoSvg: `<svg viewBox="0 0 200 80" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg"><text x="100" y="34" text-anchor="middle" fill="#f8991c" font-family="Georgia,serif" font-size="24" font-weight="700" font-style="italic">Magic</text><text x="100" y="54" text-anchor="middle" fill="#888" font-family="Georgia,serif" font-size="11" letter-spacing="1">THE GATHERING</text></svg>` },
   { id: 'lorcana',   name: 'Disney Lorcana',       tagline: 'Sets & USD prices', c1: '#7b2c9e', c2: '#0f9b8e', route: '/sets/lorcana', available: true,
     logoSvg: `<svg viewBox="0 0 200 80" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg"><text x="100" y="36" text-anchor="middle" fill="#c9a0dc" font-family="Georgia,serif" font-size="24" font-weight="700" font-style="italic">Lorcana</text><text x="100" y="54" text-anchor="middle" fill="#0f9b8e" font-family="Arial,sans-serif" font-size="10" letter-spacing="3">DISNEY</text></svg>` },
-  { id: 'one-piece', name: 'One Piece Card Game',  tagline: '20 sets · 3300+ cards · USD prices', c1: '#d7263d', c2: '#1b1b3a', route: '/sets/one-piece', available: true,
+  { id: 'one-piece', name: 'One Piece Card Game',  tagline: 'English + Japanese sets · USD prices', c1: '#d7263d', c2: '#1b1b3a', route: '/sets/one-piece', available: true,
     logoSvg: `<svg viewBox="0 0 200 80" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg"><text x="100" y="34" text-anchor="middle" fill="#d7263d" font-family="Arial Black,sans-serif" font-size="20" font-weight="900">ONE PIECE</text><text x="100" y="54" text-anchor="middle" fill="#888" font-family="Arial,sans-serif" font-size="10" letter-spacing="2">CARD GAME</text></svg>` },
   { id: 'riftbound', name: 'Riftbound (LoL TCG)',  tagline: '7 sets · 1000+ cards · images from Riot', c1: '#0bc6e3', c2: '#0a2540', route: '/sets/riftbound', available: true,
     logoSvg: `<svg viewBox="0 0 200 80" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg"><text x="100" y="34" text-anchor="middle" fill="#0bc6e3" font-family="Arial Black,sans-serif" font-size="18" font-weight="900">RIFTBOUND</text><text x="100" y="54" text-anchor="middle" fill="#667" font-family="Arial,sans-serif" font-size="9" letter-spacing="1">LEAGUE OF LEGENDS</text></svg>` },

@@ -98,7 +98,7 @@ Important integrations:
 - MTG: Scryfall.
 - Yu-Gi-Oh: YGOPRODeck; set-specific prices often live in `card_sets[].set_price`.
 - Lorcana: Lorcast.
-- One Piece: optcgapi.
+- One Piece: optcgapi (English). Japanese sets use a pre-built static index (`op-jp-index.json`) because the official card list does not send CORS headers. Always preserve `_lang: 'ja'` on sets and cards.
 - Riftbound: riftcodex card data; PriceCharting variant-aware prices.
 - PriceCharting: parse prices carefully; `$0` is a valid price, not null.
 - Limitless: scraped in serverless code; fragile by nature, cache aggressively.

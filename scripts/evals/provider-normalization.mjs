@@ -1,5 +1,5 @@
 import { assert, ok, read, runEval } from './lib.mjs'
-import { opPriceFor, opVariantSlug, ygoPriceFor, ygoSlug } from '../../src/services/tcg/providers.js'
+import { opNormalizeJapaneseCard, opNormalizeJapaneseSet, opPriceFor, opVariantSlug, ygoPriceFor, ygoSlug } from '../../src/services/tcg/providers.js'
 
 runEval('provider price normalization semantics', () => {
   assert(opVariantSlug('Monkey.D.Luffy (SPR)') === 'sp', 'One Piece SPR variant should normalize to sp')
@@ -12,6 +12,13 @@ runEval('provider price normalization semantics', () => {
   assert(opPriceFor(opPrices, 'op01-001', 'Monkey.D.Luffy', 1) === 12.34, 'One Piece base printing should use base price-map key')
   assert(opPriceFor(opPrices, 'op01-001', 'Monkey.D.Luffy (SPR)', 1) === 999.99, 'One Piece variant should use variant-specific price-map key')
   assert(opPriceFor({}, 'OP99-999', 'Unknown', 7.5) === 7.5, 'One Piece should fall back when no TCGplayer price exists')
+
+  const jpSet = opNormalizeJapaneseSet({ id: 'OP-01', name: 'ROMANCE DAWN', code: 'OP-01', total: 154 })
+  assert(jpSet.id === 'OP-01' && jpSet._lang === 'ja' && jpSet.total === 154, 'Japanese One Piece sets should preserve id/count/lang')
+  const jpCard = opNormalizeJapaneseCard({ id: 'jp:OP01-001_p1', name: 'モンキー・D・ルフィ', number: 'OP01-001_p1', image: '/card.png', price: 0, rarity: 'L' }, jpSet)
+  assert(jpCard.id === 'jp:OP01-001_p1', 'Japanese One Piece card id should stay stable for variants')
+  assert(jpCard._lang === 'ja', 'Japanese One Piece cards should carry language marker')
+  assert(jpCard.price === 0, 'Japanese One Piece zero price should remain zero, not null')
 
   assert(ygoSlug('Legend of Blue Eyes White Dragon') === 'legend-of-blue-eyes-white-dragon', 'YGO set names should slug predictably')
   const ygoPrices = {

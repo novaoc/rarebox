@@ -16,6 +16,20 @@
     <!-- Set list -->
     <div v-else-if="!selectedSet">
       <div class="sets-header mb-4">
+        <div v-if="languages.length" class="lang-tabs" role="tablist" aria-label="Card language">
+          <button
+            v-for="l in languages"
+            :key="l.id"
+            class="lang-tab"
+            :class="{ active: activeLang === l.id }"
+            type="button"
+            role="tab"
+            :aria-selected="activeLang === l.id"
+            @click="switchLang(l.id)"
+          >
+            {{ l.label }}
+          </button>
+        </div>
         <div class="search-input-wrap">
           <input v-model="setFilter" class="input search-input" placeholder="Filter sets..." style="padding-left:12px" />
           <button v-if="setFilter" class="btn btn-ghost btn-icon search-clear" @click="setFilter = ''" aria-label="Clear filter">✕</button>
@@ -104,7 +118,7 @@
               <div class="card-name">{{ card.name }}</div>
               <div class="card-num text-muted">#{{ card.number }}</div>
               <div class="card-price-row">
-                <span v-if="card.price" class="card-price">${{ card.price.toFixed(2) }}</span>
+                <span v-if="card.price != null" class="card-price">${{ card.price.toFixed(2) }}</span>
                 <span v-else class="text-muted" style="font-size:11px">—</span>
                 <span v-if="card.rarity" class="card-rarity badge badge-accent">{{ card.rarity }}</span>
               </div>
@@ -135,7 +149,7 @@
               {{ selectedSet?.name }} · #{{ detailCard.number }}<template v-if="detailCard.rarity"> · {{ detailCard.rarity }}</template>
             </div>
             <PriceChart
-              :cardRef="{ game: gameId, setId: selectedSet?.id, setName: selectedSet?.name, number: detailCard.number, cardId: detailCard.id, tcgplayerId: detailCard.tcgplayerId }"
+              :cardRef="{ game: gameId, setId: selectedSet?.id, setName: selectedSet?.name, number: detailCard.number, cardId: detailCard.id, tcgplayerId: detailCard.tcgplayerId, lang: detailCard._lang || selectedSet?._lang || activeLang }"
               :currentPrice="detailCard.price"
               :height="240"
             />
@@ -197,7 +211,7 @@
                   <div class="bulk-card-name">{{ card.name }}</div>
                   <div class="bulk-card-meta text-muted">#{{ card.number }}<template v-if="card.rarity"> · {{ card.rarity }}</template></div>
                 </div>
-                <span v-if="card.price" class="bulk-card-price">${{ card.price.toFixed(2) }}</span>
+                <span v-if="card.price != null" class="bulk-card-price">${{ card.price.toFixed(2) }}</span>
                 <span v-else class="bulk-card-price text-muted">—</span>
               </div>
             </div>
@@ -231,6 +245,9 @@ const route = useRoute()
 const gameId = computed(() => route.params.game)
 const provider = computed(() => getProvider(gameId.value))
 const meta = computed(() => TCGS.find(t => t.id === gameId.value))
+const languages = computed(() => provider.value?.languages || [])
+const selectedLang = ref('en')
+const activeLang = computed(() => languages.value.some(l => l.id === selectedLang.value) ? selectedLang.value : 'en')
 
 const sets = ref([])
 const loadingSets = ref(false)
@@ -263,6 +280,17 @@ const filteredCards = computed(() => {
   return cards.value.filter(c => tokenMatch(q, c.name, String(c.number)))
 })
 
+async function switchLang(lang) {
+  if (activeLang.value === lang) return
+  selectedLang.value = lang
+  selectedSet.value = null
+  cards.value = []
+  detailCard.value = null
+  setFilter.value = ''
+  cardFilter.value = ''
+  await loadSets()
+}
+
 // Tap-to-reveal on touch devices (desktop reveals on hover; taps no-op there)
 const revealedCard = ref(null)
 const _canHover = typeof window !== 'undefined' && window.matchMedia('(hover: hover)').matches
@@ -279,7 +307,7 @@ async function loadSets() {
   loadingSets.value = true
   setsError.value = ''
   try {
-    sets.value = await provider.value.getSets({ signal: ac.signal })
+    sets.value = await provider.value.getSets({ signal: ac.signal, lang: activeLang.value })
   } catch (e) {
     if (e.name !== 'AbortError') setsError.value = navigator.onLine ? 'Could not reach the card database. Please try again.' : 'You\'re offline and this list hasn\'t been viewed yet — open it once online and it stays available offline.'
   } finally {
@@ -301,7 +329,8 @@ async function loadSetCards(set) {
   loadingCards.value = true
   cardsError.value = ''
   try {
-    const result = await provider.value.getSetCards(set.id, { signal: ac.signal })
+    const lang = set._lang || activeLang.value
+    const result = await provider.value.getSetCards(set.id, { signal: ac.signal, lang })
     // Provider aborts don't reach the fetch layer, so a slow set A can
     // resolve after the user opened set B — drop stale responses
     if (selectedSet.value?.id !== set.id) return
@@ -323,6 +352,7 @@ function closeSet() {
 }
 
 function addCard(card) {
+  const lang = card._lang || selectedSet.value?._lang || activeLang.value
   addingCard.value = {
     game: gameId.value,
     id: card.id,
@@ -333,6 +363,7 @@ function addCard(card) {
     image: card.image,
     price: card.price,
     rarity: card.rarity,
+    _lang: lang,
   }
 }
 
@@ -363,17 +394,18 @@ async function startBulkAdd(set) {
   newShelfName.value = ''
   bulkCards.value = []
   try {
-    const allCards = await provider.value.getSetCards(set.id)
+    const lang = set._lang || activeLang.value
+    const allCards = await provider.value.getSetCards(set.id, { lang })
     // Check which cards are already in the selected portfolio
     const portfolio = store.portfolios.find(p => p.id === bulkPortfolioId.value)
-    const ownedNames = new Set(
+    const ownedKeys = new Set(
       (portfolio?.items || [])
-        .filter(i => i.type === 'card' && i.game === gameId.value)
-        .map(i => (i.cardData?.name || '').toLowerCase())
+        .filter(i => i.type === 'card' && i.game === gameId.value && (i._lang || i.cardData?._lang || 'en') === lang)
+        .flatMap(i => [i.cardId, (i.cardData?.name || '').toLowerCase()].filter(Boolean))
     )
     bulkCards.value = allCards.map(c => ({
       ...c,
-      checked: !ownedNames.has(c.name.toLowerCase()),
+      checked: !ownedKeys.has(c.id) && !ownedKeys.has(c.name.toLowerCase()),
     }))
   } catch {
     bulkCards.value = []
@@ -412,6 +444,7 @@ async function confirmBulkAdd() {
       purchaseDate: '',
       notes: '',
       game: gameId.value,
+      _lang: card._lang || selectedSet.value?._lang || activeLang.value,
       // cardId + set.id are what master-set detection and the Hunt gallery
       // match on — without them grouping never finds these items
       cardId: card.id,
@@ -421,6 +454,7 @@ async function confirmBulkAdd() {
         set: { id: bulkSetId.value, name: bulkSetName.value },
         images: { small: card.image },
         rarity: card.rarity,
+        _lang: card._lang || selectedSet.value?._lang || activeLang.value,
       },
       pcUrl: '',
       currentMarketPrice: card.price,
@@ -443,6 +477,8 @@ watch(gameId, () => {
   selectedSet.value = null
   cards.value = []
   setFilter.value = ''
+  cardFilter.value = ''
+  selectedLang.value = 'en'
   loadSets()
 })
 
@@ -455,7 +491,25 @@ onMounted(loadSets)
 .tcg-crumb { display: flex; align-items: center; gap: 10px; }
 .tcg-crumb-name { font-size: 13px; color: var(--text-muted); font-weight: 600; }
 
-.sets-header { display: flex; gap: 12px; }
+.sets-header { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.lang-tabs { display: flex; gap: 6px; flex-wrap: wrap; }
+.lang-tab {
+  min-height: 44px;
+  padding: 8px 14px;
+  border: var(--bw) solid var(--ink);
+  border-radius: var(--radius);
+  background: var(--bg-card);
+  color: var(--text-primary);
+  box-shadow: var(--shadow-xs);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+.lang-tab:hover { transform: translate(-1px, -1px); box-shadow: var(--shadow-sm); }
+.lang-tab:active { transform: translate(1px, 1px); box-shadow: var(--shadow-pressed); }
+.lang-tab.active { background: var(--accent); color: var(--on-accent); }
 .search-input-wrap { flex: 1; position: relative; display: flex; align-items: center; max-width: 400px; }
 .search-input { flex: 1; }
 .search-clear { position: absolute; right: 4px; }

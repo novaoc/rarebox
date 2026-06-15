@@ -12,6 +12,7 @@ const ROUTES = [
   '/search',
   '/sets',
   '/sets/pokemon',
+  '/sets/one-piece',
   '/sets/yugioh',
   '/settings',
   '/trade',

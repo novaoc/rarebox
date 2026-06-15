@@ -358,6 +358,7 @@ function submit() {
         ...item,
         type: 'graded',
         game: game.value,
+        _lang: props.tcgCard?._lang || null,
         cardId: props.tcgCard?.id || undefined,
         cardData: {
           name: form.value.name,
@@ -365,6 +366,7 @@ function submit() {
           set: { id: props.tcgCard?.setId || undefined, name: form.value.setName },
           images: { small: form.value.imageUrl },
           rarity: props.tcgCard?.rarity || '',
+          _lang: props.tcgCard?._lang || null,
         },
         gradingCompany: form.value.gradingCompany,
         grade: form.value.grade,
@@ -375,6 +377,7 @@ function submit() {
         ...item,
         type: 'card',
         game: game.value,
+        _lang: props.tcgCard?._lang || null,
         cardId: props.tcgCard?.id || undefined,
         cardData: {
           name: form.value.name,
@@ -382,6 +385,7 @@ function submit() {
           set: { id: props.tcgCard?.setId || undefined, name: form.value.setName },
           images: { small: form.value.imageUrl },
           rarity: props.tcgCard?.rarity || '',
+          _lang: props.tcgCard?._lang || null,
         },
         pcUrl: form.value.pcUrl,
         currentMarketPrice: value,
