@@ -34,10 +34,10 @@ function gameDef(id) {
 }
 
 function parsePrice(val) {
-  if (typeof val === 'number') return val > 0 ? val : null
+  if (typeof val === 'number') return val >= 0 ? val : null
   if (!val) return null
   const n = parseFloat(String(val).replace(/[$,]/g, '').trim())
-  return Number.isFinite(n) && n > 0 ? n : null
+  return Number.isFinite(n) && n >= 0 ? n : null
 }
 
 // Heuristic: is this product a sealed product (box/pack/…) vs a single card?

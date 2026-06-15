@@ -8,6 +8,7 @@
     "dev": "vite",
     "prebuild": "node scripts/sync-ocr-assets.mjs",
     "build": "vite build",
+    "eval:harness": "node scripts/evals/run-all.mjs",
     "preview": "vite preview"
   },
   "dependencies": {

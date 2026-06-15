@@ -94,7 +94,7 @@ function cached(key, ttlMs, fn, { signal } = {}) {
 function num(v) {
   if (v == null) return null
   const n = parseFloat(String(v).replace(/[$,]/g, ''))
-  return Number.isFinite(n) && n > 0 ? n : null
+  return Number.isFinite(n) && n >= 0 ? n : null
 }
 
 // ── MTG: Scryfall ───────────────────────────────────────────────────────────

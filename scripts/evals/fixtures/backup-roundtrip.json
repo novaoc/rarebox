@@ -1,0 +1,87 @@
+{
+  "version": 2,
+  "exportedAt": "2026-06-14T00:00:00.000Z",
+  "app": "rarebox",
+  "data": {
+    "portfolios": {
+      "portfolios": [
+        {
+          "id": "shelf-main",
+          "name": "Trade Binder",
+          "color": "#ffd23f",
+          "createdAt": "2026-06-01T00:00:00.000Z",
+          "items": [
+            {
+              "id": "item-card-zero",
+              "type": "card",
+              "game": "pokemon",
+              "name": "Promo Card",
+              "setName": "Sample Set",
+              "setCode": "sv0",
+              "cardId": "sv0-001",
+              "number": "001",
+              "quantity": 1,
+              "purchasePrice": 0,
+              "currentMarketPrice": 0,
+              "lastPriceUpdate": "2026-06-14T00:00:00.000Z",
+              "_lang": "en",
+              "cardData": {
+                "id": "sv0-001",
+                "name": "Promo Card",
+                "number": "001",
+                "set": { "id": "sv0", "name": "Sample Set" },
+                "images": { "small": "https://example.invalid/card.png" }
+              }
+            },
+            {
+              "id": "item-sealed",
+              "type": "sealed",
+              "game": "pokemon",
+              "name": "Booster Box",
+              "setName": "Sample Set",
+              "quantity": 1,
+              "purchasePrice": 99.99,
+              "currentValue": 123.45,
+              "lastPriceUpdate": "2026-06-14T00:00:00.000Z"
+            }
+          ]
+        }
+      ],
+      "activePortfolioId": "shelf-main",
+      "settings": {
+        "currency": "USD",
+        "tcgPrefs": ["pokemon", "mtg"]
+      },
+      "snapshots": {
+        "shelf-main": [
+          {
+            "date": "2026-06-14",
+            "ts": 1781395200000,
+            "values": {
+              "item-card-zero": 0,
+              "item-sealed": 123.45
+            }
+          }
+        ]
+      }
+    },
+    "trade": {
+      "sideA": { "items": [], "totalValue": 0 },
+      "sideB": { "items": [], "totalValue": 0 }
+    },
+    "decks": [
+      {
+        "id": "deck-main",
+        "name": "Sample Deck",
+        "game": "pokemon",
+        "cards": [
+          { "cardId": "sv0-001", "name": "Promo Card", "quantity": 1, "price": 0 }
+        ]
+      }
+    ],
+    "priceCache": {
+      "ph_cache_sample": { "price": 0, "timestamp": 1781395200000 },
+      "evil_key_should_not_import": "blocked"
+    }
+  }
+}

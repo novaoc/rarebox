@@ -96,7 +96,7 @@ export async function rescueMtg(query) {
     const c = await res.json()
     if (!c?.name) return []
     const imgs = c.image_uris || c.card_faces?.[0]?.image_uris || {}
-    const num = (v) => { const n = parseFloat(String(v || '')); return Number.isFinite(n) && n > 0 ? n : null }
+    const num = (v) => { const n = parseFloat(String(v || '')); return Number.isFinite(n) && n >= 0 ? n : null }
     return [{
       id: c.id,
       name: c.name,

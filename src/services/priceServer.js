@@ -89,13 +89,13 @@ async function searchPC(query) {
 }
 
 /**
- * Parse "$1,234.56" or number → float, or null if zero/missing.
+ * Parse "$1,234.56" or number → float, or null if missing/invalid.
  */
 function parsePrice(val) {
-  if (typeof val === 'number') return val > 0 ? val : null
+  if (typeof val === 'number') return val >= 0 ? val : null
   if (!val) return null
   const num = parseFloat(String(val).replace(/[$,]/g, '').trim())
-  return num > 0 ? num : null
+  return Number.isFinite(num) && num >= 0 ? num : null
 }
 
 /**
