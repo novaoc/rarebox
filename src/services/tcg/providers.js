@@ -256,15 +256,16 @@ export function opNormalizeJapaneseSet(s) {
   }
 }
 
-export function opNormalizeJapaneseCard(c, set) {
+export function opNormalizeJapaneseCard(c, set, priceMap = {}) {
   const number = opCleanString(c?.number || c?.id, 40)
   const id = opCleanString(c?.id || `jp:${set?.id || 'op'}:${number}`, 80)
+  const price = opPriceFor(priceMap, set?.id || set?.code, number, null)
   return {
     id,
     name: opCleanString(c?.name || number, 160),
     number,
     image: opCleanString(c?.image, 400),
-    price: c?.price == null ? null : num(c.price),
+    price: price ?? (c?.price == null ? null : num(c.price)),
     rarity: opCleanString(c?.rarity, 40),
     type: opCleanString(c?.type, 40),
     _lang: 'ja',
@@ -316,7 +317,8 @@ const onePiece = {
       return cached(`opt-ja:cards:${setId}`, 600_000, async (signal) => {
         const idx = await fetchOpJpIndex(signal)
         const set = (idx.sets || []).find(s => s.id === setId || s.code === setId) || { id: setId }
-        return (idx.cards?.[setId] || []).map(c => opNormalizeJapaneseCard(c, set))
+        const priceMap = await getOpPriceMap(signal)
+        return (idx.cards?.[setId] || []).map(c => opNormalizeJapaneseCard(c, set, priceMap))
       })
     }
     return cached(`opt:cards:${setId}`, 600_000, async (signal) => {

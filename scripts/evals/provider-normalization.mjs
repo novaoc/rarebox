@@ -64,5 +64,19 @@ runEval('provider price normalization semantics', () => {
     // skip
   }
 
+
+  // Japanese One Piece cards should be able to receive prices from the shared op-prices map
+  try {
+    const jpRaw = read('public/op-jp-index.json')
+    const jp = JSON.parse(jpRaw)
+    const cards = Object.values(jp.cards || {}).flat()
+    const hasPriceField = cards.some(c => 'price' in c)
+    if (!hasPriceField) {
+      console.log('⚠ Japanese One Piece cards in static index are missing price field')
+    }
+  } catch (e) {
+    // skip
+  }
+
   ok('OP/YGO fixture prices prefer exact variants and Riftbound source keeps no-inherit variant guard')
 })
