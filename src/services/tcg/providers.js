@@ -212,6 +212,15 @@ export async function getOpPriceMap(signal) {
   } catch { return {} }
 }
 
+export async function getOpJpPriceMap(signal) {
+  try {
+    return await cached('opt-jp:tcgp-prices', 3600_000, async (sig) => {
+      const d = await getJson('/op-jp-prices.json', { signal: sig })
+      return d.prices || {}
+    }, { signal })
+  } catch { return {} }
+}
+
 /** TCGplayer-first price for an optcgapi card row. */
 export function opPriceFor(priceMap, cardSetId, cardName, fallback) {
   const key = `${String(cardSetId || '').toUpperCase()}|${opVariantSlug(cardName)}`
@@ -317,7 +326,7 @@ const onePiece = {
       return cached(`opt-ja:cards:${setId}`, 600_000, async (signal) => {
         const idx = await fetchOpJpIndex(signal)
         const set = (idx.sets || []).find(s => s.id === setId || s.code === setId) || { id: setId }
-        const priceMap = await getOpPriceMap(signal)
+        const priceMap = await getOpJpPriceMap(signal) || await getOpPriceMap(signal)
         return (idx.cards?.[setId] || []).map(c => opNormalizeJapaneseCard(c, set, priceMap))
       })
     }

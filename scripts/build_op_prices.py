@@ -32,7 +32,8 @@ import urllib.request
 from pathlib import Path
 
 TCGCSV = "https://tcgcsv.com/tcgplayer"
-OP_CATEGORY = 68
+OP_CATEGORY = 68          # English One Piece (TCGplayer category)
+JP_CATEGORY = None        # Japanese One Piece — set this once the tcgcsv category ID is known
 OUT = Path(__file__).resolve().parent.parent / "public" / "op-prices.json"
 
 HEADERS = {
@@ -64,6 +65,10 @@ def variant_slug(name: str) -> str:
 
 
 def main() -> int:
+    # To generate Japanese prices:
+    # 1. Discover the correct JP_CATEGORY ID on tcgcsv.com
+    # 2. Set JP_CATEGORY above
+    # 3. Optionally create a separate op-jp-prices.json output
     stamp = fetch("https://tcgcsv.com/last-updated.txt").strip()
     if OUT.exists():
         try:
