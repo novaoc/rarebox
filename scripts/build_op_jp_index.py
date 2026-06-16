@@ -17,6 +17,7 @@ import sys
 import time
 import urllib.parse
 import urllib.request
+import os
 from pathlib import Path
 
 # One Piece Japanese set logos (populated manually for best quality)
@@ -112,7 +113,13 @@ def parse_cards(page: str, set_code: str, set_name: str) -> list[dict]:
         name_match = re.search(r'<div class="cardName">(.*?)</div>', block, re.S)
         name = clean(name_match.group(1)) if name_match else fallback_id
         img_match = re.search(r'<img[^>]+data-src="([^"]+)"', block)
-        image = absolute_image(img_match.group(1)) if img_match else ""
+        if img_match:
+            original = absolute_image(img_match.group(1))
+            # Rewrite to same-origin proxy (official site blocks CORP)
+            filename = os.path.basename(original.split("?")[0])
+            image = f"/api/op-jp-card-image?file={filename}"
+        else:
+            image = ""
         cards.append({
             "id": f"jp:{fallback_id}",
             "name": name,

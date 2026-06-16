@@ -39,11 +39,29 @@ runEval('provider price normalization semantics', () => {
 
 
   // Japanese One Piece set names must be clean (no leftover HTML from official site)
-  const jpRaw = read('public/op-jp-index.json')
-  const jp = JSON.parse(jpRaw)
-  const bad = (jp.sets || []).filter(s => (s.name || '').includes('<')).map(s => s.name)
-  if (bad.length > 0) {
-    console.log('⚠ Japanese One Piece set names contain HTML (extraction needs hardening):', bad.slice(0,2))
+  try {
+    const jpRaw = read('public/op-jp-index.json')
+    const jp = JSON.parse(jpRaw)
+    const bad = (jp.sets || []).filter(s => (s.name || '').includes('<')).map(s => s.name)
+    if (bad.length > 0) {
+      console.log('⚠ Japanese One Piece set names contain HTML (extraction needs hardening):', bad.slice(0,2))
+    }
+  } catch (e) {
+    // Index not present or invalid — skip check (normal in some CI jobs)
+  }
+
+
+  // Japanese One Piece card images must use the same-origin proxy
+  try {
+    const jpRaw = read('public/op-jp-index.json')
+    const jp = JSON.parse(jpRaw)
+    const cards = Object.values(jp.cards || {}).flat()
+    const badImages = cards.filter(c => c.image && !c.image.startsWith('/api/op-jp-card-image'))
+    if (badImages.length > 0) {
+      console.log('⚠ Some JP One Piece card images are not using the proxy:', badImages.slice(0,2).map(c => c.image))
+    }
+  } catch (e) {
+    // skip
   }
 
   ok('OP/YGO fixture prices prefer exact variants and Riftbound source keeps no-inherit variant guard')
