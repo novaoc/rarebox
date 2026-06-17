@@ -191,6 +191,7 @@
                 <th>Qty</th>
                 <th>Paid</th>
                 <th>Value</th>
+                <th>Signal</th>
                 <th>Gain/Loss</th>
                 <th></th>
               </tr>
@@ -222,6 +223,11 @@
                 <td class="font-mono">{{ item.quantity || 1 }}</td>
                 <td class="font-mono">${{ ((item.purchasePrice || 0) * (item.quantity || 1)).toFixed(2) }}</td>
                 <td class="font-mono"><span class="text-accent">${{ (getCurrentValue(item) * (item.quantity || 1)).toFixed(2) }}</span></td>
+                <td>
+                  <span class="badge" :class="indicatorClass(store.getItemIndicator(item))">
+                    {{ store.getItemIndicator(item) }}
+                  </span>
+                </td>
                 <td>
                   <div class="gain-cell">
                     <span :class="getGain(item) >= 0 ? 'text-success' : 'text-danger'">
@@ -260,9 +266,11 @@
                 <div class="mobile-item-stats mt-1">
                   <span class="text-accent font-bold">${{ (getCurrentValue(item) * (item.quantity || 1)).toFixed(2) }}</span>
                   <span class="text-muted">· {{ item.quantity || 1 }} qty</span>
-                  <span :class="getGain(item) >= 0 ? 'gain-pos' : 'gain-neg'" class="mobile-item-gain">
-                    {{ getGainPct(item) >= 0 ? '+' : '' }}{{ getGainPct(item).toFixed(1) }}%
-                  </span>
+                  <div class="indicator-dot ml-auto" :class="indicatorClass(store.getItemIndicator(item))">
+                    <RbIcon v-if="store.getItemIndicator(item) === 'BUY'" name="arrow-down-circle" :size="14" />
+                    <RbIcon v-else-if="store.getItemIndicator(item) === 'SELL'" name="arrow-up-circle" :size="14" />
+                    <span v-else class="dot-neutral"></span>
+                  </div>
                 </div>
               </div>
               <div class="mobile-item-menu" @click.stop="openItemMenu(item)">
@@ -486,7 +494,7 @@
           </div>
           <div class="modal-footer">
             <button class="btn btn-secondary" @click="confirmDelete = false">Cancel</button>
-            <button class="btn btn-danger" @click="deletePortfolio">Delete Forever</button>
+            <button class="btn="btn-danger" @click="deletePortfolio">Delete Forever</button>
           </div>
         </div>
       </div>
@@ -1083,6 +1091,14 @@ async function refreshPrices() {
   refreshing.value = false
 }
 
+function indicatorClass(sig) {
+  return {
+    BUY: 'badge-info',
+    SELL: 'badge-danger',
+    HOLD: 'badge-ghost'
+  }[sig]
+}
+
 onMounted(() => { refreshPrices() })
 function exportPortfolio() { if (portfolio.value) exportPortfolioToExcel(portfolio.value) }
 function deletePortfolio() { store.deletePortfolio(portfolio.value.id); router.push('/') }
@@ -1141,6 +1157,9 @@ function deletePortfolio() { store.deletePortfolio(portfolio.value.id); router.p
 .gain-cell { display: flex; align-items: center; gap: 6px; font-weight: 700; }
 .gain-pct { font-size: 12px; font-weight: 500; }
 
+/* Signal Badges */
+.badge-ghost { background: transparent; border-color: var(--border-subtle); color: var(--text-muted); }
+
 /* Mobile Card View */
 .mobile-item-list { display: flex; flex-direction: column; gap: 10px; padding: 12px 16px 16px; }
 /* Desktop default: mobile-only blocks hidden (was missing — both layouts rendered) */
@@ -1152,10 +1171,16 @@ function deletePortfolio() { store.deletePortfolio(portfolio.value.id); router.p
 .mobile-item-name { font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mobile-item-sub { font-size: 12px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mobile-item-stats { display: flex; align-items: center; gap: 6px; font-size: 12px; }
-.mobile-item-gain { margin-left: auto; padding: 1px 8px; border: 1.5px solid var(--on-accent); border-radius: 999px; font-weight: 800; font-size: 11px; flex-shrink: 0; }
+.mobile-item-gain { padding: 1px 8px; border: 1.5px solid var(--on-accent); border-radius: 999px; font-weight: 800; font-size: 11px; flex-shrink: 0; }
 .gain-pos { background: var(--success); color: var(--on-accent); }
 .gain-neg { background: var(--danger); color: var(--on-danger); }
 .mobile-item-menu { width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; color: var(--text-secondary); }
+
+/* Compact Signal Icons for Mobile */
+.indicator-dot { width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; border-radius: 50%; }
+.indicator-dot.badge-info { color: var(--info); border: none; background: transparent; }
+.indicator-dot.badge-danger { color: var(--danger); border: none; background: transparent; }
+.dot-neutral { width: 6px; height: 6px; background: var(--border-subtle); border-radius: 50%; }
 
 /* Custom Checkbox */
 .mobile-item-checkbox { width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; }

@@ -62,7 +62,7 @@
         <span class="app-footer-dot">·</span>
         <a href="https://github.com/novaoc/rarebox" target="_blank" rel="noopener" class="app-footer-link">GitHub</a>
         <p class="app-footer-ip">
-          Card images © their respective owners (The Pokémon Company, Wizards of the
+          Not financial advice. Card images © their respective owners (The Pokémon Company, Wizards of the
           Coast, Konami, Disney, Bandai, Riot Games) — used for identification and
           personal collection tracking only. Rarebox is unaffiliated fan software.
         </p>

@@ -347,6 +347,27 @@ export const usePortfolioStore = defineStore('portfolio', () => {
     return _hasNeverPriced(item)
   }
 
+  /**
+   * Buy/Sell/Hold Indicator
+   * SELL: +20% gain
+   * BUY: -15% loss
+   * HOLD: otherwise
+   */
+  function getItemIndicator(item) {
+    const purchase = item.purchasePrice || 0
+    if (!purchase) return 'HOLD'
+    const current = item.type === 'card'
+      ? (item.currentMarketPrice || purchase)
+      : (item.currentValue || purchase)
+    
+    if (!current) return 'HOLD'
+
+    const pct = ((current - purchase) / purchase) * 100
+    if (pct >= 20) return 'SELL'
+    if (pct <= -15) return 'BUY'
+    return 'HOLD'
+  }
+
   // ── Portfolio stats ──────────────────────────────────────────────────
 
   function getPortfolioStats(portfolioId) {
@@ -870,6 +891,7 @@ export const usePortfolioStore = defineStore('portfolio', () => {
     getPortfolioStats,
     recordSnapshot,
     getItemHistory,
+    getItemIndicator,
     isJPCard,
     isPriceStale,
     hasNeverPriced,
