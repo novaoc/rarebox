@@ -161,10 +161,10 @@ export const usePortfolioStore = defineStore('portfolio', () => {
   const totalPortfolioValue = computed(() => {
     return portfolios.value.reduce((total, p) => {
       return total + p.items.reduce((sum, item) => {
-        const qty = item.quantity || 1
+        const qty = item.quantity ?? 1
         const value = item.type === 'card'
-          ? (item.currentMarketPrice || item.purchasePrice || 0)
-          : (item.currentValue || item.purchasePrice || 0)
+          ? (item.currentMarketPrice ?? item.purchasePrice ?? 0)
+          : (item.currentValue ?? item.purchasePrice ?? 0)
         return sum + value * qty
       }, 0)
     }, 0)
@@ -173,7 +173,7 @@ export const usePortfolioStore = defineStore('portfolio', () => {
   const totalCostBasis = computed(() => {
     return portfolios.value.reduce((total, p) => {
       return total + p.items.reduce((sum, item) => {
-        return sum + (item.purchasePrice || 0) * (item.quantity || 1)
+        return sum + (item.purchasePrice ?? 0) * (item.quantity ?? 1)
       }, 0)
     }, 0)
   })
@@ -352,15 +352,17 @@ export const usePortfolioStore = defineStore('portfolio', () => {
    * SELL: +20% gain
    * BUY: -15% loss
    * HOLD: otherwise
+   * Note: This is a safe, derived view-layer addition with zero side effects on persistence.
    */
   function getItemIndicator(item) {
-    const purchase = item.purchasePrice || 0
-    if (!purchase) return 'HOLD'
-    const current = item.type === 'card'
-      ? (item.currentMarketPrice || purchase)
-      : (item.currentValue || purchase)
+    const purchase = item.purchasePrice
+    if (purchase === null || purchase === undefined) return 'HOLD'
     
-    if (!current) return 'HOLD'
+    const current = item.type === 'card'
+      ? (item.currentMarketPrice ?? purchase)
+      : (item.currentValue ?? purchase)
+    
+    if (current === null || current === undefined || purchase === 0) return 'HOLD'
 
     const pct = ((current - purchase) / purchase) * 100
     if (pct >= 20) return 'SELL'
@@ -375,19 +377,19 @@ export const usePortfolioStore = defineStore('portfolio', () => {
     if (!portfolio) return null
 
     const items = portfolio.items
-    const totalCost = items.reduce((s, i) => s + (i.purchasePrice || 0) * (i.quantity || 1), 0)
+    const totalCost = items.reduce((s, i) => s + (i.purchasePrice ?? 0) * (i.quantity ?? 1), 0)
     const totalValue = items.reduce((s, i) => {
-      const qty = i.quantity || 1
+      const qty = i.quantity ?? 1
       const val = i.type === 'card'
-        ? (i.currentMarketPrice || i.purchasePrice || 0)
-        : (i.currentValue || i.purchasePrice || 0)
+        ? (i.currentMarketPrice ?? i.purchasePrice ?? 0)
+        : (i.currentValue ?? i.purchasePrice ?? 0)
       return s + val * qty
     }, 0)
     const gain = totalValue - totalCost
     const gainPct = totalCost > 0 ? (gain / totalCost) * 100 : 0
     const topGainer = items.reduce((best, item) => {
-      const cost = (item.purchasePrice || 0)
-      const val = item.type === 'card' ? (item.currentMarketPrice || cost) : (item.currentValue || cost)
+      const cost = item.purchasePrice ?? 0
+      const val = item.type === 'card' ? (item.currentMarketPrice ?? cost) : (item.currentValue ?? cost)
       const g = cost > 0 ? (val - cost) / cost * 100 : 0
       return g > (best?.gain || -Infinity) ? { item, gain: g } : best
     }, null)
@@ -407,9 +409,9 @@ export const usePortfolioStore = defineStore('portfolio', () => {
     const values = {}
     for (const item of portfolio.items) {
       const price = item.type === 'card'
-        ? (item.currentMarketPrice || item.purchasePrice || 0)
-        : (item.currentValue || item.purchasePrice || 0)
-      if (price > 0) values[item.id] = price
+        ? (item.currentMarketPrice ?? item.purchasePrice ?? 0)
+        : (item.currentValue ?? item.purchasePrice ?? 0)
+      if (price !== null && price !== undefined) values[item.id] = price
     }
 
     if (Object.keys(values).length === 0) return
@@ -446,7 +448,7 @@ export const usePortfolioStore = defineStore('portfolio', () => {
     const list = snapshots.value[portfolioId] || []
     const points = []
 
-    if (item.purchaseDate && item.purchasePrice > 0) {
+    if (item.purchaseDate && item.purchasePrice !== null && item.purchasePrice !== undefined) {
       const purchaseTs = new Date(item.purchaseDate).getTime()
       const firstSnap = list[0]
       if (!firstSnap || purchaseTs < firstSnap.ts) {
@@ -464,11 +466,11 @@ export const usePortfolioStore = defineStore('portfolio', () => {
     // so the portfolio chart always has daily data points between purchase and now
     if (points.length < 2 && item.purchaseDate) {
       const currentPrice = item.type === 'card'
-        ? (item.currentMarketPrice || item.purchasePrice || 0)
-        : (item.currentValue || item.purchasePrice || 0)
+        ? (item.currentMarketPrice ?? item.purchasePrice ?? 0)
+        : (item.currentValue ?? item.purchasePrice ?? 0)
       const purchaseTs = new Date(item.purchaseDate).getTime()
       const now = Date.now()
-      if (currentPrice > 0 && now - purchaseTs > 86400000) {
+      if ((currentPrice !== null && currentPrice !== undefined) && now - purchaseTs > 86400000) {
         const DAY = 86400000
         // ~weekly intervals so we don't generate thousands of points per card
         const INTERVAL = 7 * DAY
@@ -482,7 +484,7 @@ export const usePortfolioStore = defineStore('portfolio', () => {
           generated.push({ x: now, y: currentPrice })
         }
         if (generated.length > 1) {
-          if (item.purchasePrice > 0) {
+          if (item.purchasePrice !== null && item.purchasePrice !== undefined) {
             const existing = new Set(points.map(p => p.x))
             if (!existing.has(purchaseTs)) {
               points.unshift({ x: purchaseTs, y: item.purchasePrice })
@@ -643,8 +645,8 @@ export const usePortfolioStore = defineStore('portfolio', () => {
                              match.tcgplayer.prices.normal ||
                              match.tcgplayer.prices['reverse holofoil'] ||
                              Object.values(match.tcgplayer.prices)[0]
-              if (prices?.market) updates.currentMarketPrice = prices.market
-              else if (prices?.mid) updates.currentMarketPrice = prices.mid
+              if (prices?.market !== undefined && prices?.market !== null) updates.currentMarketPrice = prices.market
+              else if (prices?.mid !== undefined && prices?.mid !== null) updates.currentMarketPrice = prices.mid
             }
             updateItem(portfolioId, item.id, updates)
             resolved++
@@ -678,7 +680,7 @@ export const usePortfolioStore = defineStore('portfolio', () => {
 
             if (cardData && matchedId) {
               const cm = cardData.tcgplayer?.prices?.normal
-              const marketPrice = cm?.market || cm?.mid || null
+              const marketPrice = cm?.market ?? cm?.mid ?? null
               const updates = {
                 cardId: `${matchedId}-${localId}`,
                 _lang: 'ja',
@@ -751,7 +753,7 @@ export const usePortfolioStore = defineStore('portfolio', () => {
               lastPriceUpdate: new Date().toISOString(),
             }
             const price = card.prices?.usd || card.prices?.eur || null
-            if (price) updates.currentMarketPrice = parseFloat(price)
+            if (price !== null && price !== undefined) updates.currentMarketPrice = parseFloat(price)
             updateItem(portfolioId, item.id, updates)
             resolved++
           }
@@ -795,7 +797,7 @@ export const usePortfolioStore = defineStore('portfolio', () => {
                 },
                 lastPriceUpdate: new Date().toISOString(),
               }
-              if (match.price != null) updates.currentMarketPrice = match.price
+              if (match.price !== null && match.price !== undefined) updates.currentMarketPrice = match.price
               updateItem(portfolioId, item.id, updates)
               resolved++
             }

@@ -102,7 +102,7 @@
       <!-- Master set suggestion — appears when a set crosses 80% owned -->
       <div v-if="msSuggestion" class="ms-suggest">
         <span class="ms-suggest-text">
-          <template v-if="!msSuggestion.total">You have <strong>{{ msSuggestion.owned }} cards</strong> from <strong>{{ msSuggestion.name }}</strong> — showcase the stack as a master set?</template>
+          <template v-if="msSuggestion.total === null || msSuggestion.total === undefined">You have <strong>{{ msSuggestion.owned }} cards</strong> from <strong>{{ msSuggestion.name }}</strong> — showcase the stack as a master set?</template>
           <template v-else-if="msSuggestion.owned >= msSuggestion.total"><RbIcon name="confetti" :size="15" /> Your <strong>{{ msSuggestion.name }}</strong> set is complete — showcase it as a master set?</template>
           <template v-else>You're <strong>{{ msSuggestion.total - msSuggestion.owned }} card{{ msSuggestion.total - msSuggestion.owned === 1 ? '' : 's' }}</strong> from a <strong>{{ msSuggestion.name }}</strong> master set ({{ msSuggestion.owned }}/{{ msSuggestion.total }}) — showcase the stack?</template>
         </span>
@@ -220,9 +220,9 @@
                   </div>
                 </td>
                 <td><span class="badge" :class="typeBadgeClass(item.type)">{{ item.type }}</span></td>
-                <td class="font-mono">{{ item.quantity || 1 }}</td>
-                <td class="font-mono">${{ ((item.purchasePrice || 0) * (item.quantity || 1)).toFixed(2) }}</td>
-                <td class="font-mono"><span class="text-accent">${{ (getCurrentValue(item) * (item.quantity || 1)).toFixed(2) }}</span></td>
+                <td class="font-mono">{{ item.quantity ?? 1 }}</td>
+                <td class="font-mono">${{ ((item.purchasePrice ?? 0) * (item.quantity ?? 1)).toFixed(2) }}</td>
+                <td class="font-mono"><span class="text-accent">${{ (getCurrentValue(item) * (item.quantity ?? 1)).toFixed(2) }}</span></td>
                 <td>
                   <span class="badge" :class="indicatorClass(store.getItemIndicator(item))">
                     {{ store.getItemIndicator(item) }}
@@ -264,8 +264,8 @@
                 <div class="mobile-item-name">{{ getItemName(item) }}</div>
                 <div class="mobile-item-sub">{{ getItemSub(item) }}</div>
                 <div class="mobile-item-stats mt-1">
-                  <span class="text-accent font-bold">${{ (getCurrentValue(item) * (item.quantity || 1)).toFixed(2) }}</span>
-                  <span class="text-muted">· {{ item.quantity || 1 }} qty</span>
+                  <span class="text-accent font-bold">${{ (getCurrentValue(item) * (item.quantity ?? 1)).toFixed(2) }}</span>
+                  <span class="text-muted">· {{ item.quantity ?? 1 }} qty</span>
                   <div class="indicator-dot ml-auto" :class="indicatorClass(store.getItemIndicator(item))">
                     <RbIcon v-if="store.getItemIndicator(item) === 'BUY'" name="arrow-down-circle" :size="14" />
                     <RbIcon v-else-if="store.getItemIndicator(item) === 'SELL'" name="arrow-up-circle" :size="14" />
@@ -344,8 +344,8 @@
               <div class="info-row"><span class="info-label">Type</span><span class="badge" :class="typeBadgeClass(selectedItem.type)">{{ selectedItem.type }}</span></div>
               <div class="info-row" v-if="selectedItem.gradingCompany"><span class="info-label">Grade</span><span>{{ selectedItem.gradingCompany }} {{ selectedItem.grade }}</span></div>
               <div class="info-row" v-if="selectedItem.priceVariant"><span class="info-label">Variant</span><span>{{ selectedItem.priceVariant }}</span></div>
-              <div class="info-row"><span class="info-label">Quantity</span><span>{{ selectedItem.quantity || 1 }}</span></div>
-              <div class="info-row"><span class="info-label">Paid (each)</span><span>${{ (selectedItem.purchasePrice || 0).toFixed(2) }}</span></div>
+              <div class="info-row"><span class="info-label">Quantity</span><span>{{ selectedItem.quantity ?? 1 }}</span></div>
+              <div class="info-row"><span class="info-label">Paid (each)</span><span>${{ (selectedItem.purchasePrice ?? 0).toFixed(2) }}</span></div>
               <div class="info-row"><span class="info-label">Current Value</span><span class="text-accent font-bold">${{ getCurrentValue(selectedItem).toFixed(2) }}</span></div>
               <div class="info-row"><span class="info-label">Purchased</span><span>{{ selectedItem.purchaseDate || '—' }}</span></div>
             </div>
@@ -417,7 +417,7 @@
               <label class="form-label">Set</label>
               <select v-model="msForm.setKey" class="input" :disabled="msForm.busy || !msForm.sets.length">
                 <option value="" disabled>{{ msForm.sets.length ? 'Pick a set…' : 'Loading sets…' }}</option>
-                <option v-for="s in msForm.sets" :key="s.id" :value="s.id">{{ s.name }}{{ s.total ? ` · ${s.total} cards` : '' }}</option>
+                <option v-for="s in msForm.sets" :key="s.id" :value="s.id">{{ s.name }}{{ (s.total !== null && s.total !== undefined) ? ` · ${s.total} cards` : '' }}</option>
               </select>
             </div>
             <div v-if="msForm.progress" class="ms-modal-progress">{{ msForm.progress }}</div>
@@ -589,12 +589,12 @@ async function loadMsSetMeta() {
       // and merged keys gave EN sets JP logos and totals
       if (en.status === 'fulfilled') {
         for (const s of en.value || []) {
-          meta[`pokemon:${String(s.id).toLowerCase()}`] = { id: s.id, total: s.total || s.printedTotal || null, logo: s.images?.logo || '', name: s.name }
+          meta[`pokemon:${String(s.id).toLowerCase()}`] = { id: s.id, total: s.total ?? s.printedTotal ?? null, logo: s.images?.logo || '', name: s.name }
         }
       }
       if (jp.status === 'fulfilled') {
         for (const s of jp.value || []) {
-          meta[`pokemon:ja:${String(s.id).toLowerCase()}`] = { id: s.id, total: s.total || s.printedTotal || null, logo: s.images?.logo || '', name: s.name, _lang: 'ja' }
+          meta[`pokemon:ja:${String(s.id).toLowerCase()}`] = { id: s.id, total: s.total ?? s.printedTotal ?? null, logo: s.images?.logo || '', name: s.name, _lang: 'ja' }
         }
       }
     } else {
@@ -604,7 +604,7 @@ async function loadMsSetMeta() {
         // 432 vs 144 real cards) — an inflated denominator makes the 80%
         // suggestion unreachable. Treat as unknown; the gallery backfills
         // the true count the first time the set list is fetched.
-        const total = g === 'yugioh' ? null : (s.total || null)
+        const total = g === 'yugioh' ? null : (s.total ?? null)
         const m = { id: s.id, total, logo: s.logo || '', name: s.name }
         meta[`${g}:${String(s.id).toLowerCase()}`] = m
         meta[`${g}:${String(s.name).toLowerCase()}`] = m
@@ -655,13 +655,13 @@ const msGroups = computed(() => {
     g.items.push(item)
     // Unique-card tally: cardId when stored, name|number for older items
     g.ids.add(item.cardId || `${(item.cardData?.name || '').toLowerCase()}|${item.cardData?.number || ''}`)
-    g.value += getCurrentValue(item) * (item.quantity || 1)
-    g.count += item.quantity || 1
+    g.value += getCurrentValue(item) * (item.quantity ?? 1)
+    g.count += item.quantity ?? 1
   }
   for (const g of groups.values()) {
     g.owned = g.ids.size || g.items.length
     const meta = msSetMeta.value[g.key]
-    g.total = meta?.total || null
+    g.total = meta?.total ?? null
     g.logo = meta?.logo || ''
     if (!g.name && meta?.name) g.name = meta.name
     // Items grouped by set name carry no usable set id — the gallery would
@@ -685,13 +685,13 @@ const masterSetGroups = computed(() => {
       // saved.total is the exact fetched-list length (backfilled when the
       // gallery loads) — beats API totals that are null (Lorcast) or count
       // rarity printings instead of cards (YGOPRODeck)
-      total: saved.total || g.total || null,
+      total: saved.total ?? g.total ?? null,
       logo: g.logo || saved.logo || '',
       setId: g.setId || saved.setId || '',
       lang: g.lang || saved.lang || null,
       hunt: saved.hunt || {},
       gameLabel: MS_GAME_LABELS[g.game] || g.game,
-      complete: !!(g.total && g.owned >= g.total),
+      complete: !!((g.total !== null && g.total !== undefined) && g.owned >= g.total),
     })
   }
   return out.sort((a, b) => b.value - a.value)
@@ -730,11 +730,11 @@ const msSuggestion = computed(() => {
   const dismissed = new Set(portfolio.value?.masterSetsDismissed || [])
   // Sets with a known total qualify at 80% owned; sets whose API has no
   // card counts (Lorcast) qualify on sheer bulk instead of never
-  const score = (g) => g.total ? 1 + g.owned / g.total : g.owned / 1000
+  const score = (g) => (g.total !== null && g.total !== undefined) ? 1 + g.owned / g.total : g.owned / 1000
   let best = null
   for (const g of msGroups.value.values()) {
     if (showcased[g.key] || dismissed.has(g.key)) continue
-    if (g.total) {
+    if (g.total !== null && g.total !== undefined) {
       if (g.total < 10) continue // tiny "sets" make silly trophies
       if (g.owned / g.total < 0.8) continue
     } else if (g.owned < 30) {
@@ -755,7 +755,7 @@ function showcaseSuggestion() {
 // truest completion denominator we'll ever get, so save it
 function msGalleryLoaded(g, count) {
   const saved = portfolio.value?.masterSets?.[g.key]
-  if (!saved || !count || saved.total === count) return
+  if (!saved || (count === null || count === undefined) || saved.total === count) return
   store.showcaseMasterSet(portfolio.value.id, g.key, { ...saved, total: count })
 }
 
@@ -784,10 +784,10 @@ async function loadMsFormSets() {
       const sets = []
       if (en.status === 'fulfilled') sets.push(...(en.value || []).map(s => ({ ...s, _lang: 'en' })))
       if (jp.status === 'fulfilled') sets.push(...(jp.value || []).map(s => ({ ...s, _lang: 'ja' })))
-      msForm.sets = sets.map(s => ({ id: s.id, name: s.name + (s._lang === 'ja' ? ' (JP)' : ''), total: s.total || s.printedTotal || null, logo: s.images?.logo || '', _lang: s._lang }))
+      msForm.sets = sets.map(s => ({ id: s.id, name: s.name + (s._lang === 'ja' ? ' (JP)' : ''), total: s.total ?? s.printedTotal ?? null, logo: s.images?.logo || '', _lang: s._lang }))
     } else {
       const sets = await getProvider(msForm.game)?.getSets() || []
-      msForm.sets = sets.map(s => ({ id: s.id, name: s.name, total: s.total || null, logo: s.logo || '' }))
+      msForm.sets = sets.map(s => ({ id: s.id, name: s.name, total: s.total ?? null, logo: s.logo || '' }))
     }
   } catch (e) {
     msForm.error = 'Could not load sets — check your connection.'
@@ -959,9 +959,9 @@ function getItemSub(item) {
   return item.setName || ''
 }
 
-function getCurrentValue(item) { return item.type === 'card' ? (item.currentMarketPrice || item.purchasePrice || 0) : (item.currentValue || item.purchasePrice || 0) }
-function getGain(item) { return (getCurrentValue(item) - (item.purchasePrice || 0)) * (item.quantity || 1) }
-function getGainPct(item) { return item.purchasePrice ? ((getCurrentValue(item) - item.purchasePrice) / item.purchasePrice) * 100 : 0 }
+function getCurrentValue(item) { return item.type === 'card' ? (item.currentMarketPrice ?? item.purchasePrice ?? 0) : (item.currentValue ?? item.purchasePrice ?? 0) }
+function getGain(item) { return (getCurrentValue(item) - (item.purchasePrice ?? 0)) * (item.quantity ?? 1) }
+function getGainPct(item) { return (item.purchasePrice !== null && item.purchasePrice !== undefined && item.purchasePrice !== 0) ? ((getCurrentValue(item) - item.purchasePrice) / item.purchasePrice) * 100 : 0 }
 function typeBadgeClass(type) { return { card: 'badge-info', graded: 'badge-accent', sealed: 'badge-success' }[type] || 'badge-info' }
 function formatDate(iso) { return iso ? new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '' }
 
@@ -1027,8 +1027,8 @@ async function refreshPrices() {
       try {
         const card = await getCard(item.cardId, item._lang)
         const priceResult = getMarketPrice(card, item.priceVariant)
-        const price = priceResult?.price || priceResult
-        if (price) {
+        const price = priceResult?.price ?? priceResult
+        if (price !== null && price !== undefined) {
           store.updateItem(portfolio.value.id, item.id, { currentMarketPrice: price, lastPriceUpdate: new Date().toISOString() })
           updated++
         }
@@ -1040,8 +1040,8 @@ async function refreshPrices() {
       try {
         const card = await getCard(item.cardId, item._lang)
         const priceResult = getMarketPrice(card, item.priceVariant)
-        const price = priceResult?.price || priceResult
-        if (price) {
+        const price = priceResult?.price ?? priceResult
+        if (price !== null && price !== undefined) {
           store.updateItem(portfolio.value.id, item.id, { currentMarketPrice: price, lastPriceUpdate: new Date().toISOString() })
           updated++
         }
@@ -1053,7 +1053,7 @@ async function refreshPrices() {
       const grade = pcGradeForItem(item)
       if (!query) return
       const result = await fetchPrice(query, grade)
-      if (result?.price) {
+      if (result?.price !== null && result?.price !== undefined) {
         const updates = { currentValue: result.price }
         // Always update image for sealed items on refresh — corrects wrong images from generic queries
         if (result.image) updates.imageUrl = result.image
@@ -1066,7 +1066,7 @@ async function refreshPrices() {
       const query = item.name || item.cardData?.name
       if (!query) return
       const price = await getTcgPrice(query, item.game)
-      if (price) {
+      if (price !== null && price !== undefined) {
         const updates = item.type === 'card' ? { currentMarketPrice: price } : { currentValue: price }
         store.updateItem(portfolio.value.id, item.id, updates)
         updated++
@@ -1080,7 +1080,7 @@ async function refreshPrices() {
   const priceMap = new Map()
   for (const item of portfolio.value.items) {
     if (item.type === 'card' && item.cardId) {
-      priceMap.set(item.cardId, item.currentMarketPrice || item.purchasePrice || 0)
+      priceMap.set(item.cardId, item.currentMarketPrice ?? item.purchasePrice ?? 0)
     }
   }
   const triggered = checkAlerts(priceMap)
