@@ -494,7 +494,7 @@
           </div>
           <div class="modal-footer">
             <button class="btn btn-secondary" @click="confirmDelete = false">Cancel</button>
-            <button class="btn="btn-danger" @click="deletePortfolio">Delete Forever</button>
+            <button class="btn btn-danger" @click="deletePortfolio">Delete Forever</button>
           </div>
         </div>
       </div>
@@ -664,7 +664,7 @@ const msGroups = computed(() => {
     g.total = meta?.total ?? null
     g.logo = meta?.logo || ''
     if (!g.name && meta?.name) g.name = meta.name
-    // Items grouped by set name carry no usable set id — the gallery would
+    // Items grouped by set name carry no unusable set id — the gallery would
     // fetch getSetCards('') and show a stranger's card list (the Riftbound
     // "wrong set" bug). The meta map knows the real id.
     if (!g.setId && meta?.id) g.setId = meta.id
