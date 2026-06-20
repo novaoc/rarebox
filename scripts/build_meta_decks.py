@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """Build public/meta-decks/{game}.json — live meta decks from all 6 TCG sources.
 
 Formerly the /api/meta-decks serverless function; the app is local-only, so
