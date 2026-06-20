@@ -149,7 +149,7 @@ def resolve_cards_parallel(card_list, resolver=resolve_pokemon_card):
                     ordered[idx] = result
             except Exception:
                 pass
-        results = [r for r in ordered if r]
+        results = ordered
     return results
 
 
@@ -253,6 +253,8 @@ def scrape_pokemon() -> list[dict]:
 
     deck_cards = [[] for _ in raw_decks]
     for ci, resolved in enumerate(resolved_all):
+        if resolved is None:
+            continue
         deck_idx = card_deck_map[ci]
         deck_cards[deck_idx].append(resolved)
 
