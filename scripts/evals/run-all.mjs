@@ -1,6 +1,7 @@
 import { spawnSync } from 'node:child_process'
 
 const evals = [
+  ['python3', 'scripts/evals/meta-deck-resolver.py'],
   'scripts/evals/provider-shape.mjs',
   'scripts/evals/provider-normalization.mjs',
   'scripts/evals/sealed-filter.mjs',
@@ -12,8 +13,9 @@ const evals = [
 
 let failed = false
 for (const file of evals) {
-  console.log(`\n=== ${file} ===`)
-  const result = spawnSync(process.execPath, [file], { stdio: 'inherit' })
+  const [command, path] = Array.isArray(file) ? file : [process.execPath, file]
+  console.log(`\n=== ${path} ===`)
+  const result = spawnSync(command, [path], { stdio: 'inherit' })
   if (result.status !== 0) failed = true
 }
 
