@@ -13,6 +13,7 @@ runEval('price parser semantics', () => {
     ['$0', 0],
     [0, 0],
     ['0.00', 0],
+    [' $0.00 ', 0],
     ['', null],
     [null, null],
     ['not a price', null],
