@@ -184,7 +184,17 @@ export async function fetchPrice(query, grade = 'ungraded') {
   if (!filtered.length) filtered = products
   if (!filtered.length) throw new Error('no_results')
 
-  const product = filtered[0]
+  // Pick best match by name overlap instead of blindly taking [0].
+  // This prevents wrong SKU (e.g. case vs box, wrong variant) for ambiguous names
+  // like "Spider-Man Collector Booster Box".
+  const queryTokens = lq.split(/\s+/).filter(t => t.length > 2)
+  const scored = filtered.map(p => {
+    const name = (p.productName || '').toLowerCase()
+    const score = queryTokens.reduce((s, tok) => s + (name.includes(tok) ? 1 : 0), 0)
+    return { p, score }
+  }).sort((a, b) => b.score - a.score)
+
+  const product = (scored[0]?.score > 0 ? scored[0].p : filtered[0])
   const price = priceForGrade(product, grade)
   if (!price) throw new Error(grade !== 'ungraded' ? 'no_graded_data' : 'no_results')
 
