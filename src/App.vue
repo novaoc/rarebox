@@ -120,6 +120,7 @@
     </transition>
 
     <InstallPrompt />
+    <QuickAddMenu />
 
     <!-- Tour videos (replayable via info icon) -->
     <TourModal v-if="showSetsTour" :key="tourKey" src="/videos/sets-tour.mp4" storage-key="rarebox_sets_tour_seen" />
@@ -133,6 +134,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { usePortfolioStore } from './stores/portfolio'
 import InstallPrompt from './components/InstallPrompt.vue'
 import TourModal from './components/TourModal.vue'
+import QuickAddMenu from './components/QuickAddMenu.vue'
 
 const store = usePortfolioStore()
 const route = useRoute()
