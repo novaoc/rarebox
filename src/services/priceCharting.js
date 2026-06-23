@@ -74,10 +74,13 @@ export async function getPCProduct(id) {
   return data
 }
 
-// Extract the most relevant price from a product based on item type.
-// itemType: 'sealed' | 'graded' | 'card'
-// grade: e.g. '10', '9.5', '9' (only used for graded)
-// Returns price in dollars, or null.
+/**
+ * Extract the most relevant price from a product based on item type.
+ * @param {Object} product - Product data from PriceCharting
+ * @param {'sealed' | 'graded' | 'card'} itemType - The context of the item being priced
+ * @param {string|number} [grade] - Numeric grade for graded cards (e.g. 10, 9.5)
+ * @returns {number|null} Price in dollars, or null if unavailable.
+ */
 export function extractPrice(product, itemType, grade = null) {
   if (!product) return null
   const toDollars = v => (v && v > 0) ? Math.round(v) / 100 : null
