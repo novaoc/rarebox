@@ -304,10 +304,14 @@ const currentPageTitle = computed(() => {
   if (route.name === 'Browse') return 'Browse Sets'
   if (route.name === 'Sets') return 'Pokémon Sets'
   if (route.name === 'TcgSets') return 'Browse Sets'
+  if (route.name === 'Decks') return 'Decks'
+  if (route.name === 'MetaDecks') return 'Meta Decks'
+  if (route.name === 'DeckBuilder') return 'Deck Builder'
   if (route.name === 'Booth') return 'Card Booth'
   if (route.name === 'BoothEdit') return 'Edit Booth'
   if (route.name === 'Settings') return 'Settings'
   if (route.name === 'Terms') return 'Terms & Conditions'
+  if (route.name === 'ShelfGuide') return 'How Shelves Work'
   if (route.name === 'TradeAnalyzer' || route.name === 'TradeLanding') return 'Trade Analyzer'
   if (route.name === 'Portfolio') {
     const p = store.portfolios.find(p => p.id === route.params.id)
@@ -324,7 +328,7 @@ function createPortfolio() {
   if (!newPortfolioName.value.trim()) return
   const p = store.createPortfolio(newPortfolioName.value.trim(), newPortfolioColor.value)
   newPortfolioName.value = ''
-  showNewPortfolioModal.value = false
+  showNewPortfolioModal = false
   router.push(`/portfolio/${p.id}`)
 }
 

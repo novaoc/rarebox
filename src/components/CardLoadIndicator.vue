@@ -50,7 +50,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 
 const visible = ref(false)
 const expanded = ref(true)
@@ -182,6 +182,21 @@ function finish() {
     visible.value = false
   }, 4000)
 }
+
+// React to "Hide Loading Progress" setting changes immediately
+const onStorageChange = () => {
+  if (hiddenByPref() && visible.value) {
+    visible.value = false
+  }
+}
+
+onMounted(() => {
+  window.addEventListener('storage', onStorageChange)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('storage', onStorageChange)
+})
 
 defineExpose({ start, onProgress, finish })
 </script>
