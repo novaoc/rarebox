@@ -52,6 +52,34 @@
           </div>
         </div>
 
+        <!-- PriceCharting Search for Graded -->
+        <div v-if="itemType === 'graded'" class="pc-fetch-section mt-1 mb-4">
+          <div class="pc-fetch-label">Fetch Market Price</div>
+          <div class="flex gap-2">
+            <input
+              v-model="gradingPcQuery"
+              class="input input-sm"
+              placeholder="Search query…"
+              @keyup.enter="searchGradingPC"
+            />
+            <button
+              class="btn btn-secondary btn-sm"
+              :disabled="gradingPcSearching || !gradingPcQuery.trim()"
+              @click="searchGradingPC"
+              style="flex-shrink:0"
+            >
+              <span v-if="gradingPcSearching" class="spinner spinner-sm"></span>
+              <span v-else>Fetch</span>
+            </button>
+          </div>
+          <div v-if="gradingPcError" class="text-danger mt-1" style="font-size:12px">{{ gradingPcError }}</div>
+          <div v-if="gradingPcResult" class="pc-result-box mt-2">
+            <div class="pc-result-price-main">${{ gradingPcResult.price.toFixed(2) }}</div>
+            <div class="pc-result-meta">{{ gradingPcResult.product_name }} · Grade {{ gradingPcResult.grade }}</div>
+            <button class="btn btn-primary btn-sm mt-2" @click="applyGradingPCPrice">Apply Price</button>
+          </div>
+        </div>
+
         <!-- Card variant selector -->
         <div v-if="itemType === 'card' && variants.length > 0" class="form-group mt-2">
           <label class="form-label">Variant / Finish</label>
@@ -150,6 +178,11 @@
           </div>
         </div>
 
+        <div v-if="itemType === 'graded' && !gradingPcResult" class="form-group">
+          <label class="form-label">Current Market Value ($)</label>
+          <input v-model.number="form.currentValue" class="input" type="number" min="0" step="0.01" placeholder="0.00" />
+        </div>
+
         <div class="form-group">
           <label class="form-label">Purchase Date</label>
           <input v-model="form.purchaseDate" class="input" type="date" />
@@ -182,7 +215,7 @@
 import { ref, computed, watch, onMounted } from 'vue'
 import { usePortfolioStore } from '../stores/portfolio'
 import { getAllVariants, getMarketPrice } from '../services/pokemonApi'
-import { searchSealed } from '../services/priceServer'
+import { searchSealed, fetchPrice } from '../services/priceServer'
 
 const props = defineProps({
   card: { type: Object, default: null },
@@ -208,6 +241,34 @@ const gradesByCompany = {
   Other: ['10', '9.5', '9', '8', '7', '6', '5', '4', '3', '2', '1'],
 }
 const gradeOptions = computed(() => gradesByCompany[form.value.gradingCompany] || gradesByCompany.PSA)
+
+// Graded search
+const gradingPcQuery = ref('')
+const gradingPcSearching = ref(false)
+const gradingPcResult = ref(null)
+const gradingPcError = ref('')
+
+async function searchGradingPC() {
+  if (!gradingPcQuery.value.trim()) return
+  gradingPcSearching.value = true
+  gradingPcError.value = ''
+  gradingPcResult.value = null
+  try {
+    const result = await fetchPrice(gradingPcQuery.value, form.value.grade)
+    gradingPcResult.value = result
+  } catch (e) {
+    if (e.message === 'server_down') gradingPcError.value = 'PriceCharting unavailable'
+    else if (e.message === 'no_results') gradingPcError.value = 'No results found'
+    else gradingPcError.value = 'Fetch failed'
+  } finally {
+    gradingPcSearching.value = false
+  }
+}
+
+function applyGradingPCPrice() {
+  if (!gradingPcResult.value) return
+  form.value.currentValue = gradingPcResult.value.price
+}
 
 // Sealed search
 const sealedQuery = ref('')
@@ -358,6 +419,10 @@ onMounted(() => {
     const best = priority.find(k => variants.value.some(v => v.key === k))
     form.value.priceVariant = best || variants.value[0]?.key || ''
   }
+
+  if (props.card) {
+    gradingPcQuery.value = `${props.card.name} ${props.card.set?.name || ''}`.trim()
+  }
 })
 
 watch(() => props.card, () => {
@@ -366,6 +431,13 @@ watch(() => props.card, () => {
     const best = priority.find(k => variants.value.some(v => v.key === k))
     form.value.priceVariant = best || variants.value[0]?.key || ''
   }
+  if (props.card) {
+    gradingPcQuery.value = `${props.card.name} ${props.card.set?.name || ''}`.trim()
+  }
+})
+
+watch(() => form.value.grade, () => {
+  gradingPcResult.value = null
 })
 </script>
 
@@ -460,6 +532,36 @@ watch(() => props.card, () => {
 }
 .sealed-selected-name { font-size: 14px; font-weight: 600; }
 .sealed-selected-set { font-size: 12px; color: var(--text-secondary); }
+
+/* PC fetch specific */
+.pc-fetch-section {
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-primary);
+  border-radius: var(--radius);
+  padding: 10px;
+}
+.pc-fetch-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+.pc-result-box {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 8px 10px;
+  background: var(--bg-card);
+}
+.pc-result-price-main {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--accent);
+}
+.pc-result-meta {
+  font-size: 11px;
+  color: var(--text-muted);
+}
 
 /* Mobile responsive */
 @media (max-width: 640px) {
