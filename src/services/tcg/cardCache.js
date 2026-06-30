@@ -8,6 +8,7 @@
  */
 import db from '../../db.js'
 import { tokenMatch } from '../../utils/search.js'
+import { TCGS } from './providers.js'
 
 // ── Schema ──────────────────────────────────────────────────────────────────
 db.version(3).stores({
@@ -125,7 +126,7 @@ export async function isCacheFresh(game) {
 
 /** Get card counts per game from IDB. */
 export async function getCardCounts() {
-  const games = ['pokemon', 'mtg', 'lorcana', 'one-piece', 'riftbound', 'yugioh']
+  const games = TCGS.map(t => t.id)
   const counts = {}
   for (const g of games) {
     counts[g] = await db.cards.where('game').equals(g).count()
