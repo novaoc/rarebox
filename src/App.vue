@@ -295,7 +295,8 @@ function replayTour() {
 
 const portfolioColors = [
   '#ffd23f', '#ff6ba9', '#2fbf71', '#4f86f7',
-  '#e4434f', '#9a6cf5', '#1ec8c8', '#f08a3c'
+  '#e4434f', '#9a6cf5', '#1ec8c8', '#f08a3c',
+  '#fb8500', '#8338ec', '#2a9d8f', '#8d99ae'
 ]
 
 const currentPageTitle = computed(() => {
@@ -304,15 +305,22 @@ const currentPageTitle = computed(() => {
   if (route.name === 'Browse') return 'Browse Sets'
   if (route.name === 'Sets') return 'Pokémon Sets'
   if (route.name === 'TcgSets') return 'Browse Sets'
+  if (route.name === 'Decks') return 'Your Decks'
+  if (route.name === 'MetaDecks') return 'Meta Decks'
+  if (route.name === 'DeckBuilder') return 'Deck Builder'
   if (route.name === 'Booth') return 'Card Booth'
   if (route.name === 'BoothEdit') return 'Edit Booth'
+  if (route.name === 'BoothDisplay') return 'Booth Display'
+  if (route.name === 'BoothTable') return 'Table Mode'
   if (route.name === 'Settings') return 'Settings'
   if (route.name === 'Terms') return 'Terms & Conditions'
+  if (route.name === 'ShelfGuide') return 'How Shelves Work'
   if (route.name === 'TradeAnalyzer' || route.name === 'TradeLanding') return 'Trade Analyzer'
   if (route.name === 'Portfolio') {
     const p = store.portfolios.find(p => p.id === route.params.id)
     return p?.name || 'Shelf'
   }
+  if (route.name?.startsWith('Design')) return 'Design Lab'
   return 'Rarebox'
 })
 
@@ -324,7 +332,7 @@ function createPortfolio() {
   if (!newPortfolioName.value.trim()) return
   const p = store.createPortfolio(newPortfolioName.value.trim(), newPortfolioColor.value)
   newPortfolioName.value = ''
-  showNewPortfolioModal.value = false
+  showNewPortfolioModal = false
   router.push(`/portfolio/${p.id}`)
 }
 
