@@ -253,7 +253,8 @@ const TAB_FOR_ROUTE = {
   Browse: 'browse', Sets: 'browse', TcgSets: 'browse',
   Decks: 'decks', MetaDecks: 'decks', DeckBuilder: 'decks',
   TradeLanding: 'trade', TradeAnalyzer: 'trade',
-  Booth: 'booth', BoothEdit: 'booth',
+  Booth: 'booth', BoothEdit: 'booth', BoothDisplay: 'booth', BoothTable: 'booth',
+  Settings: 'settings', Terms: 'terms', ShelfGuide: 'home',
 }
 function isTab(tab) {
   return TAB_FOR_ROUTE[route.name] === tab
@@ -299,21 +300,11 @@ const portfolioColors = [
 ]
 
 const currentPageTitle = computed(() => {
-  if (route.name === 'Dashboard') return 'Dashboard'
-  if (route.name === 'Search') return 'Search Cards'
-  if (route.name === 'Browse') return 'Browse Sets'
-  if (route.name === 'Sets') return 'Pokémon Sets'
-  if (route.name === 'TcgSets') return 'Browse Sets'
-  if (route.name === 'Booth') return 'Card Booth'
-  if (route.name === 'BoothEdit') return 'Edit Booth'
-  if (route.name === 'Settings') return 'Settings'
-  if (route.name === 'Terms') return 'Terms & Conditions'
-  if (route.name === 'TradeAnalyzer' || route.name === 'TradeLanding') return 'Trade Analyzer'
   if (route.name === 'Portfolio') {
     const p = store.portfolios.find(p => p.id === route.params.id)
     return p?.name || 'Shelf'
   }
-  return 'Rarebox'
+  return route.meta?.title || 'Rarebox'
 })
 
 function hardRefresh() {
@@ -324,7 +315,7 @@ function createPortfolio() {
   if (!newPortfolioName.value.trim()) return
   const p = store.createPortfolio(newPortfolioName.value.trim(), newPortfolioColor.value)
   newPortfolioName.value = ''
-  showNewPortfolioModal.value = false
+  showNewPortfolioModal = false
   router.push(`/portfolio/${p.id}`)
 }
 
