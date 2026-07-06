@@ -264,6 +264,39 @@
         </div>
       </div>
 
+      <!-- New Releases Section -->
+      <div class="section-header">
+        <div class="section-title">New Releases</div>
+        <router-link to="/sets" class="btn btn-ghost btn-sm">View All Sets →</router-link>
+      </div>
+      <div class="new-releases-row mb-4">
+        <div v-if="loadingReleases" class="releases-loading">
+          <div class="spinner spinner-sm"></div>
+          <span>Fetching latest prices...</span>
+        </div>
+        <div v-else class="releases-grid">
+          <router-link
+            v-for="set in latestSets"
+            :key="set.id"
+            :to="'/sets?set=' + set.id"
+            class="release-card"
+          >
+            <div class="release-logo-wrap">
+              <img v-if="set.images?.logo" :src="set.images.logo" :alt="set.name" class="release-logo" />
+              <span v-else class="release-placeholder">⬡</span>
+            </div>
+            <div class="release-info">
+              <div class="release-name">{{ set.name }}</div>
+              <div class="release-meta">
+                <span>{{ set.total }} cards</span>
+                <span class="release-dot">·</span>
+                <span>{{ formatDate(set.releaseDate) }}</span>
+              </div>
+            </div>
+          </router-link>
+        </div>
+      </div>
+
       <!-- Combined portfolio chart -->
       <div class="card mb-4">
         <div class="section-header">
@@ -334,11 +367,15 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { usePortfolioStore } from '../stores/portfolio'
-import { getCard, getJapaneseCardDetail, getMarketPrice } from '../services/pokemonApi'
+import { getCard, getJapaneseCardDetail, getMarketPrice, getSets } from '../services/pokemonApi'
 import PortfolioChart from '../components/PortfolioChart.vue'
 
 const store = usePortfolioStore()
 const featuresRef = ref(null)
+
+// New Releases state
+const latestSets = ref([])
+const loadingReleases = ref(false)
 
 // New user = every portfolio has 0 items (store auto-creates one empty portfolio on init)
 const isNewUser = computed(() => {
@@ -375,8 +412,29 @@ function getPortfolioGainPct(portfolio) {
   return (getPortfolioGain(portfolio) / cost) * 100
 }
 
+function formatDate(dateStr) {
+  if (!dateStr) return ''
+  const [y, m, d] = dateStr.split('/')
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+  return `${months[parseInt(m, 10) - 1]} ${y}`
+}
+
+async function loadLatestReleases() {
+  loadingReleases.value = true
+  try {
+    const sets = await getSets()
+    latestSets.value = sets.slice(0, 4)
+  } catch (e) {
+    console.error('Failed to load latest releases:', e)
+  } finally {
+    loadingReleases.value = false
+  }
+}
+
 // Silently refresh prices for all card items on mount (background, no blocking)
 onMounted(async () => {
+  loadLatestReleases()
+
   const allCardItems = store.portfolios.flatMap(p =>
     p.items.filter(i => i.type === 'card' && i.cardId).map(i => ({ ...i, portfolioId: p.id }))
   )
@@ -412,6 +470,83 @@ onMounted(async () => {
 
 <style scoped>
 .dashboard { max-width: 1200px; margin: 0 auto; }
+
+/* ── New Releases ── */
+.new-releases-row {
+  min-height: 80px;
+}
+.releases-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  height: 80px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  color: var(--text-muted);
+  font-size: 13px;
+}
+.releases-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
+}
+.release-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  text-decoration: none;
+  color: inherit;
+  transition: all 0.2s;
+}
+.release-card:hover {
+  border-color: var(--accent);
+  transform: translateY(-1px);
+  background: var(--bg-secondary);
+}
+.release-logo-wrap {
+  width: 60px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.release-logo {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+.release-placeholder {
+  font-size: 20px;
+  color: var(--text-muted);
+}
+.release-info {
+  flex: 1;
+  min-width: 0;
+}
+.release-name {
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.release-meta {
+  font-size: 11px;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 2px;
+}
+.release-dot {
+  opacity: 0.5;
+}
 
 /* ── Landing Page ── */
 .landing {
