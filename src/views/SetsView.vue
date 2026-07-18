@@ -336,6 +336,7 @@
 
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { tokenMatch } from '../utils/search.js'
 import { getSets, getCardsBySet, getMarketPrice, formatVariantLabel, getJapaneseSets, getJapaneseCardsBySet, getJapaneseCardDetail } from '../services/pokemonApi'
 import { sortByNumber } from '../utils/masterSets'
@@ -344,6 +345,7 @@ import PriceChart from '../components/PriceChart.vue'
 import AddItemModal from '../components/AddItemModal.vue'
 
 const store = usePortfolioStore()
+const route = useRoute()
 
 // Set list state
 const sets = ref([])
@@ -684,7 +686,15 @@ watch(bulkAddPortfolioId, () => {
   bulkAddCards.value.forEach(c => { c.checked = !ownedIds.has(c.id) })
 })
 
-onMounted(loadSets)
+// Deep links like /sets/pokemon?set=sv10 open that set directly (used by the
+// Dashboard "New Releases" cards). Unknown ids (or a ja list) just no-op.
+onMounted(async () => {
+  await loadSets()
+  const wanted = route.query.set
+  if (!wanted) return
+  const match = sets.value.find(s => s.id === wanted)
+  if (match) openSet(match)
+})
 </script>
 
 <style scoped>
