@@ -24,6 +24,11 @@ async function getJson(url, { signal } = {}) {
 }
 
 import db from '../../db.js'
+import {
+  detectRiftboundVariant,
+  normalizeCollectorNumber,
+  riftVariantFromName,
+} from '../../utils/riftboundVariant.js'
 
 // Two-layer cache: memory (TTL-fresh) + IndexedDB (durable, no TTL).
 // The durable layer is what makes Browse work offline — the card database
@@ -417,15 +422,15 @@ async function fetchRiftboundPrices(setName, signal) {
     const consoleName = (p.consoleName || '').toLowerCase()
     if (consoleName && consoleName !== expectedConsole) continue
     const name = p.productName || ''
-    const numMatch = name.match(/#(\d+)/)
-    if (!numMatch || !p.price1) continue
-    const n = numMatch[1]
-    const price = typeof p.price1 === 'string'
-      ? parseFloat(p.price1.replace(/[$,]/g, ''))
-      : p.price1
-    if (!(price > 0)) continue
-    const variantMatch = name.match(/\[([^\]]+)\]/)
-    const variant = variantMatch ? variantMatch[1].toLowerCase() : ''
+    const numMatch = name.match(/#\s*(\d+)/)
+    if (!numMatch) continue
+    // Shared collector-number + variant semantics (slash form, aliases, $0).
+    const n = normalizeCollectorNumber(numMatch[1])
+    if (!n) continue
+    const price = num(p.price1)
+    // $0 is a valid market price — only null/invalid is a miss.
+    if (price == null) continue
+    const variant = detectRiftboundVariant(name)
     if (variant) {
       if (!variants[n]) variants[n] = {}
       variants[n][variant] = price
@@ -436,18 +441,7 @@ async function fetchRiftboundPrices(setName, signal) {
   return { normal, variants }
 }
 
-// riftcodex name suffix → PriceCharting bracket tag. "Overnumbered" is just
-// the plain printing of an over-set-size champion card, not a variant.
-const RIFT_VARIANT_ALIASES = {
-  'overnumbered': '',
-  'launch exclusive': 'launch promo',
-}
-function riftVariantFromName(name) {
-  const m = (name || '').match(/\(([^)]+)\)\s*$/)
-  let v = m ? m[1].toLowerCase() : ''
-  if (v in RIFT_VARIANT_ALIASES) v = RIFT_VARIANT_ALIASES[v]
-  return v
-}
+// riftVariantFromName: shared util (Signature / alt-art / overnumbered→plain).
 
 const riftbound = {
   id: 'riftbound',
@@ -514,12 +508,15 @@ const riftbound = {
           return fetchRiftboundPrices(setName, sig)
         })
         for (const card of cards) {
-          if (!card.number) continue
-          const variant = riftVariantFromName(card.name)
+          const n = normalizeCollectorNumber(card.number)
+          if (!n) continue
+          const variant = detectRiftboundVariant(card.name) || riftVariantFromName(card.name)
           if (variant) {
-            card.price = priceMap.variants[card.number]?.[variant] ?? null
-          } else if (priceMap.normal[card.number] != null) {
-            card.price = priceMap.normal[card.number]
+            const vp = priceMap.variants[n]?.[variant]
+            // Preserve valid $0; only leave null when missing.
+            if (vp != null) card.price = vp
+          } else if (priceMap.normal[n] != null) {
+            card.price = priceMap.normal[n]
           }
         }
       }

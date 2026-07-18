@@ -76,11 +76,12 @@ const rangeDateFormats = {
 }
 
 const currentValue = computed(() => {
+  const finite = v => (typeof v === 'number' && Number.isFinite(v) ? v : null)
   return props.portfolios.flatMap(p => p.items).reduce((sum, item) => {
     const qty = item.quantity || 1
     const val = item.type === 'card'
-      ? (item.currentMarketPrice || item.purchasePrice || 0)
-      : (item.currentValue || item.purchasePrice || 0)
+      ? (finite(item.currentMarketPrice) ?? finite(item.purchasePrice) ?? 0)
+      : (finite(item.currentValue) ?? finite(item.purchasePrice) ?? 0)
     return sum + val * qty
   }, 0)
 })
@@ -213,8 +214,13 @@ async function buildPortfolioHistory() {
     const portfolio = portfolioForItem(item.id)
     const portfolioId = portfolio?.id
 
+    const finite = v => (typeof v === 'number' && Number.isFinite(v) ? v : null)
+    const shelfVal = item.type === 'card'
+      ? (finite(item.currentMarketPrice) ?? finite(item.purchasePrice))
+      : (finite(item.currentValue) ?? finite(item.purchasePrice))
+
     if (item.type === 'card' && historyMap[item.id]) {
-      const result = buildChartSeries(historyMap[item.id], item.currentMarketPrice || item.purchasePrice)
+      const result = buildChartSeries(historyMap[item.id], shelfVal)
       const series = Array.isArray(result) ? result : (result?.series || [])
       if (series.length > 0) {
         itemSeriesMap[item.id] = series.slice().sort((a, b) => a.x - b.x)
@@ -231,10 +237,8 @@ async function buildPortfolioHistory() {
 
     // Last resort: synthesize 2 points (purchase → today) so chart always draws a line
     if (!itemSeriesMap[item.id]) {
-      const currentPrice = item.type === 'card'
-        ? (item.currentMarketPrice || item.purchasePrice || 0)
-        : (item.currentValue || item.purchasePrice || 0)
-      const purchasePrice = item.purchasePrice || 0
+      const currentPrice = shelfVal ?? 0
+      const purchasePrice = finite(item.purchasePrice) ?? 0
       const purchaseTs = item.purchaseDate
         ? new Date(item.purchaseDate).getTime()
         : Date.now() - 1000 * 60 * 60 * 24 // yesterday if no date

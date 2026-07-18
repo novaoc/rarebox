@@ -6,6 +6,19 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { loadState, saveState, isStale as _isStale, hasNeverPriced as _hasNeverPriced } from '../db'
+import { findSafeRiftboundGradedMatch } from '../utils/riftboundVariant'
+
+/** Finite shelf display value; $0 is valid (never collapse with ||). */
+function finiteMoney(v) {
+  return typeof v === 'number' && Number.isFinite(v) ? v : null
+}
+function itemShelfValue(item) {
+  if (!item) return 0
+  if (item.type === 'card') {
+    return finiteMoney(item.currentMarketPrice) ?? finiteMoney(item.purchasePrice) ?? 0
+  }
+  return finiteMoney(item.currentValue) ?? finiteMoney(item.purchasePrice) ?? 0
+}
 
 // Legacy localStorage keys (for migration)
 const LEGACY_PORTFOLIOS_KEY = 'rarebox_portfolios'
@@ -162,10 +175,7 @@ export const usePortfolioStore = defineStore('portfolio', () => {
     return portfolios.value.reduce((total, p) => {
       return total + p.items.reduce((sum, item) => {
         const qty = item.quantity || 1
-        const value = item.type === 'card'
-          ? (item.currentMarketPrice || item.purchasePrice || 0)
-          : (item.currentValue || item.purchasePrice || 0)
-        return sum + value * qty
+        return sum + itemShelfValue(item) * qty
       }, 0)
     }, 0)
   })
@@ -357,16 +367,13 @@ export const usePortfolioStore = defineStore('portfolio', () => {
     const totalCost = items.reduce((s, i) => s + (i.purchasePrice || 0) * (i.quantity || 1), 0)
     const totalValue = items.reduce((s, i) => {
       const qty = i.quantity || 1
-      const val = i.type === 'card'
-        ? (i.currentMarketPrice || i.purchasePrice || 0)
-        : (i.currentValue || i.purchasePrice || 0)
-      return s + val * qty
+      return s + itemShelfValue(i) * qty
     }, 0)
     const gain = totalValue - totalCost
     const gainPct = totalCost > 0 ? (gain / totalCost) * 100 : 0
     const topGainer = items.reduce((best, item) => {
-      const cost = (item.purchasePrice || 0)
-      const val = item.type === 'card' ? (item.currentMarketPrice || cost) : (item.currentValue || cost)
+      const cost = finiteMoney(item.purchasePrice) ?? 0
+      const val = itemShelfValue(item)
       const g = cost > 0 ? (val - cost) / cost * 100 : 0
       return g > (best?.gain || -Infinity) ? { item, gain: g } : best
     }, null)
@@ -385,10 +392,12 @@ export const usePortfolioStore = defineStore('portfolio', () => {
 
     const values = {}
     for (const item of portfolio.items) {
-      const price = item.type === 'card'
-        ? (item.currentMarketPrice || item.purchasePrice || 0)
-        : (item.currentValue || item.purchasePrice || 0)
-      if (price > 0) values[item.id] = price
+      const price = itemShelfValue(item)
+      // Include explicit $0 market values; skip only when nothing finite exists.
+      if (finiteMoney(item.type === 'card' ? item.currentMarketPrice : item.currentValue) != null
+        || finiteMoney(item.purchasePrice) != null) {
+        if (Number.isFinite(price)) values[item.id] = price
+      }
     }
 
     if (Object.keys(values).length === 0) return
@@ -442,12 +451,10 @@ export const usePortfolioStore = defineStore('portfolio', () => {
     // Backfill: if fewer than 2 distinct timestamps, extend current price backward
     // so the portfolio chart always has daily data points between purchase and now
     if (points.length < 2 && item.purchaseDate) {
-      const currentPrice = item.type === 'card'
-        ? (item.currentMarketPrice || item.purchasePrice || 0)
-        : (item.currentValue || item.purchasePrice || 0)
+      const currentPrice = itemShelfValue(item)
       const purchaseTs = new Date(item.purchaseDate).getTime()
       const now = Date.now()
-      if (currentPrice > 0 && now - purchaseTs > 86400000) {
+      if (Number.isFinite(currentPrice) && currentPrice >= 0 && now - purchaseTs > 86400000) {
         const DAY = 86400000
         // ~weekly intervals so we don't generate thousands of points per card
         const INTERVAL = 7 * DAY
@@ -756,34 +763,68 @@ export const usePortfolioStore = defineStore('portfolio', () => {
               // Score candidates: an exact card-number match beats a set-name
               // match, which beats result order. Picking the first OR-match
               // used to grab the wrong printing for cards with many reprints.
-              let match = null
-              let bestScore = 0
-              for (const c of candidates) {
-                const cSet = (c.set || '').toLowerCase()
-                const cNum = (c.number || '').toLowerCase()
-                const cDigits = cNum.replace(/\D/g, '').replace(/^0+/, '')
-                let score = 0
-                if (numStr && cNum === numStr) score += 4
-                else if (numDigits && cDigits === numDigits) score += 2
-                if (setLower && cSet && (cSet.includes(setLower) || setLower.includes(cSet))) score += 1
-                if (score > bestScore) { bestScore = score; match = c }
+              const scoreMatch = () => {
+                let match = null
+                let bestScore = 0
+                for (const c of candidates) {
+                  const cSet = (c.set || '').toLowerCase()
+                  const cNum = (c.number || '').toLowerCase()
+                  const cDigits = cNum.replace(/\D/g, '').replace(/^0+/, '')
+                  let score = 0
+                  if (numStr && cNum === numStr) score += 4
+                  else if (numDigits && cDigits === numDigits) score += 2
+                  if (setLower && cSet && (cSet.includes(setLower) || setLower.includes(cSet))) score += 1
+                  if (score > bestScore) { bestScore = score; match = c }
+                }
+                return match || candidates[0]
               }
-              if (!match) match = candidates[0]
-              
-              const updates = {
-                cardId: match.id,
-                cardData: {
-                  name: match.name,
-                  number: match.number || item.cardData.number,
-                  images: { small: match.image || '', large: '' },
-                  set: { id: match.set || '', name: match.set || item.cardData.set?.name },
-                  rarity: match.rarity || item.cardData.rarity,
-                },
-                lastPriceUpdate: new Date().toISOString(),
+
+              // Graded slabs: resolve identity/images only. Never overwrite
+              // Collectr/imported currentValue with raw multiSearch prices.
+              // Riftbound: scan all candidates for first safe variant+number match
+              // (never accept/skip only a fuzzy first hit).
+              if (item.type === 'graded') {
+                const match = game === 'riftbound'
+                  ? findSafeRiftboundGradedMatch(item, candidates, game)
+                  : scoreMatch()
+                if (match) {
+                  const prev = item.cardData || {}
+                  const updates = {
+                    cardId: item.cardId || match.id,
+                    cardData: {
+                      // Preserve imported name/number/variant text when present.
+                      name: prev.name || match.name,
+                      number: prev.number || match.number || '',
+                      images: (prev.images && prev.images.small)
+                        ? prev.images
+                        : { small: match.image || '', large: '' },
+                      set: {
+                        id: prev.set?.id || match.set || '',
+                        name: prev.set?.name || match.set || '',
+                      },
+                      rarity: prev.rarity || match.rarity || '',
+                    },
+                  }
+                  updateItem(portfolioId, item.id, updates)
+                  resolved++
+                }
+              } else {
+                const match = scoreMatch()
+                const updates = {
+                  cardId: match.id,
+                  cardData: {
+                    name: match.name,
+                    number: match.number || item.cardData.number,
+                    images: { small: match.image || '', large: '' },
+                    set: { id: match.set || '', name: match.set || item.cardData.set?.name },
+                    rarity: match.rarity || item.cardData.rarity,
+                  },
+                  lastPriceUpdate: new Date().toISOString(),
+                }
+                if (match.price != null) updates.currentMarketPrice = match.price
+                updateItem(portfolioId, item.id, updates)
+                resolved++
               }
-              if (match.price != null) updates.currentMarketPrice = match.price
-              updateItem(portfolioId, item.id, updates)
-              resolved++
             }
           } catch (e) {
             console.warn(`Failed to resolve ${game} card "${item.cardData.name}":`, e.message)

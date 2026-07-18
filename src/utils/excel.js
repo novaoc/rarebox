@@ -140,11 +140,17 @@ function buildCombinedSheet(portfolios) {
   return [headers, ...rows]
 }
 
+/** Finite shelf display value; $0 is valid (never collapse with ||). */
+function finiteMoney(v) {
+  return typeof v === 'number' && Number.isFinite(v) ? v : null
+}
+
 function getCurrentValue(item) {
+  // Explicit $0 market/current must not fall back to purchase; unknown may.
   if (item.type === 'card') {
-    return item.currentMarketPrice || item.purchasePrice || 0
+    return finiteMoney(item.currentMarketPrice) ?? finiteMoney(item.purchasePrice) ?? 0
   }
-  return item.currentValue || item.purchasePrice || 0
+  return finiteMoney(item.currentValue) ?? finiteMoney(item.purchasePrice) ?? 0
 }
 
 function getItemName(item) {

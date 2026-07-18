@@ -351,12 +351,12 @@
                 </div>
               </div>
 
-              <!-- eBay price fetch -->
+              <!-- PriceCharting graded/sealed fetch -->
               <div class="pc-fetch-section mt-4">
                 <div class="pc-fetch-label">Fetch from PriceCharting</div>
-                <div class="flex gap-2">
-                  <input v-model="pcQuery" class="input input-sm" placeholder="Search query…" @keyup.enter="searchPC" />
-                  <button class="btn btn-secondary btn-sm" :disabled="pcSearching || !pcQuery.trim()" @click="searchPC">
+                <div class="flex gap-2 pc-fetch-row">
+                  <input v-model="pcQuery" class="input input-sm" placeholder="Search query…" @keyup.enter="searchPC" aria-label="PriceCharting search query" />
+                  <button class="btn btn-secondary pc-fetch-btn" :disabled="pcSearching || !pcQuery.trim()" @click="searchPC">
                     <span v-if="pcSearching" class="spinner spinner-sm"></span>
                     <span v-else>Fetch</span>
                   </button>
@@ -365,7 +365,7 @@
                 <div v-if="pcResult" class="pc-result-box mt-3">
                   <div class="pc-result-price-main">${{ pcResult.price.toFixed(2) }}</div>
                   <div class="pc-result-meta">{{ pcResult.product_name }} · PriceCharting</div>
-                  <button class="btn btn-primary btn-sm w-full mt-3" @click="applyPCPrice">Apply Price</button>
+                  <button class="btn btn-primary pc-apply-btn w-full mt-3" @click="applyPCPrice">Apply Price</button>
                 </div>
               </div>
             </div>
@@ -525,6 +525,13 @@ import { getCard, getMarketPrice } from '../services/pokemonApi'
 import { fetchPrice } from '../services/priceServer'
 import { itemHistoryRef } from '../services/priceHistory'
 import { getPrice as getTcgPrice } from '../services/priceFeedService'
+import {
+  buildGradedPcQuery,
+  pcGradeForItem,
+  isFiniteGradedPrice,
+  riftboundGradedFetchGuard,
+  RIFTBOUND_GRADED_NO_NUMBER_MSG,
+} from '../utils/gradedPriceQuery'
 import { checkAlerts, notifyTriggered } from '../utils/alerts'
 import PriceChart from '../components/PriceChart.vue'
 import PortfolioChart from '../components/PortfolioChart.vue'
@@ -886,29 +893,59 @@ const pcError = ref('')
 watch(selectedItem, (item) => {
   pcResult.value = null; pcError.value = ''
   if (!item) return
-  if (item.type === 'graded') pcQuery.value = `${item.cardData?.name || ''} PSA ${item.grade || ''}`.trim()
-  else if (item.type === 'sealed') pcQuery.value = item.name || ''
+  if (item.type === 'graded') {
+    pcQuery.value = buildGradedPcQuery({
+      game: item.game,
+      name: item.cardData?.name || item.name,
+      setName: item.cardData?.set?.name || item.setName,
+      number: item.cardData?.number,
+      cardData: item.cardData,
+    })
+  } else if (item.type === 'sealed') pcQuery.value = item.name || ''
 })
 
 async function searchPC() {
   if (!pcQuery.value.trim()) return
   pcSearching.value = true; pcError.value = ''; pcResult.value = null
   try {
-    const grade = selectedItem.value?.type === 'graded' ? (selectedItem.value.grade || '10') : 'ungraded'
-    pcResult.value = await fetchPrice(pcQuery.value, grade)
+    const item = selectedItem.value
+    if (item?.type === 'graded') {
+      const guard = riftboundGradedFetchGuard({
+        game: item.game,
+        number: item.cardData?.number,
+        name: item.cardData?.name || item.name,
+        cardData: item.cardData,
+      }, pcQuery.value)
+      if (!guard.ok) {
+        pcError.value = guard.message || RIFTBOUND_GRADED_NO_NUMBER_MSG
+        return
+      }
+    }
+    const grade = item?.type === 'graded'
+      ? pcGradeForItem(item)
+      : 'ungraded'
+    const result = await fetchPrice(pcQuery.value, grade)
+    if (item?.type === 'graded' && !isFiniteGradedPrice(result)) {
+      pcError.value = 'No graded market data for that grade — the slab may trade too thinly. Set the value manually below. Raw market is never used.'
+      return
+    }
+    pcResult.value = result
   } catch (e) {
     pcError.value = e?.message === 'no_graded_data'
-      ? 'No graded market data for that grade — the slab may trade too thinly. Set the value manually below.'
-      : 'Fetch failed'
+      ? 'No graded market data for that grade — the slab may trade too thinly. Set the value manually below. Raw market is never used.'
+      : e?.message === 'no_results'
+        ? 'No PriceCharting match for this exact card (number/variant) — set the value manually.'
+        : 'Fetch failed'
   }
   finally { pcSearching.value = false }
 }
 
 function applyPCPrice() {
-  if (!selectedItem.value || !pcResult.value) return
+  if (!selectedItem.value || !isFiniteGradedPrice(pcResult.value)) return
   const price = pcResult.value.price
   const key = selectedItem.value.type === 'card' ? 'currentMarketPrice' : 'currentValue'
-  store.updateItem(portfolio.value.id, selectedItem.value.id, { [key]: price })
+  const updates = { [key]: price, lastPriceUpdate: new Date().toISOString() }
+  store.updateItem(portfolio.value.id, selectedItem.value.id, updates)
   editCurrentValue.value = price
   pcResult.value = null
 }
@@ -943,7 +980,7 @@ function filterCount(type) {
 
 function getItemName(item) { return item.type === 'sealed' ? item.name : (item.cardData?.name || '—') }
 
-const GAME_LABELS = { magic: 'Magic', yugioh: 'Yu-Gi-Oh!', 'one-piece': 'One Piece', lorcana: 'Lorcana' }
+const GAME_LABELS = { magic: 'Magic', yugioh: 'Yu-Gi-Oh!', 'one-piece': 'One Piece', lorcana: 'Lorcana', riftbound: 'Riftbound' }
 function getItemSub(item) {
   if (item.type === 'graded') return `${item.gradingCompany || 'PSA'} ${item.grade || ''} · ${item.cardData?.set?.name || item.setName || ''}`
   if (item.game && item.game !== 'pokemon') return `${item.type === 'sealed' ? item.setName : item.cardData?.set?.name} · ${GAME_LABELS[item.game] || item.game}`
@@ -951,7 +988,13 @@ function getItemSub(item) {
   return item.setName || ''
 }
 
-function getCurrentValue(item) { return item.type === 'card' ? (item.currentMarketPrice || item.purchasePrice || 0) : (item.currentValue || item.purchasePrice || 0) }
+function finiteMoney(v) { return typeof v === 'number' && Number.isFinite(v) ? v : null }
+function getCurrentValue(item) {
+  if (item.type === 'card') {
+    return finiteMoney(item.currentMarketPrice) ?? finiteMoney(item.purchasePrice) ?? 0
+  }
+  return finiteMoney(item.currentValue) ?? finiteMoney(item.purchasePrice) ?? 0
+}
 function getGain(item) { return (getCurrentValue(item) - (item.purchasePrice || 0)) * (item.quantity || 1) }
 function getGainPct(item) { return item.purchasePrice ? ((getCurrentValue(item) - item.purchasePrice) / item.purchasePrice) * 100 : 0 }
 function typeBadgeClass(type) { return { card: 'badge-info', graded: 'badge-accent', sealed: 'badge-success' }[type] || 'badge-info' }
@@ -976,9 +1019,13 @@ function moveEditingItem() {
 
 function pcQueryForItem(item) {
   if (item.type === 'graded') {
-    const name = item.cardData?.name || item.name || ''
-    const set = item.cardData?.set?.name || ''
-    return `${name} ${set}`.trim()
+    return buildGradedPcQuery({
+      game: item.game,
+      name: item.cardData?.name || item.name,
+      setName: item.cardData?.set?.name || item.setName,
+      number: item.cardData?.number,
+      cardData: item.cardData,
+    })
   }
   if (item.type === 'sealed') {
     // Include set name so PriceCharting returns the right product, not just the most popular one
@@ -988,17 +1035,18 @@ function pcQueryForItem(item) {
   }
   return null
 }
-function pcGradeForItem(item) {
-  if (item.type === 'graded') {
-    const company = (item.gradingCompany || 'PSA').toLowerCase()
-    const grade = item.grade || '10'
-    if (company === 'psa') return grade === '10' ? 'psa10' : grade
-    if (company === 'bgs') return grade === '10' ? 'bgs10' : grade
-    if (company === 'cgc') return grade === '10' ? 'cgc10' : grade
-    if (company === 'sgc') return grade === '10' ? 'sgc10' : grade
-    return grade
-  }
-  return 'ungraded'
+
+/** Bounded concurrency pool for price refresh workers. */
+async function mapPool(items, limit, fn) {
+  if (!items.length) return
+  let i = 0
+  const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while (i < items.length) {
+      const idx = i++
+      await fn(items[idx], idx)
+    }
+  })
+  await Promise.all(workers)
 }
 
 async function refreshPrices() {
@@ -1009,13 +1057,20 @@ async function refreshPrices() {
   const isPokemonItem = i => !i.game || i.game === 'pokemon'
   const cardItems = portfolio.value.items.filter(i => i.type === 'card' && i.cardId && isPokemonItem(i))
   const ebayItems = portfolio.value.items.filter(i => (i.type === 'graded' || i.type === 'sealed') && isPokemonItem(i))
-  // Non-Pokémon TCG items (cards + sealed) — priced via priceFeedService by name.
-  const otherTcgItems = portfolio.value.items.filter(i => i.game && i.game !== 'pokemon')
+  // Non-Pokémon raw cards + sealed only — graded never goes through getTcgPrice.
+  const otherTcgRawItems = portfolio.value.items.filter(
+    i => i.game && i.game !== 'pokemon' && i.type !== 'graded'
+  )
+  // All non-Pokémon graded slabs (Riftbound and others) — grade-aware PC only.
+  const otherTcgGradedItems = portfolio.value.items.filter(
+    i => i.game && i.game !== 'pokemon' && i.type === 'graded'
+  )
   let updated = 0
+  const REFRESH_CONCURRENCY = 4
 
   await Promise.allSettled([
     // Raw EN cards — pokemontcg.io (bulk-friendly)
-    ...cardItems.filter(i => !store.isJPCard(i)).map(async item => {
+    mapPool(cardItems.filter(i => !store.isJPCard(i)), REFRESH_CONCURRENCY, async item => {
       try {
         const card = await getCard(item.cardId, item._lang)
         const priceResult = getMarketPrice(card, item.priceVariant)
@@ -1027,7 +1082,7 @@ async function refreshPrices() {
       } catch {}
     }),
     // JP cards — tcgdex (one request per card, stagger)
-    ...cardItems.filter(i => store.isJPCard(i)).map(async (item, idx) => {
+    mapPool(cardItems.filter(i => store.isJPCard(i)), 2, async (item, idx) => {
       await new Promise(r => setTimeout(r, idx * 500))
       try {
         const card = await getCard(item.cardId, item._lang)
@@ -1039,31 +1094,65 @@ async function refreshPrices() {
         }
       } catch {}
     }),
-    // Graded slabs + sealed — PriceCharting (direct browser API)
-    ...ebayItems.map(async item => {
+    // Pokémon graded slabs + sealed — PriceCharting (direct browser API)
+    mapPool(ebayItems, REFRESH_CONCURRENCY, async item => {
       const query = pcQueryForItem(item)
       const grade = pcGradeForItem(item)
       if (!query) return
-      const result = await fetchPrice(query, grade)
-      if (result?.price) {
-        const updates = { currentValue: result.price }
-        // Always update image for sealed items on refresh — corrects wrong images from generic queries
-        if (result.image) updates.imageUrl = result.image
-        store.updateItem(portfolio.value.id, item.id, updates)
-        updated++
+      try {
+        const result = await fetchPrice(query, grade)
+        if (!isFiniteGradedPrice(result) && item.type === 'graded') return // retain stale/manual
+        if (result && typeof result.price === 'number' && Number.isFinite(result.price)) {
+          const updates = { currentValue: result.price, lastPriceUpdate: new Date().toISOString() }
+          // Always update image for sealed items on refresh — corrects wrong images from generic queries
+          if (item.type === 'sealed' && result.image) updates.imageUrl = result.image
+          store.updateItem(portfolio.value.id, item.id, updates)
+          updated++
+        }
+      } catch {
+        // Graded/sealed miss or offline — keep existing value
       }
     }),
-    // Non-Pokémon TCGs (Magic, One Piece, Riftbound, …) — priceFeedService routes per game
-    ...otherTcgItems.map(async item => {
+    // Non-Pokémon graded — fetchPrice(query, grade) only. Never getTcgPrice/raw.
+    mapPool(otherTcgGradedItems, REFRESH_CONCURRENCY, async item => {
+      const query = pcQueryForItem(item)
+      const grade = pcGradeForItem(item)
+      if (!query) return
+      // Riftbound without collector # — refuse fuzzy graded auto-price.
+      const guard = riftboundGradedFetchGuard({
+        game: item.game,
+        number: item.cardData?.number,
+        name: item.cardData?.name || item.name,
+        cardData: item.cardData,
+      }, query)
+      if (!guard.ok) return
+      try {
+        const result = await fetchPrice(query, grade)
+        if (!isFiniteGradedPrice(result)) return // retain Collectr/manual/stale
+        store.updateItem(portfolio.value.id, item.id, {
+          currentValue: result.price,
+          lastPriceUpdate: new Date().toISOString(),
+        })
+        updated++
+      } catch {
+        // no_graded_data / offline / timeout — never raw fallback
+      }
+    }),
+    // Non-Pokémon raw cards + sealed — priceFeedService routes per game
+    mapPool(otherTcgRawItems, REFRESH_CONCURRENCY, async item => {
       const query = item.name || item.cardData?.name
       if (!query) return
-      const price = await getTcgPrice(query, item.game)
-      if (price) {
-        const updates = item.type === 'card' ? { currentMarketPrice: price } : { currentValue: price }
-        store.updateItem(portfolio.value.id, item.id, updates)
-        updated++
-      }
-    })
+      try {
+        const price = await getTcgPrice(query, item.game)
+        if (typeof price === 'number' && Number.isFinite(price)) {
+          const updates = item.type === 'card'
+            ? { currentMarketPrice: price, lastPriceUpdate: new Date().toISOString() }
+            : { currentValue: price, lastPriceUpdate: new Date().toISOString() }
+          store.updateItem(portfolio.value.id, item.id, updates)
+          updated++
+        }
+      } catch {}
+    }),
   ])
 
   if (updated > 0) store.recordSnapshot(portfolio.value.id)
@@ -1200,11 +1289,19 @@ function deletePortfolio() { store.deletePortfolio(portfolio.value.id); router.p
 .info-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border-subtle); font-size: 14px; }
 .info-label { color: var(--text-secondary); font-weight: 600; }
 
-/* PriceCharting fetch */
+/* PriceCharting fetch — scoped ≥44px targets (do not change global btn-sm) */
 .pc-fetch-section { border-top: var(--bw) solid var(--border-subtle); padding-top: 14px; }
 .pc-fetch-label { font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-secondary); margin-bottom: 8px; }
+.pc-fetch-row { align-items: stretch; }
+.pc-fetch-btn,
+.pc-apply-btn {
+  flex-shrink: 0;
+  min-height: 44px;
+  min-width: 44px;
+  padding: 10px 14px;
+}
 .pc-result-box { background: var(--bg-card); border: var(--bw) solid var(--ink); border-radius: var(--radius); box-shadow: var(--shadow-xs); padding: 14px; }
-.pc-result-price-main { font-size: 22px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.pc-result-price-main { font-size: 22px; font-weight: 800; font-variant-numeric: tabular-nums; color: var(--accent-text); }
 .pc-result-meta { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
 
 @media (max-width: 768px) {
