@@ -30,7 +30,7 @@
         <router-link to="/booth" class="topnav-link" :class="{ active: isTab('booth') }">Booth</router-link>
       </nav>
 
-      <div class="topbar-page" aria-hidden="true">
+      <div class="topbar-page">
         {{ currentPageTitle }}
         <button v-if="currentTour" class="tour-info-btn" @click="replayTour" title="Watch tour video" aria-label="Watch tour video">i</button>
       </div>
@@ -191,6 +191,7 @@
 import { ref, computed, watch, onMounted, onErrorCaptured } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { usePortfolioStore } from './stores/portfolio'
+import { useDeckStore } from './stores/decks'
 import InstallPrompt from './components/InstallPrompt.vue'
 import XFollowPrompt from './components/XFollowPrompt.vue'
 import TourModal from './components/TourModal.vue'
@@ -201,6 +202,7 @@ import { preloadGames } from './services/tcg/cardPreloader.js'
 import { applyTheme, setThemePref, getThemePref, resolvedTheme } from './utils/theme.js'
 
 const store = usePortfolioStore()
+const deckStore = useDeckStore()
 const route = useRoute()
 const router = useRouter()
 
@@ -253,7 +255,8 @@ const TAB_FOR_ROUTE = {
   Browse: 'browse', Sets: 'browse', TcgSets: 'browse',
   Decks: 'decks', MetaDecks: 'decks', DeckBuilder: 'decks',
   TradeLanding: 'trade', TradeAnalyzer: 'trade',
-  Booth: 'booth', BoothEdit: 'booth',
+  Booth: 'booth', BoothEdit: 'booth', BoothDisplay: 'booth', BoothTable: 'booth',
+  Settings: 'settings', Terms: 'terms', ShelfGuide: 'home',
 }
 function isTab(tab) {
   return TAB_FOR_ROUTE[route.name] === tab
@@ -299,21 +302,15 @@ const portfolioColors = [
 ]
 
 const currentPageTitle = computed(() => {
-  if (route.name === 'Dashboard') return 'Dashboard'
-  if (route.name === 'Search') return 'Search Cards'
-  if (route.name === 'Browse') return 'Browse Sets'
-  if (route.name === 'Sets') return 'Pokémon Sets'
-  if (route.name === 'TcgSets') return 'Browse Sets'
-  if (route.name === 'Booth') return 'Card Booth'
-  if (route.name === 'BoothEdit') return 'Edit Booth'
-  if (route.name === 'Settings') return 'Settings'
-  if (route.name === 'Terms') return 'Terms & Conditions'
-  if (route.name === 'TradeAnalyzer' || route.name === 'TradeLanding') return 'Trade Analyzer'
   if (route.name === 'Portfolio') {
     const p = store.portfolios.find(p => p.id === route.params.id)
     return p?.name || 'Shelf'
   }
-  return 'Rarebox'
+  if (route.name === 'DeckBuilder') {
+    const d = deckStore.decks.find(d => d.id === route.params.id)
+    return d?.name || 'Deck Builder'
+  }
+  return route.meta?.title || 'Rarebox'
 })
 
 function hardRefresh() {
