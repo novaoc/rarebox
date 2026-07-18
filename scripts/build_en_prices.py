@@ -16,7 +16,7 @@ matching, no release-date cutoff), from three maintained sources:
   0. explicit: a small hand-verified tcgcsv groupId → pokemontcg set id map
      (EXPLICIT_GROUPS below) for sets whose tcgcsv abbreviation disagrees
      with pokemontcg's ptcgoCode AND that the history repo has not mapped yet
-     — e.g. Mega Brilliant Stars (me5): tcgcsv group 24688 abbreviates ME05
+     — e.g. Pitch Black (me5): tcgcsv group 24688 abbreviates ME05
      while pokemontcg's ptcgoCode is PBL, so neither data-driven join fires.
   1. history: rarebox-price-history `maps/groups.json` — the daily-maintained
      tcgcsv groupId → pokemontcg set id map that repo's ingest already uses
@@ -73,7 +73,7 @@ VARIANT_PRIORITY = [
 # sets neither the history map nor the ptcgoCode join covers. Highest
 # precedence. Keep this SMALL and delete entries once an upstream source
 # maps the group (the join self-heals). Verified 2026-07-18:
-#   24688 "Mega Brilliant Stars" (tcgcsv abbrev ME05) → me5; pokemontcg
+#   24688 "Pitch Black" (tcgcsv abbrev ME05) → me5; pokemontcg
 #   ptcgoCode is PBL, so the ptcgo join can't match ME05.
 EXPLICIT_GROUPS = {"24688": "me5"}
 
