@@ -133,6 +133,84 @@ runEval('strict Riftbound PC candidate validation (variant + number)', () => {
   ok('Signature/plain/number strict candidate rules hold')
 })
 
+runEval('Riftbound graded PC pick requires set + base name (not only #/variant)', () => {
+  // Exact user repro: same collector #, wrong name + wrong set must not accept.
+  const repro = pickRiftboundPcCandidate('Riftbound Origin Ahri #001', [
+    { productName: 'Teemo #001', consoleName: 'Riftbound Spiritforged' },
+  ])
+  assert(!repro.ok && repro.reason === 'no_results',
+    'repro: Origin Ahri #001 must reject Spiritforged Teemo #001', JSON.stringify(repro))
+
+  // Same set, wrong name, same number
+  const wrongName = pickRiftboundPcCandidate('Riftbound Origin Ahri #001', [
+    { productName: 'Teemo #001', consoleName: 'Riftbound Origin' },
+  ])
+  assert(!wrongName.ok, 'same set + same # + wrong name must reject')
+
+  // Correct set/name/number accepts
+  const ahri = { productName: 'Ahri #001', consoleName: 'Riftbound Origin', price2: '$50' }
+  const hit = pickRiftboundPcCandidate('Riftbound Origin Ahri #001', [
+    { productName: 'Teemo #001', consoleName: 'Riftbound Spiritforged' },
+    ahri,
+  ])
+  assert(hit.ok && hit.product === ahri, 'correct set/name/number must accept', JSON.stringify(hit))
+
+  // Origin ↔ Origins plural drift on console
+  const originsConsole = pickRiftboundPcCandidate('Riftbound Origin Ahri #001', [
+    { productName: 'Ahri #001', consoleName: 'Riftbound Origins' },
+  ])
+  assert(originsConsole.ok, 'Origin query must accept Origins console')
+
+  // Correct name, wrong set, same number
+  const wrongSet = pickRiftboundPcCandidate('Riftbound Origin Ahri #001', [
+    { productName: 'Ahri #001', consoleName: 'Riftbound Spiritforged' },
+  ])
+  assert(!wrongSet.ok, 'correct name + wrong set must reject')
+
+  // Missing console on graded candidate → reject
+  const noConsole = pickRiftboundPcCandidate('Riftbound Origin Ahri #001', [
+    { productName: 'Ahri #001' },
+  ])
+  assert(!noConsole.ok, 'missing consoleName must reject for graded pick')
+
+  // Subtitle / punctuation form: selected short name vs PC subtitle
+  const subtitle = pickRiftboundPcCandidate('Riftbound Origin Ahri #001', [
+    { productName: 'Ahri - Loose Cannon #001', consoleName: 'Riftbound Origin' },
+  ])
+  assert(subtitle.ok, 'PC subtitle form must match short selected name', JSON.stringify(subtitle))
+
+  const punct = pickRiftboundPcCandidate("Riftbound Origin Kai'Sa #010", [
+    { productName: 'KaiSa #010', consoleName: 'Riftbound Origin' },
+  ])
+  assert(punct.ok, 'apostrophe/punctuation forms must be compatible', JSON.stringify(punct))
+
+  // #number / set / variant tokens alone must not accept unrelated product
+  const tokenOnly = pickRiftboundPcCandidate('Riftbound Origin Ahri (Signature) #299', [
+    { productName: 'Teemo [Signature] #299', consoleName: 'Riftbound Origin' },
+  ])
+  assert(!tokenOnly.ok, 'shared # + variant + set without name must reject')
+
+  // Unconditional qNum path gone: number match with zero name evidence fails
+  const numOnlyPool = pickRiftboundPcCandidate('Riftbound Origin Ahri #001', [
+    { productName: '#001', consoleName: 'Riftbound Origin' },
+  ])
+  assert(!numOnlyPool.ok, 'collector # alone must not accept')
+
+  // Promo alias console vs query set label
+  const promoHit = pickRiftboundPcCandidate('Riftbound Promo Ahri #001', [
+    { productName: 'Ahri #001', consoleName: 'Riftbound Promo' },
+  ])
+  assert(promoHit.ok, 'Riftbound Promo query/console must match')
+
+  const promoAlias = pickRiftboundPcCandidate(
+    'Riftbound Riftbound Promotional Cards Ahri #001',
+    [{ productName: 'Ahri #001', consoleName: 'Riftbound Promo' }],
+  )
+  assert(promoAlias.ok, 'Promotional Cards query must alias to Riftbound Promo console')
+
+  ok('set + base-name graded PC identity rules hold')
+})
+
 runEval('no-number Riftbound graded auto-fetch is rejected', () => {
   assert(riftboundGradedMissingNumber('riftbound', '', 'Riftbound Origin Ahri (Signature)') === true,
     'missing number detected')
@@ -236,6 +314,175 @@ runEval('imported Signature identity and value retained on resolve', () => {
   assert(isSafeRiftboundGradedMatch(slashItem, sigMatch, 'riftbound'),
     '299/350 import must safely match #299 Signature candidate')
 
+  // Set + base-name hardening (not only number+variant)
+  const crossSetSameNum = {
+    id: 'rift-ahri-sf',
+    name: 'Ahri (Signature)',
+    number: '299',
+    set: 'Spiritforged',
+    price: 12,
+  }
+  assert(!isSafeRiftboundGradedMatch(item, crossSetSameNum, 'riftbound'),
+    'import safe matcher must reject cross-set same-number')
+
+  const wrongNameSameNum = {
+    id: 'rift-teemo-299',
+    name: 'Teemo (Signature)',
+    number: '299',
+    set: 'Origin',
+    price: 12,
+  }
+  assert(!isSafeRiftboundGradedMatch(item, wrongNameSameNum, 'riftbound'),
+    'import safe matcher must reject wrong-name same-number')
+
+  // Object vs string set shapes still match when compatible
+  const objSetItem = {
+    type: 'graded',
+    game: 'riftbound',
+    cardData: {
+      name: 'Ahri (Signature)',
+      number: '299',
+      set: { name: 'Origins' },
+    },
+  }
+  const stringSetMatch = {
+    id: 'rift-ahri-sig-299-b',
+    name: 'Ahri (Signature)',
+    number: '299',
+    set: 'Origin',
+  }
+  assert(isSafeRiftboundGradedMatch(objSetItem, stringSetMatch, 'riftbound'),
+    'object/string set shapes + Origin/Origins must be safe when identity matches')
+
+  assert(
+    findSafeRiftboundGradedMatch(
+      item,
+      [plainMatch, crossSetSameNum, wrongNameSameNum, sigWrongNum, sigMatch],
+      'riftbound',
+    ) === sigMatch,
+    'scan must skip cross-set/wrong-name and land on exact identity',
+  )
+
+  // Blank import set: fail-closed — do not auto-attach (would stamp wrong set).
+  const blankSetImport = {
+    type: 'graded',
+    game: 'riftbound',
+    currentValue: 40,
+    cardData: {
+      name: 'Ahri (Signature)',
+      number: '299',
+      set: { name: '' },
+    },
+  }
+  assert(!isSafeRiftboundGradedMatch(blankSetImport, sigMatch, 'riftbound'),
+    'blank import set must reject otherwise same name/number/variant candidate')
+  assert(
+    findSafeRiftboundGradedMatch(blankSetImport, [sigMatch, plainMatch], 'riftbound') == null,
+    'blank-set import scan must retain manual identity (no auto-attach)',
+  )
+  const blankSetMissingField = {
+    type: 'graded',
+    game: 'riftbound',
+    cardData: { name: 'Ahri (Signature)', number: '299' },
+  }
+  assert(!isSafeRiftboundGradedMatch(blankSetMissingField, sigMatch, 'riftbound'),
+    'missing import set field must reject auto-attach')
+
+  // Import set present, candidate set missing → reject
+  const noSetCandidate = {
+    id: 'rift-ahri-noset',
+    name: 'Ahri (Signature)',
+    number: '299',
+    price: 12,
+  }
+  assert(!isSafeRiftboundGradedMatch(item, noSetCandidate, 'riftbound'),
+    'import set present but candidate set missing must reject')
+  assert(
+    findSafeRiftboundGradedMatch(item, [noSetCandidate, plainMatch], 'riftbound') == null,
+    'scan must not attach when only blank-set candidates remain',
+  )
+
+  // Multiword card name correct match
+  const missFortuneItem = {
+    type: 'graded',
+    game: 'riftbound',
+    cardData: {
+      name: 'Miss Fortune',
+      number: '42',
+      set: { name: 'Origin' },
+    },
+  }
+  const missFortuneMatch = {
+    id: 'rift-mf-42',
+    name: 'Miss Fortune',
+    number: '42',
+    set: 'Origin',
+  }
+  const missFortuneWrong = {
+    id: 'rift-mf-wrong',
+    name: 'Miss Fortune',
+    number: '42',
+    set: 'Spiritforged',
+  }
+  assert(isSafeRiftboundGradedMatch(missFortuneItem, missFortuneMatch, 'riftbound'),
+    'multiword Miss Fortune must match same set/number')
+  assert(!isSafeRiftboundGradedMatch(missFortuneItem, missFortuneWrong, 'riftbound'),
+    'multiword Miss Fortune must reject cross-set same number')
+
+  // Subtitle compatibility both directions (import short ↔ candidate subtitle)
+  const subtitleCand = {
+    id: 'rift-ahri-sub',
+    name: 'Ahri - Loose Cannon',
+    number: '001',
+    set: 'Origin',
+  }
+  const shortAhriItem = {
+    type: 'graded',
+    game: 'riftbound',
+    cardData: { name: 'Ahri', number: '001', set: { name: 'Origin' } },
+  }
+  assert(isSafeRiftboundGradedMatch(shortAhriItem, subtitleCand, 'riftbound'),
+    'short import name must accept subtitle candidate')
+  const subtitleItem = {
+    type: 'graded',
+    game: 'riftbound',
+    cardData: { name: 'Ahri - Loose Cannon', number: '001', set: { name: 'Origin' } },
+  }
+  const shortCand = { id: 'rift-ahri-short', name: 'Ahri', number: '001', set: 'Origin' }
+  assert(isSafeRiftboundGradedMatch(subtitleItem, shortCand, 'riftbound'),
+    'subtitle import name must accept short candidate')
+
+  // Promo alias compatibility both directions (Promo ↔ Promotional Cards)
+  const promoItem = {
+    type: 'graded',
+    game: 'riftbound',
+    cardData: {
+      name: 'Ahri',
+      number: '001',
+      set: { name: 'Promo' },
+    },
+  }
+  const promoLongCand = {
+    id: 'rift-promo-long',
+    name: 'Ahri',
+    number: '001',
+    set: 'Riftbound Promotional Cards',
+  }
+  assert(isSafeRiftboundGradedMatch(promoItem, promoLongCand, 'riftbound'),
+    'Promo import must accept Promotional Cards candidate')
+  const promoLongItem = {
+    type: 'graded',
+    game: 'riftbound',
+    cardData: {
+      name: 'Ahri',
+      number: '001',
+      set: { name: 'Riftbound Promotional Cards' },
+    },
+  }
+  const promoShortCand = { id: 'rift-promo-short', name: 'Ahri', number: '001', set: 'Promo' }
+  assert(isSafeRiftboundGradedMatch(promoLongItem, promoShortCand, 'riftbound'),
+    'Promotional Cards import must accept Promo candidate')
+
   // Collectr Variance/Rarity → canonical graded name
   assert(canonicalRiftboundGradedName('Ahri', 'Signature', '') === 'Ahri (Signature)',
     'Variance Signature folds into graded name')
@@ -269,6 +516,9 @@ runEval('imported Signature identity and value retained on resolve', () => {
     'graded resolve must not touch currentValue (retain imported)')
   assert(!/match\.price/.test(gradedBody),
     'graded resolve must not read match.price')
+  // Blank-set attach would stamp match.set via prev.set?.name || match.set
+  assert(/name:\s*prev\.set\?\.name \|\| match\.set/.test(gradedBody),
+    'graded resolve stamps set from match when prev set blank — matcher must block that path')
 
   // Collectr import source guards
   const collectr = read('src/utils/collectrImport.js')
@@ -282,6 +532,69 @@ runEval('imported Signature identity and value retained on resolve', () => {
     'Collectr graded currentValue must not collapse $0 via || null')
 
   ok('imported Signature identity/value retention guards hold')
+})
+
+runEval('Riftbound graded fail-closed set + ambiguous PC survivors', () => {
+  // PC query with missing set fails closed (manual behavior)
+  const noSetQ = pickRiftboundPcCandidate('Riftbound Ahri #001', [
+    { productName: 'Ahri #001', consoleName: 'Riftbound Origin' },
+  ])
+  assert(!noSetQ.ok && noSetQ.reason === 'no_results',
+    'PC query missing set must fail closed explicitly', JSON.stringify(noSetQ))
+
+  const bareNameQ = pickRiftboundPcCandidate('Riftbound Ahri (Signature) #299', [
+    { productName: 'Ahri [Signature] #299', consoleName: 'Riftbound Origin' },
+  ])
+  assert(!bareNameQ.ok, 'PC query without set token must not auto-pick')
+
+  // Ambiguous survivors with different incompatible bases → reject
+  const ambig = pickRiftboundPcCandidate('Riftbound Origin Ahri #001', [
+    { productName: 'Ahri Loose Cannon #001', consoleName: 'Riftbound Origin' },
+    { productName: 'Ahri Nine-Tailed Fox #001', consoleName: 'Riftbound Origin' },
+  ])
+  assert(!ambig.ok && ambig.reason === 'no_results',
+    'equal-score incompatible base survivors must reject', JSON.stringify(ambig))
+
+  // Multiword PC pick
+  const mf = pickRiftboundPcCandidate('Riftbound Origin Miss Fortune #42', [
+    { productName: 'Miss Fortune #42', consoleName: 'Riftbound Origin' },
+    { productName: 'Teemo #42', consoleName: 'Riftbound Origin' },
+  ])
+  assert(mf.ok && mf.product.productName === 'Miss Fortune #42',
+    'multiword Miss Fortune PC pick must win', JSON.stringify(mf))
+
+  // Subtitle both directions on PC path
+  const subPc = pickRiftboundPcCandidate('Riftbound Origin Ahri #001', [
+    { productName: 'Ahri - Loose Cannon #001', consoleName: 'Riftbound Origin' },
+  ])
+  assert(subPc.ok, 'PC short→subtitle must accept')
+  const subPcRev = pickRiftboundPcCandidate('Riftbound Origin Ahri Loose Cannon #001', [
+    { productName: 'Ahri #001', consoleName: 'Riftbound Origin' },
+  ])
+  assert(subPcRev.ok, 'PC subtitle→short must accept')
+
+  // Promo alias both directions on PC path
+  const promoPc = pickRiftboundPcCandidate('Riftbound Promo Ahri #001', [
+    { productName: 'Ahri #001', consoleName: 'Riftbound Promo' },
+  ])
+  assert(promoPc.ok, 'Promo query/console must match')
+  const promoPcAlias = pickRiftboundPcCandidate(
+    'Riftbound Riftbound Promotional Cards Ahri #001',
+    [{ productName: 'Ahri #001', consoleName: 'Riftbound Promo' }],
+  )
+  assert(promoPcAlias.ok, 'Promotional Cards query must alias to Promo console')
+  const promoPcRev = pickRiftboundPcCandidate('Riftbound Promo Ahri #001', [
+    { productName: 'Ahri #001', consoleName: 'Riftbound Promotional Cards' },
+  ])
+  assert(promoPcRev.ok, 'Promo query must accept Promotional Cards console')
+
+  // Candidate missing console still rejected when query has set
+  const missConsole = pickRiftboundPcCandidate('Riftbound Origin Ahri #001', [
+    { productName: 'Ahri #001', set: '' },
+  ])
+  assert(!missConsole.ok, 'PC candidate with blank set must reject')
+
+  ok('fail-closed set + ambiguous PC survivor rules hold')
 })
 
 runEval('sealed→graded mode race: submit precedence + clear on switch', () => {
