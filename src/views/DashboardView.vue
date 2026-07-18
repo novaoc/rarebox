@@ -438,10 +438,18 @@ const totalGain = computed(() => store.totalPortfolioValue - store.totalCostBasi
 const totalGainPct = computed(() => store.totalCostBasis > 0 ? (totalGain.value / store.totalCostBasis) * 100 : 0)
 const totalItems = computed(() => store.portfolios.reduce((s, p) => s + p.items.length, 0))
 
+/** Finite shelf display value; $0 is valid (never collapse with ||). */
+function finiteMoney(v) {
+  return typeof v === 'number' && Number.isFinite(v) ? v : null
+}
+
 function getPortfolioValue(portfolio) {
   return portfolio.items.reduce((s, item) => {
     const qty = item.quantity || 1
-    const val = item.type === 'card' ? (item.currentMarketPrice || item.purchasePrice || 0) : (item.currentValue || item.purchasePrice || 0)
+    // Explicit $0 market/current must not fall back to purchase; unknown may.
+    const val = item.type === 'card'
+      ? (finiteMoney(item.currentMarketPrice) ?? finiteMoney(item.purchasePrice) ?? 0)
+      : (finiteMoney(item.currentValue) ?? finiteMoney(item.purchasePrice) ?? 0)
     return s + val * qty
   }, 0)
 }
@@ -534,7 +542,7 @@ async function refreshAllPrices() {
   for (const portfolio of store.portfolios) {
     for (const item of portfolio.items) {
       if (item.type === 'card' && item.cardId) {
-        priceMap.set(item.cardId, item.currentMarketPrice || item.purchasePrice || 0)
+        priceMap.set(item.cardId, finiteMoney(item.currentMarketPrice) ?? finiteMoney(item.purchasePrice) ?? 0)
       }
     }
   }

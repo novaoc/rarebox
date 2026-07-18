@@ -341,11 +341,15 @@ function openAddModal(card) {
     // Set a temporary tcgCard ref for the template
     addingTcgCard.value = {
       game: card.game,
+      id: card.id,
       name: card.name,
       set: card.set || '',
+      setId: card.setId || card.set || '',
       number: card.number,
       image: card.image,
       price: card.price,
+      rarity: card.rarity || '',
+      _lang: card._lang || null,
     }
   } else {
     addingTcgCard.value = null

@@ -37,9 +37,19 @@ await runEval('backup fixture round-trip invariants', () => {
   const snapshotValues = Object.values(snapshots).flatMap(arr => arr || []).flatMap(s => Object.keys(s.values || {}))
 
   assert(shelves.length === 1, 'Fixture should preserve shelf count')
-  assert(items.length === 2, 'Fixture should preserve item count')
+  assert(items.length === 3, 'Fixture should preserve item count')
   assert(items.some(i => i.currentMarketPrice === 0), 'Fixture should preserve zero currentMarketPrice')
+  const riftGraded = items.find(i => i.id === 'item-riftbound-graded')
+  assert(riftGraded?.type === 'graded' && riftGraded?.game === 'riftbound',
+    'Fixture should preserve Riftbound graded item')
+  assert(riftGraded?.gradingCompany === 'PSA' && riftGraded?.grade === '10',
+    'Fixture should preserve grade fields')
+  assert(riftGraded?.currentValue === 85.5,
+    'Fixture should preserve graded currentValue (not raw overwrite)')
+  assert(riftGraded?.cardData?.name?.includes('Signature'),
+    'Fixture should preserve Riftbound variant identity in cardData.name')
   assert(snapshotValues.includes('item-card-zero'), 'Fixture should preserve snapshot item IDs')
+  assert(snapshotValues.includes('item-riftbound-graded'), 'Fixture should snapshot graded Riftbound value')
   assert(!Object.prototype.hasOwnProperty.call(items[0], '__proto__'), 'Prototype pollution key should be stripped')
   assert(!Object.prototype.hasOwnProperty.call(items[0], 'constructor'), 'Constructor pollution key should be stripped')
 

@@ -30,10 +30,20 @@ runEval('provider price normalization semantics', () => {
   assert(ygoPriceFor({}, 'Unknown', 'UNK-001', 'Rare', 3.21) === 3.21, 'YGO should fall back when no static price exists')
 
   const providers = read('src/services/tcg/providers.js')
-  assert(/card\.price\s*=\s*priceMap\.variants\[card\.number\]\?\.\[variant\]\s*\?\?\s*null/.test(providers),
+  // Variant path must never fall through to normal[n] — only assign when
+  // variants[n][variant] is present (explicit != null or ?? null).
+  const variantAssign = providers.match(
+    /if \(variant\) \{([\s\S]*?)\} else if \(priceMap\.normal/,
+  )
+  assert(variantAssign, 'Riftbound variant vs plain price branches must be separable')
+  assert(/priceMap\.variants\[n\]\?\.\[variant\]/.test(variantAssign[1]),
+    'Riftbound variant fallback must look up variants map by normalized collector #')
+  assert(!/priceMap\.normal/.test(variantAssign[1]),
     'Riftbound variant fallback must not inherit plain-card prices')
-  assert(/card\.price\s*=\s*priceMap\.normal\[card\.number\]/.test(providers),
+  assert(/priceMap\.normal\[n\]/.test(providers),
     'Riftbound plain cards should still use normal price-map entries')
+  assert(/normalizeCollectorNumber/.test(providers) && /detectRiftboundVariant/.test(providers),
+    'Riftbound PC fallback must share collector-number + variant helpers')
 
 
 

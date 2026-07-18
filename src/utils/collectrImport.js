@@ -4,6 +4,10 @@
  * Built by Nova — GitHub: @novaoc
  */
 import * as XLSX from 'xlsx'
+import {
+  canonicalRiftboundGradedName,
+  normalizeCollectorNumber,
+} from './riftboundVariant.js'
 
 const GAME_MAP = {
   pokemon: 'pokemon',
@@ -49,6 +53,15 @@ function parseCost(val) {
   const cleaned = String(val).replace(/[$,"]/g, '')
   const n = parseFloat(cleaned)
   return Number.isFinite(n) ? Math.round(n * 100) / 100 : 0
+}
+
+/** Market/override price: empty → null; $0 is a valid finite price. */
+function parseOptionalPrice(val) {
+  if (val == null || val === '') return null
+  const cleaned = String(val).replace(/[$,"]/g, '')
+  if (cleaned.trim() === '') return null
+  const n = parseFloat(cleaned)
+  return Number.isFinite(n) ? Math.round(n * 100) / 100 : null
 }
 
 function parseGrade(raw) {
@@ -113,9 +126,10 @@ export function convertRow(row) {
   const [gradingCompany, grade] = parseGrade(gradeRaw)
   const now = new Date().toISOString()
 
-  // Price override takes precedence over market price
-  const overridePrice = parseCost(priceOverrideStr)
-  const marketPrice = overridePrice > 0 ? overridePrice : parseCost(marketPriceStr)
+  // Price override takes precedence over market price ($0 is valid).
+  const overridePrice = parseOptionalPrice(priceOverrideStr)
+  const marketPrice = overridePrice != null ? overridePrice : parseOptionalPrice(marketPriceStr)
+  const collectorNumber = normalizeCollectorNumber(cardNumber) || cardNumber
 
   const base = {
     id: uuid(),
@@ -135,19 +149,24 @@ export function convertRow(row) {
     base.name = productName
     base.setName = setName
     base.sealedType = 'booster_box'
-    base.currentValue = marketPrice || null
+    base.currentValue = marketPrice
     base.pcUrl = ''
     base.imageUrl = ''
     if (condition) base.condition = condition
   } else if (gradingCompany) {
     // ── Graded slab ──────────────────────────────────────────────────────
+    // Riftbound: fold Collectr Variance/Rarity into canonical name so
+    // Signature / alt-art imports stay identifiable after resolve.
+    const gradedName = game === 'riftbound'
+      ? canonicalRiftboundGradedName(productName, variance, rarity)
+      : productName
     base.type = 'graded'
     base.gradingCompany = gradingCompany
     base.grade = grade || '10'
-    base.currentValue = marketPrice || null
+    base.currentValue = marketPrice
     base.cardData = {
-      name: productName,
-      number: cardNumber,
+      name: gradedName,
+      number: collectorNumber,
       set: { name: setName },
       rarity,
       images: { small: '', large: '' },
@@ -158,10 +177,10 @@ export function convertRow(row) {
     // ── Raw card ─────────────────────────────────────────────────────────
     base.type = 'card'
     base.priceVariant = mapVariance(variance)
-    base.currentMarketPrice = marketPrice || null
+    base.currentMarketPrice = marketPrice
     base.cardData = {
       name: productName,
-      number: cardNumber,
+      number: collectorNumber,
       set: { name: setName },
       rarity,
       images: { small: '', large: '' },

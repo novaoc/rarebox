@@ -43,6 +43,25 @@
               "purchasePrice": 99.99,
               "currentValue": 123.45,
               "lastPriceUpdate": "2026-06-14T00:00:00.000Z"
+            },
+            {
+              "id": "item-riftbound-graded",
+              "type": "graded",
+              "game": "riftbound",
+              "quantity": 1,
+              "purchasePrice": 40,
+              "currentValue": 85.5,
+              "gradingCompany": "PSA",
+              "grade": "10",
+              "lastPriceUpdate": "2026-06-14T00:00:00.000Z",
+              "cardId": "rift-ahri-sig-299",
+              "cardData": {
+                "name": "Ahri (Signature)",
+                "number": "299",
+                "set": { "id": "OGN", "name": "Origin" },
+                "images": { "small": "https://example.invalid/ahri.png" },
+                "rarity": "Signature"
+              }
             }
           ]
         }
@@ -59,7 +78,8 @@
             "ts": 1781395200000,
             "values": {
               "item-card-zero": 0,
-              "item-sealed": 123.45
+              "item-sealed": 123.45,
+              "item-riftbound-graded": 85.5
             }
           }
         ]

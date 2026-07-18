@@ -11,6 +11,11 @@
 // The old mapping had 2↔3 swapped AND fell back to the raw price when
 // graded data was missing — which quoted raw prices as "PSA 10".
 
+import {
+  extractCollectorNumber,
+  pickRiftboundPcCandidate,
+} from '../utils/riftboundVariant.js'
+
 const PC_BASE = 'https://www.pricecharting.com'
 
 // In-memory cache — 1 hour TTL, max 200 entries
@@ -184,19 +189,35 @@ export async function fetchPrice(query, grade = 'ungraded') {
   if (!filtered.length) filtered = products
   if (!filtered.length) throw new Error('no_results')
 
-  // Pick best match by name overlap instead of blindly taking [0].
-  // This prevents wrong SKU (e.g. case vs box, wrong variant) for ambiguous names
-  // like "Spider-Man Collector Booster Box".
-  const queryTokens = lq.split(/\s+/).filter(t => t.length > 2)
-  const scored = filtered.map(p => {
-    const name = (p.productName || '').toLowerCase()
-    const score = queryTokens.reduce((s, tok) => s + (name.includes(tok) ? 1 : 0), 0)
-    return { p, score }
-  }).sort((a, b) => b.score - a.score)
+  const isGraded = grade !== 'ungraded'
+  let product
 
-  const product = (scored[0]?.score > 0 ? scored[0].p : filtered[0])
+  // Riftbound graded: strict number + variant match (Signature/alt-art/plain).
+  // Never fall back to unfiltered token-score winner — wrong printing risk.
+  if (isRiftbound && isGraded) {
+    if (!extractCollectorNumber(q)) throw new Error('no_results')
+    const pick = pickRiftboundPcCandidate(q, filtered)
+    if (!pick.ok) throw new Error('no_results')
+    product = pick.product
+  } else {
+    // Pick best match by name overlap instead of blindly taking [0].
+    // This prevents wrong SKU (e.g. case vs box, wrong variant) for ambiguous names
+    // like "Spider-Man Collector Booster Box".
+    const queryTokens = lq.split(/\s+/).filter(t => t.length > 2)
+    const scored = filtered.map(p => {
+      const name = (p.productName || '').toLowerCase()
+      const score = queryTokens.reduce((s, tok) => s + (name.includes(tok) ? 1 : 0), 0)
+      return { p, score }
+    }).sort((a, b) => b.score - a.score)
+
+    product = (scored[0]?.score > 0 ? scored[0].p : filtered[0])
+  }
+
   const price = priceForGrade(product, grade)
-  if (!price) throw new Error(grade !== 'ungraded' ? 'no_graded_data' : 'no_results')
+  // $0 is a valid market price — only null means missing graded/raw data.
+  // Graded requests must never fall through to raw price1 (priceForGrade
+  // already returns null when graded fields are absent).
+  if (price == null) throw new Error(isGraded ? 'no_graded_data' : 'no_results')
 
   const result = {
     query: q,

@@ -10,6 +10,7 @@ const evals = [
   'scripts/evals/en-prices-fallback.mjs',
   'scripts/evals/route-safety.mjs',
   'scripts/evals/backup-roundtrip.mjs',
+  'scripts/evals/riftbound-graded.mjs',
 ]
 
 let failed = false

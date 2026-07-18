@@ -15,7 +15,7 @@
           </select>
         </div>
 
-        <!-- Type selector: card + graded for all TCGs, sealed only for Pokémon -->
+        <!-- Type selector: card, graded, and sealed for all TCGs -->
         <div v-if="!props.defaultType" class="type-tabs mb-4">
           <button
             v-for="t in visibleTypes"
@@ -28,7 +28,7 @@
           </button>
         </div>
 
-        <!-- Card / Graded: show card info -->
+        <!-- Card / Graded: show card info (Pokémon raw card or prefilled TCG card) -->
         <div v-if="card && (itemType === 'card' || itemType === 'graded')" class="card-preview">
           <img v-if="card.images?.small" :src="card.images.small" :alt="card.name" class="card-thumb" @error="$event.target.style.display='none'" />
           <div class="card-preview-info">
@@ -39,9 +39,38 @@
             </div>
           </div>
         </div>
+        <div v-else-if="tcgCard && (itemType === 'card' || itemType === 'graded')" class="card-preview">
+          <img v-if="tcgCard.image" :src="tcgCard.image" :alt="tcgCard.name" class="card-thumb" @error="$event.target.style.display='none'" />
+          <div class="card-preview-info">
+            <div class="card-preview-name">{{ tcgCard.name }}</div>
+            <div class="card-preview-set">{{ tcgCard.set }} · #{{ tcgCard.number }}</div>
+            <div class="card-preview-price" v-if="itemType === 'card' && tcgCard.price != null">
+              Market: <span class="text-accent font-bold">${{ Number(tcgCard.price).toFixed(2) }}</span>
+            </div>
+          </div>
+        </div>
 
-        <!-- Graded specific -->
-        <div v-if="itemType === 'graded' && game !== 'riftbound'" class="form-row mt-3">
+        <!-- Graded non-Pokémon without a prefilled card: identity fields -->
+        <div v-if="itemType === 'graded' && !isPokemon && !card && !tcgCard" class="mb-3">
+          <div class="form-group">
+            <label class="form-label">Card Name</label>
+            <input v-model="form.name" class="input" placeholder="e.g. Ahri (Signature)" aria-label="Graded card name" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Set</label>
+            <input v-model="form.setName" class="input" placeholder="e.g. Origin" aria-label="Graded card set" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Collector #</label>
+            <input v-model="form.number" class="input" placeholder="e.g. 299" aria-label="Graded card collector number" />
+          </div>
+          <p v-if="isRiftbound" class="text-muted" style="font-size:11px;line-height:1.4;margin-top:4px">
+            Riftbound graded fetch needs a collector number (or pick the card from search/browse). Manual value is always allowed.
+          </p>
+        </div>
+
+        <!-- Graded specific (all TCGs including Riftbound) -->
+        <div v-if="itemType === 'graded'" class="form-row mt-3">
           <div class="form-group">
             <label class="form-label">Grading Company</label>
             <select v-model="form.gradingCompany" class="select">
@@ -60,39 +89,43 @@
           </div>
         </div>
 
-        <!-- PriceCharting fetch for Pokémon graded cards. Non-Pokémon graded
-             items use the generic PriceCharting section below (it already has
-             its own search + value input) — don't render a second one here. -->
-        <div v-if="itemType === 'graded' && isPokemon" class="pc-fetch-section mt-1 mb-4">
-          <div class="pc-fetch-label">Fetch Market Price</div>
-          <div class="flex gap-2">
+        <!-- Grade-aware PriceCharting fetch (all graded slabs). Never uses
+             raw/TCGplayer prices as a graded value — missing graded data stays
+             manual. -->
+        <div v-if="itemType === 'graded' && usesGradedPcFetch" class="pc-fetch-section mt-1 mb-4">
+          <div class="pc-fetch-label">Fetch Graded Market Price</div>
+          <div class="flex gap-2 pc-fetch-row">
             <input
               v-model="gradingPcQuery"
-              class="input input-sm"
+              class="input"
               placeholder="Search query…"
               @keyup.enter="searchGradingPC"
+              aria-label="Graded price search query"
             />
             <button
-              class="btn btn-secondary btn-sm"
-              :disabled="gradingPcSearching || !gradingPcQuery.trim()"
+              class="btn btn-secondary pc-fetch-btn"
+              :disabled="gradingPcSearching || !gradingPcQuery.trim() || !!riftboundGradedBlockReason"
               @click="searchGradingPC"
-              style="flex-shrink:0"
             >
               <span v-if="gradingPcSearching" class="spinner spinner-sm"></span>
               <span v-else>Fetch</span>
             </button>
           </div>
-          <div v-if="gradingPcError" class="text-danger mt-1" style="font-size:12px">{{ gradingPcError }}</div>
+          <div v-if="gradingPcError" class="text-danger mt-1" style="font-size:12px" role="status">{{ gradingPcError }}</div>
+          <div v-else-if="riftboundGradedBlockReason" class="text-muted mt-1" style="font-size:12px" role="status">{{ riftboundGradedBlockReason }}</div>
           <div v-if="gradingPcResult" class="pc-result-box mt-2">
             <div class="pc-result-price-main">${{ gradingPcResult.price.toFixed(2) }}</div>
             <div class="pc-result-meta">{{ gradingPcResult.product_name }} · Grade {{ gradingPcResult.grade }}</div>
-            <button class="btn btn-primary btn-sm mt-2" @click="applyGradingPCPrice">Apply Price</button>
+            <button class="btn btn-primary pc-apply-btn mt-2" @click="applyGradingPCPrice">Apply Price</button>
           </div>
+          <p v-if="isRiftbound" class="text-muted mt-2" style="font-size:11px;line-height:1.4">
+            Graded prices come from PriceCharting only. If no graded listing matches this exact card (including Signature / variant text and collector #), enter the value manually — raw market is never used.
+          </p>
         </div>
 
-        <div v-if="itemType === 'graded' && isPokemon" class="form-group">
+        <div v-if="itemType === 'graded' && usesGradedPcFetch" class="form-group">
           <label class="form-label">Current Market Value ($)</label>
-          <input v-model.number="form.currentValue" class="input" type="number" min="0" step="0.01" placeholder="0.00" />
+          <input v-model.number="form.currentValue" class="input" type="number" min="0" step="0.01" placeholder="Manual if no graded data" aria-label="Current graded market value" />
         </div>
 
         <!-- Card variant selector -->
@@ -105,8 +138,9 @@
           </select>
         </div>
 
-        <!-- Sealed (Pokémon) + any non-Pokémon TCG: PriceCharting search -->
-        <div v-if="itemType === 'sealed' || !isPokemon">
+        <!-- Sealed (Pokémon) + non-Pokémon raw/sealed search. Graded Riftbound
+             uses the grade-aware section above — never this raw feed. -->
+        <div v-if="itemType === 'sealed' || (!isPokemon && itemType !== 'graded')">
           <!-- Search -->
           <div class="form-group">
             <label class="form-label">{{ isPokemon ? 'Search by Set Name' : 'Search cards & sealed products' }}</label>
@@ -228,6 +262,14 @@ import { usePortfolioStore } from '../stores/portfolio'
 import { getAllVariants, getMarketPrice } from '../services/pokemonApi'
 import { searchSealed, fetchPrice } from '../services/priceServer'
 import { SUPPORTED_GAMES, searchProducts } from '../services/priceFeedService'
+import {
+  buildGradedPcQuery,
+  pcGradeForItem,
+  isFiniteGradedPrice,
+  riftboundGradedFetchGuard,
+  RIFTBOUND_GRADED_NO_NUMBER_MSG,
+} from '../utils/gradedPriceQuery'
+import { resolveNonPokemonSubmitType } from '../utils/addItemSubmitType'
 
 const props = defineProps({
   card: { type: Object, default: null },
@@ -254,14 +296,11 @@ const types = [
 const game = ref(props.tcgCard?.game || 'pokemon')
 const games = SUPPORTED_GAMES
 const isPokemon = computed(() => game.value === 'pokemon')
-// All TCGs get card/graded/sealed. Riftbound hides graded.
-const visibleTypes = computed(() => {
-  if (game.value === 'riftbound') {
-    if (itemType.value === 'graded') itemType.value = 'card'
-    return types.filter(t => t.value !== 'graded')
-  }
-  return types
-})
+const isRiftbound = computed(() => game.value === 'riftbound')
+// Every graded slab uses grade-aware PriceCharting — never raw/TCGplayer.
+const usesGradedPcFetch = computed(() => itemType.value === 'graded')
+// All TCGs get card / graded / sealed — including Riftbound graded slabs.
+const visibleTypes = computed(() => types)
 // Whether the currently-selected non-Pokémon product is a sealed product.
 const selectedIsSealed = ref(false)
 
@@ -274,32 +313,85 @@ const gradesByCompany = {
 }
 const gradeOptions = computed(() => gradesByCompany[form.value.gradingCompany] || gradesByCompany.PSA)
 
-// Graded PriceCharting fetch (Pokémon only — non-Pokémon uses the generic section)
+// Graded PriceCharting fetch (all TCGs — grade-aware, never raw market)
 const gradingPcQuery = ref('')
 const gradingPcSearching = ref(false)
 const gradingPcResult = ref(null)
 const gradingPcError = ref('')
 
+function gradedIdentitySrc() {
+  if (props.card) {
+    return {
+      game: 'pokemon',
+      name: props.card.name,
+      setName: props.card.set?.name,
+      number: props.card.number,
+    }
+  }
+  if (props.tcgCard) {
+    return {
+      game: props.tcgCard.game || game.value,
+      name: props.tcgCard.name || form.value.name,
+      setName: props.tcgCard.set || form.value.setName,
+      number: props.tcgCard.number || form.value.number,
+    }
+  }
+  return {
+    game: game.value,
+    name: form.value.name,
+    setName: form.value.setName,
+    number: form.value.number,
+  }
+}
+
+function defaultGradedQuery() {
+  return buildGradedPcQuery(gradedIdentitySrc())
+}
+
+const riftboundGradedBlockReason = computed(() => {
+  if (itemType.value !== 'graded' || !isRiftbound.value) return ''
+  const guard = riftboundGradedFetchGuard(gradedIdentitySrc(), gradingPcQuery.value)
+  return guard.ok ? '' : (guard.message || RIFTBOUND_GRADED_NO_NUMBER_MSG)
+})
+
 async function searchGradingPC() {
   if (!gradingPcQuery.value.trim()) return
+  const guard = riftboundGradedFetchGuard(gradedIdentitySrc(), gradingPcQuery.value)
+  if (!guard.ok) {
+    gradingPcError.value = guard.message || RIFTBOUND_GRADED_NO_NUMBER_MSG
+    gradingPcResult.value = null
+    return
+  }
   gradingPcSearching.value = true
   gradingPcError.value = ''
   gradingPcResult.value = null
   try {
-    gradingPcResult.value = await fetchPrice(gradingPcQuery.value, form.value.grade)
+    // Grade-aware only — priceServer refuses raw fallback for graded grades.
+    // pcGradeForItem maps PSA 10 → psa10 (same token as shelf refresh).
+    const gradeToken = pcGradeForItem({
+      type: 'graded',
+      gradingCompany: form.value.gradingCompany,
+      grade: form.value.grade,
+    })
+    const result = await fetchPrice(gradingPcQuery.value, gradeToken)
+    if (!isFiniteGradedPrice(result)) {
+      gradingPcError.value = 'No graded market data for this grade — enter the value manually. Raw market is never used for slabs.'
+      return
+    }
+    gradingPcResult.value = result
   } catch (e) {
-    if (e.message === 'server_down') gradingPcError.value = 'PriceCharting unavailable'
-    else if (e.message === 'timeout') gradingPcError.value = 'Request timed out — try again'
-    else if (e.message === 'no_results') gradingPcError.value = 'No results found'
-    else if (e.message === 'no_graded_data') gradingPcError.value = 'No price data for this grade'
-    else gradingPcError.value = 'Fetch failed'
+    if (e.message === 'server_down') gradingPcError.value = 'PriceCharting unavailable — enter value manually or try again offline later'
+    else if (e.message === 'timeout') gradingPcError.value = 'Request timed out — try again, or enter value manually'
+    else if (e.message === 'no_results') gradingPcError.value = 'No PriceCharting match for this exact card (number/variant) — enter value manually'
+    else if (e.message === 'no_graded_data') gradingPcError.value = 'No graded market data for this grade — enter the value manually. Raw market is never used for slabs.'
+    else gradingPcError.value = 'Fetch failed — enter value manually'
   } finally {
     gradingPcSearching.value = false
   }
 }
 
 function applyGradingPCPrice() {
-  if (!gradingPcResult.value) return
+  if (!isFiniteGradedPrice(gradingPcResult.value)) return
   form.value.currentValue = gradingPcResult.value.price
 }
 
@@ -349,11 +441,13 @@ function clearSealed() {
   form.value.currentValue = null
   form.value.pcUrl = ''
   form.value.imageUrl = ''
+  selectedIsSealed.value = false
 }
 
 const form = ref({
   name: '',
   setName: '',
+  number: '',
   pcUrl: '',
   imageUrl: '',
   sealedType: 'booster_box',
@@ -405,10 +499,35 @@ function submit() {
   }
 
   if (!isPokemon.value) {
-    // Non-Pokémon TCG item, sourced from PriceCharting. Modeled with the same
-    // generic fields the rest of the app already renders/values/refreshes.
-    const value = form.value.currentValue || form.value.purchasePrice || 0
-    if (selectedIsSealed.value) {
+    // Non-Pokémon TCG item. Graded slabs use currentValue only (never raw
+    // market as a silent default when the user left value blank after a
+    // failed graded fetch — fall back to purchase price or 0).
+    // Explicit itemType==='graded' always wins over a stale selectedIsSealed
+    // flag (sealed→graded tab switch must never save a slab as sealed).
+    const num = v => (typeof v === 'number' && Number.isFinite(v) ? v : null)
+    const value = num(form.value.currentValue) ?? num(form.value.purchasePrice) ?? 0
+    const kind = resolveNonPokemonSubmitType(itemType.value, selectedIsSealed.value)
+    if (kind === 'graded') {
+      item = {
+        ...item,
+        type: 'graded',
+        game: game.value,
+        _lang: props.tcgCard?._lang || null,
+        cardId: props.tcgCard?.id || undefined,
+        cardData: {
+          name: form.value.name,
+          number: props.tcgCard?.number || form.value.number || '',
+          set: { id: props.tcgCard?.setId || undefined, name: form.value.setName },
+          images: { small: form.value.imageUrl },
+          rarity: props.tcgCard?.rarity || '',
+          _lang: props.tcgCard?._lang || null,
+        },
+        gradingCompany: form.value.gradingCompany,
+        grade: form.value.grade,
+        currentValue: value,
+        lastPriceUpdate: num(form.value.currentValue) != null ? new Date().toISOString() : null,
+      }
+    } else if (kind === 'sealed') {
       item = {
         ...item,
         type: 'sealed',
@@ -418,25 +537,6 @@ function submit() {
         pcUrl: form.value.pcUrl,
         imageUrl: form.value.imageUrl,
         sealedType: 'sealed',
-        currentValue: value,
-      }
-    } else if (itemType.value === 'graded') {
-      item = {
-        ...item,
-        type: 'graded',
-        game: game.value,
-        _lang: props.tcgCard?._lang || null,
-        cardId: props.tcgCard?.id || undefined,
-        cardData: {
-          name: form.value.name,
-          number: props.tcgCard?.number || '',
-          set: { id: props.tcgCard?.setId || undefined, name: form.value.setName },
-          images: { small: form.value.imageUrl },
-          rarity: props.tcgCard?.rarity || '',
-          _lang: props.tcgCard?._lang || null,
-        },
-        gradingCompany: form.value.gradingCompany,
-        grade: form.value.grade,
         currentValue: value,
       }
     } else {
@@ -476,6 +576,7 @@ function submit() {
       currentMarketPrice: currentPrice.value,
     }
   } else if (itemType.value === 'graded') {
+    const num = v => (typeof v === 'number' && Number.isFinite(v) ? v : null)
     item = {
       ...item,
       cardId: props.card.id,
@@ -489,9 +590,11 @@ function submit() {
       },
       gradingCompany: form.value.gradingCompany,
       grade: form.value.grade,
-      currentValue: form.value.currentValue || form.value.purchasePrice || 0,
+      // Explicit $0 graded market is valid; only fall back when unset.
+      currentValue: num(form.value.currentValue) ?? num(form.value.purchasePrice) ?? 0,
     }
   } else {
+    const num = v => (typeof v === 'number' && Number.isFinite(v) ? v : null)
     item = {
       ...item,
       name: form.value.name,
@@ -499,7 +602,7 @@ function submit() {
       pcUrl: form.value.pcUrl,
       imageUrl: form.value.imageUrl,
       sealedType: form.value.sealedType,
-      currentValue: form.value.currentValue || form.value.purchasePrice || 0,
+      currentValue: num(form.value.currentValue) ?? num(form.value.purchasePrice) ?? 0,
     }
   }
 
@@ -515,8 +618,12 @@ onMounted(() => {
   if (props.tcgCard) {
     form.value.name = props.tcgCard.name || ''
     form.value.setName = props.tcgCard.set || ''
+    form.value.number = props.tcgCard.number != null ? String(props.tcgCard.number) : ''
     form.value.imageUrl = props.tcgCard.image || ''
-    if (props.tcgCard.price != null) form.value.currentValue = props.tcgCard.price
+    // Raw market must never seed a graded slab value.
+    if (itemType.value !== 'graded' && props.tcgCard.price != null) {
+      form.value.currentValue = props.tcgCard.price
+    }
     selectedIsSealed.value = false // singles from Browse
   }
 
@@ -527,8 +634,8 @@ onMounted(() => {
     form.value.priceVariant = best || variants.value[0]?.key || ''
   }
 
-  if (props.card) {
-    gradingPcQuery.value = `${props.card.name} ${props.card.set?.name || ''}`.trim()
+  if (usesGradedPcFetch.value) {
+    gradingPcQuery.value = defaultGradedQuery()
   }
 })
 
@@ -539,14 +646,63 @@ watch(() => props.card, () => {
     form.value.priceVariant = best || variants.value[0]?.key || ''
   }
   if (props.card) {
-    gradingPcQuery.value = `${props.card.name} ${props.card.set?.name || ''}`.trim()
+    gradingPcQuery.value = defaultGradedQuery()
+  }
+})
+
+// Switching to graded: drop any raw market seed, clear stale sealed selection,
+// and rebuild the PC query so submit cannot save a slab as sealed.
+watch(itemType, (t) => {
+  gradingPcResult.value = null
+  gradingPcError.value = ''
+  if (t === 'graded') {
+    const hadSealedSelection = selectedIsSealed.value
+    selectedIsSealed.value = false
+    sealedResults.value = []
+    sealedError.value = ''
+    sealedQuery.value = ''
+    if (hadSealedSelection) {
+      // Drop sealed product pick; restore browse card identity when present.
+      if (props.tcgCard) {
+        form.value.name = props.tcgCard.name || ''
+        form.value.setName = props.tcgCard.set || ''
+        form.value.number = props.tcgCard.number != null ? String(props.tcgCard.number) : ''
+        form.value.imageUrl = props.tcgCard.image || ''
+        form.value.pcUrl = ''
+        form.value.currentValue = null
+      } else if (!props.card) {
+        form.value.name = ''
+        form.value.setName = ''
+        form.value.pcUrl = ''
+        form.value.imageUrl = ''
+        form.value.currentValue = null
+      }
+    }
+    if (props.tcgCard?.price != null && form.value.currentValue === props.tcgCard.price) {
+      form.value.currentValue = null
+    }
+    if (usesGradedPcFetch.value) gradingPcQuery.value = defaultGradedQuery()
+  } else if (t === 'card' && props.tcgCard?.price != null && form.value.currentValue == null) {
+    form.value.currentValue = props.tcgCard.price
   }
 })
 
 // A fetched price is only valid for the grade it was fetched with
 watch(() => form.value.grade, () => {
   gradingPcResult.value = null
+  gradingPcError.value = ''
 })
+
+// Manual identity edits (name/set/number) rebuild the graded PC query.
+watch(
+  () => [form.value.name, form.value.setName, form.value.number, game.value],
+  () => {
+    if (itemType.value === 'graded' && usesGradedPcFetch.value && !props.card) {
+      gradingPcQuery.value = defaultGradedQuery()
+      gradingPcResult.value = null
+    }
+  },
+)
 </script>
 
 <style scoped>
@@ -557,7 +713,8 @@ watch(() => form.value.grade, () => {
   align-items: center;
   justify-content: center;
   gap: 6px;
-  padding: 8px 12px;
+  padding: 10px 12px;
+  min-height: 44px;
   border: var(--bw) solid var(--border);
   border-radius: var(--radius);
   background: var(--bg-card);
@@ -570,6 +727,15 @@ watch(() => form.value.grade, () => {
 }
 .type-tab:hover { background: var(--bg-hover); }
 .type-tab.active { background: var(--accent); color: var(--on-accent); box-shadow: var(--shadow-xs); }
+.pc-fetch-row { align-items: stretch; }
+/* Scoped ≥44px targets for graded Fetch/Apply (do not change global btn-sm) */
+.pc-fetch-btn,
+.pc-apply-btn {
+  flex-shrink: 0;
+  min-height: 44px;
+  min-width: 44px;
+  padding: 10px 14px;
+}
 
 .card-preview {
   display: flex;
@@ -668,7 +834,7 @@ watch(() => form.value.grade, () => {
 .pc-result-price-main {
   font-size: 20px;
   font-weight: 700;
-  color: var(--accent);
+  color: var(--accent-text);
 }
 .pc-result-meta {
   font-size: 11px;
@@ -685,7 +851,7 @@ watch(() => form.value.grade, () => {
     border-radius: var(--radius-lg) var(--radius-lg) 0 0;
   }
   .modal-body { padding: 16px; overflow-y: auto; }
-  .type-tab { font-size: 12px; padding: 8px 6px; gap: 4px; }
+  .type-tab { font-size: 12px; padding: 10px 6px; gap: 4px; min-height: 44px; }
   .card-preview { flex-direction: column; text-align: center; gap: 8px; }
   .form-row { flex-direction: column; gap: 0; }
   .sealed-result { flex-wrap: wrap; }
