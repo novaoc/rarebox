@@ -554,6 +554,7 @@ export const usePortfolioStore = defineStore('portfolio', () => {
 
     // Hoist dynamic import to avoid redundant module loading inside the loop
     const { multiSearch } = await import('../services/tcg/multiSearch.js')
+    const { enrichPokemonCard, getEnPriceMap } = await import('../services/tcg/enPrices.js')
 
     // Process all cards with concurrent workers (pokemontcg.io is the bottleneck,
     // averaging ~2s per request — sequential would be unusably slow)
@@ -580,7 +581,7 @@ export const usePortfolioStore = defineStore('portfolio', () => {
 
           async function pkmSearch(q) {
             if (!pkmCache.has(q)) {
-              const res = await fetch(`${PKM_BASE}?q=${encodeURIComponent(q)}&pageSize=5`)
+              const res = await fetch(`${PKM_BASE}?q=${encodeURIComponent(q)}&pageSize=5`, { signal: AbortSignal.timeout(15000) })
               pkmCache.set(q, res.ok ? (await res.json()).data || [] : [])
             }
             return pkmCache.get(q) || []
@@ -604,6 +605,10 @@ export const usePortfolioStore = defineStore('portfolio', () => {
           if (!match && candidates.length > 0) match = candidates[0]
 
           if (match) {
+            // me2pt5 and later sets return the tcgplayer URL only from
+            // pokemontcg.io — fill the missing price from the static
+            // fallback asset (strict no-op when live prices exist).
+            enrichPokemonCard(match, await getEnPriceMap())
             const updates = {
               cardId: match.id,
               _lang: null,
@@ -622,8 +627,10 @@ export const usePortfolioStore = defineStore('portfolio', () => {
                              match.tcgplayer.prices.normal ||
                              match.tcgplayer.prices['reverse holofoil'] ||
                              Object.values(match.tcgplayer.prices)[0]
-              if (prices?.market) updates.currentMarketPrice = prices.market
-              else if (prices?.mid) updates.currentMarketPrice = prices.mid
+              // $0 is a real market price — use finite checks, not truthiness.
+              const num = v => (typeof v === 'number' && Number.isFinite(v) ? v : null)
+              const mp = num(prices?.market) ?? num(prices?.mid)
+              if (mp != null) updates.currentMarketPrice = mp
             }
             updateItem(portfolioId, item.id, updates)
             resolved++

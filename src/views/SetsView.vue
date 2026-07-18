@@ -152,7 +152,7 @@
               <div class="card-name">{{ card.name }}</div>
               <div class="card-num text-muted" style="font-size:10px">#{{ card.number }}</div>
               <div class="card-price-row">
-                <span v-if="getPrice(card)" class="card-price">${{ getPrice(card).toFixed(2) }}</span>
+                <span v-if="getPrice(card) != null" class="card-price">${{ getPrice(card).toFixed(2) }}</span>
                 <span v-else class="text-muted" style="font-size:11px">—</span>
                 <span class="card-rarity badge badge-accent" v-if="card.rarity">{{ shortRarity(card.rarity) }}</span>
               </div>
@@ -531,10 +531,13 @@ function getPrice(card) {
   // For Japanese cards, price comes from detail fetch (CardMarket)
   if (card._lang === 'ja' && card.tcgplayer?.prices) {
     const vals = Object.values(card.tcgplayer.prices)[0]
-    return vals?.market || vals?.mid || null
+    const num = v => (typeof v === 'number' && Number.isFinite(v) ? v : null)
+    return num(vals?.market) ?? num(vals?.mid)
   }
   const r = getMarketPrice(card)
-  return r?.price || null
+  // Numeric only — $0 is real; never return a result object.
+  const p = typeof r === 'number' ? r : r?.price
+  return (typeof p === 'number' && Number.isFinite(p)) ? p : null
 }
 
 function shortRarity(rarity) {
@@ -599,13 +602,16 @@ async function openBulkAddModal() {
   // Build bulk card list with prices
   bulkAddCards.value = sortByNumber(allCards).map(card => {
     let price = 0
+    const num = v => (typeof v === 'number' && Number.isFinite(v) ? v : null)
     if (selectedSet.value._lang === 'ja') {
       // JP cards: use tcgplayer prices if available (from detail fetch)
       const vals = card.tcgplayer?.prices ? Object.values(card.tcgplayer.prices)[0] : null
-      price = vals?.market || vals?.mid || 0
+      price = num(vals?.market) ?? num(vals?.mid) ?? 0
     } else {
+      // Numeric only — never assign a getMarketPrice result object. $0 stays 0.
       const r = getMarketPrice(card)
-      price = r?.price || r || 0
+      const p = typeof r === 'number' ? r : r?.price
+      price = num(p) ?? 0
     }
     return {
       id: card.id,

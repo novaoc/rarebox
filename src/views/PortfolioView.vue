@@ -1019,8 +1019,8 @@ async function refreshPrices() {
       try {
         const card = await getCard(item.cardId, item._lang)
         const priceResult = getMarketPrice(card, item.priceVariant)
-        const price = priceResult?.price || priceResult
-        if (price) {
+        const price = priceResult?.price ?? priceResult
+        if (typeof price === 'number' && Number.isFinite(price)) {
           store.updateItem(portfolio.value.id, item.id, { currentMarketPrice: price, lastPriceUpdate: new Date().toISOString() })
           updated++
         }
@@ -1032,8 +1032,8 @@ async function refreshPrices() {
       try {
         const card = await getCard(item.cardId, item._lang)
         const priceResult = getMarketPrice(card, item.priceVariant)
-        const price = priceResult?.price || priceResult
-        if (price) {
+        const price = priceResult?.price ?? priceResult
+        if (typeof price === 'number' && Number.isFinite(price)) {
           store.updateItem(portfolio.value.id, item.id, { currentMarketPrice: price, lastPriceUpdate: new Date().toISOString() })
           updated++
         }

@@ -69,7 +69,10 @@ export const useDeckStore = defineStore('decks', () => {
       const rawSet = card.set
       const setName = typeof rawSet === 'object' ? (rawSet?.name || '') : (rawSet || '')
       const setCode = typeof rawSet === 'object' ? (rawSet?.id || '') : ''
-      const price = card.price != null ? card.price : (getMarketPrice(card)?.price || null)
+      // $0 is a real market price — never collapse with || null
+      const raw = card.price != null ? card.price : getMarketPrice(card)
+      const p = typeof raw === 'number' ? raw : raw?.price
+      const price = (typeof p === 'number' && Number.isFinite(p)) ? p : null
       const image = card.image || card.images?.small || ''
       const game = card.game || deck.game || 'pokemon'
 
