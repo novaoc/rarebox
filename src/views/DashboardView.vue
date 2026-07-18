@@ -190,6 +190,39 @@
         </div>
       </div>
 
+      <!-- New Releases (Pokémon sets — the only sets feed wired up so far) -->
+      <div class="section-header">
+        <div class="section-title">New Releases <span class="release-scope">Pokémon</span></div>
+        <router-link to="/sets" class="btn btn-ghost btn-sm">View All Sets →</router-link>
+      </div>
+      <div class="new-releases-row mb-4">
+        <div v-if="loadingReleases" class="releases-loading">
+          <div class="spinner spinner-sm"></div>
+          <span>Loading new releases…</span>
+        </div>
+        <div v-else class="releases-grid">
+          <router-link
+            v-for="set in latestSets"
+            :key="set.id"
+            :to="'/sets/pokemon?set=' + set.id"
+            class="release-card"
+          >
+            <div class="release-logo-wrap">
+              <img v-if="set.images?.logo" :src="set.images.logo" :alt="set.name" class="release-logo" />
+              <span v-else class="release-placeholder">⬡</span>
+            </div>
+            <div class="release-info">
+              <div class="release-name">{{ set.name }}</div>
+              <div class="release-meta">
+                <span>{{ set.total }} cards</span>
+                <span class="release-dot">·</span>
+                <span>{{ formatReleaseDate(set.releaseDate) }}</span>
+              </div>
+            </div>
+          </router-link>
+        </div>
+      </div>
+
       <!-- Combined portfolio chart -->
       <div class="card mb-4">
         <div class="section-header">
@@ -263,7 +296,7 @@
 <script setup>
 import { computed, onMounted, onActivated, ref } from 'vue'
 import { usePortfolioStore } from '../stores/portfolio'
-import { getCard, getMarketPrice } from '../services/pokemonApi'
+import { getCard, getMarketPrice, getSets } from '../services/pokemonApi'
 import { getPrice as getTcgPrice } from '../services/priceFeedService'
 import { checkAlerts, notifyTriggered } from '../utils/alerts'
 // Online failures hide the card; offline failures are handled globally by
@@ -276,6 +309,30 @@ import RbIcon from '../components/icons/RbIcon.vue'
 
 const store = usePortfolioStore()
 const featuresRef = ref(null)
+
+// New Releases — latest Pokémon sets (getSets is newest-first and localStorage-cached)
+const latestSets = ref([])
+const loadingReleases = ref(false)
+
+function formatReleaseDate(dateStr) {
+  if (!dateStr) return ''
+  const [y, m] = dateStr.split('/')
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+  const label = months[parseInt(m, 10) - 1]
+  return label ? `${label} ${y}` : dateStr
+}
+
+async function loadLatestReleases() {
+  loadingReleases.value = true
+  try {
+    const sets = await getSets()
+    latestSets.value = sets.slice(0, 4)
+  } catch (e) {
+    console.warn('Failed to load latest releases:', e.message)
+  } finally {
+    loadingReleases.value = false
+  }
+}
 
 // New user = every portfolio has 0 items (store auto-creates one empty portfolio on init)
 const isNewUser = computed(() => {
@@ -408,6 +465,7 @@ function getPortfolioGainPct(portfolio) {
 // of these loops (each is minutes of sequential fetches on a big shelf).
 let _refreshRunning = false
 onMounted(async () => {
+  loadLatestReleases()
   if (_refreshRunning) return
   _refreshRunning = true
   try {
@@ -492,6 +550,93 @@ async function refreshAllPrices() {
 
 <style scoped>
 .dashboard { max-width: 1200px; margin: 0 auto; }
+
+/* ── New Releases ── */
+.new-releases-row {
+  min-height: 80px;
+}
+.releases-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  height: 80px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  color: var(--text-muted);
+  font-size: 13px;
+}
+.release-scope {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 1px 8px;
+  margin-left: 8px;
+  vertical-align: middle;
+}
+.releases-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
+}
+.release-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  text-decoration: none;
+  color: inherit;
+  transition: all 0.2s;
+}
+.release-card:hover {
+  border-color: var(--accent);
+  transform: translateY(-1px);
+  background: var(--bg-secondary);
+}
+.release-logo-wrap {
+  width: 60px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.release-logo {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+.release-placeholder {
+  font-size: 20px;
+  color: var(--text-muted);
+}
+.release-info {
+  flex: 1;
+  min-width: 0;
+}
+.release-name {
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.release-meta {
+  font-size: 11px;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 2px;
+}
+.release-dot {
+  opacity: 0.5;
+}
 
 /* ── Landing Page ── */
 .landing {
