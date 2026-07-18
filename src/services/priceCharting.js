@@ -6,6 +6,7 @@ const PC_API = 'https://www.pricecharting.com/api'
 const KEY_STORAGE = 'pc_api_key'
 const CACHE_PREFIX = 'pc_cache_'
 const CACHE_TTL = 1000 * 60 * 60 * 4 // 4 hours
+const FETCH_TIMEOUT = 10000 // 10s timeout
 
 export function getPCApiKey() {
   return localStorage.getItem(KEY_STORAGE) || ''
@@ -43,9 +44,9 @@ export async function searchPCProducts(query) {
   const url = `${PC_API}/products?q=${encodeURIComponent(q)}&t=${key}`
   let res
   try {
-    res = await fetch(url)
+    res = await fetch(url, { signal: AbortSignal.timeout(FETCH_TIMEOUT) })
   } catch (e) {
-    throw new Error('cors') // likely CORS or network error
+    throw new Error('cors') // likely CORS, network error, or timeout
   }
 
   if (res.status === 401 || res.status === 403) throw new Error('bad_key')
@@ -66,7 +67,14 @@ export async function getPCProduct(id) {
   if (cached) return cached
 
   const url = `${PC_API}/product?id=${id}&t=${key}`
-  const res = await fetch(url)
+  let res
+  try {
+    res = await fetch(url, { signal: AbortSignal.timeout(FETCH_TIMEOUT) })
+  } catch (e) {
+    throw new Error('cors') // likely CORS, network error, or timeout
+  }
+
+  if (res.status === 401 || res.status === 403) throw new Error('bad_key')
   if (!res.ok) throw new Error(`api_${res.status}`)
 
   const data = await res.json()
@@ -74,10 +82,13 @@ export async function getPCProduct(id) {
   return data
 }
 
-// Extract the most relevant price from a product based on item type.
-// itemType: 'sealed' | 'graded' | 'card'
-// grade: e.g. '10', '9.5', '9' (only used for graded)
-// Returns price in dollars, or null.
+/**
+ * Extract the most relevant price from a product based on item type.
+ * @param {Object} product - Product data from PriceCharting
+ * @param {'sealed' | 'graded' | 'card'} itemType - The context of the item being priced
+ * @param {string|number} [grade] - Numeric grade for graded cards (e.g. 10, 9.5)
+ * @returns {number|null} Price in dollars, or null if unavailable.
+ */
 export function extractPrice(product, itemType, grade = null) {
   if (!product) return null
   const toDollars = v => (v && v > 0) ? Math.round(v) / 100 : null

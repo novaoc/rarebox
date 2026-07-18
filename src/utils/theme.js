@@ -39,6 +39,10 @@ export function isDark() {
   return document.documentElement.dataset.theme === 'dark'
 }
 
+export function isLight() {
+  return document.documentElement.dataset.theme === 'light'
+}
+
 // keep "system" users in sync with the OS
 window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
   if (getThemePref() === 'system') applyTheme('system')
