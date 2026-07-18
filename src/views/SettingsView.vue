@@ -241,8 +241,9 @@
         <button class="btn btn-ghost btn-icon btn-sm" @click="removeAlertById(alert.id)" style="color:var(--danger)">✕</button>
       </div>
 
-      <div v-if="triggeredCount > 0" class="settings-item" style="border-bottom:none">
-        <button class="btn btn-secondary btn-sm" @click="doClearTriggered">Clear {{ triggeredCount }} triggered</button>
+      <div v-if="allAlerts.length > 0" class="settings-item" style="border-bottom:none; gap:12px">
+        <button v-if="triggeredCount > 0" class="btn btn-secondary btn-sm" @click="doClearTriggered">Clear {{ triggeredCount }} triggered</button>
+        <button class="btn btn-ghost btn-sm" @click="doClearAllAlerts" style="color:var(--danger)">Clear All Alerts</button>
       </div>
     </div>
 
@@ -398,6 +399,11 @@ const triggeredCount = computed(() => getTriggeredAlerts().length)
 
 function removeAlertById(id) { removeAlert(id) }
 function doClearTriggered() { clearTriggeredAlerts() }
+function doClearAllAlerts() {
+  if (confirm('Are you sure you want to delete all price alerts?')) {
+    clearAllAlerts()
+  }
+}
 
 function saveUiPrefs() {
   localStorage.setItem('hide_load_indicator', hideLoader.value.toString())

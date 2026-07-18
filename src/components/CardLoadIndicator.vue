@@ -121,11 +121,8 @@ const speedLabel = computed(() => {
 const timeLeft = computed(() => {
   if (isDone.value) return 'Done'
   if (overallPct.value >= 95) return 'Almost done'
-  if (!startTime.value || overallPct.value <= 0) return 'Starting…'
-  const elapsed = (Date.now() - startTime.value) / 1000
-  const pctPerSec = overallPct.value / elapsed
-  if (pctPerSec <= 0) return 'Starting…'
-  const remaining = (100 - overallPct.value) / pctPerSec
+  if (speed.value <= 0) return 'Starting…'
+  const remaining = (100 - overallPct.value) / speed.value
   if (remaining <= 1) return 'Almost done'
   if (remaining < 60) return `~${Math.round(remaining)}s`
   return `~${Math.round(remaining / 60)}m`
