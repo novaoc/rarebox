@@ -65,11 +65,11 @@
                 <td style="font-size:11px;color:var(--text-muted)">{{ r.card?.set?.name }}</td>
                 <td class="font-mono">{{ r.qty }}</td>
                 <td class="font-mono">
-                  <span v-if="r.price" class="text-accent">${{ r.price.toFixed(2) }}</span>
+                  <span v-if="r.price != null" class="text-accent">${{ r.price.toFixed(2) }}</span>
                   <span v-else class="text-muted">—</span>
                 </td>
                 <td class="font-mono">
-                  <span v-if="r.price">${{ (r.price * r.qty).toFixed(2) }}</span>
+                  <span v-if="r.price != null">${{ (r.price * r.qty).toFixed(2) }}</span>
                   <span v-else class="text-muted">—</span>
                 </td>
                 <td>
@@ -142,6 +142,7 @@
 import { ref, computed, nextTick, onMounted } from 'vue'
 import { usePortfolioStore } from '../stores/portfolio'
 import { getMarketPrice } from '../services/pokemonApi'
+import { getEnPriceMap, enrichPokemonCard } from '../services/tcg/enPrices'
 
 const props = defineProps({
   portfolioId: { type: String, required: true }
@@ -168,7 +169,7 @@ const progressPct = computed(() =>
 const activeResolved = computed(() => resolved.value.filter(r => !r.excluded))
 
 const totalValue = computed(() =>
-  activeResolved.value.reduce((s, r) => s + (r.price || 0) * r.qty, 0)
+  activeResolved.value.reduce((s, r) => s + (r.price ?? 0) * r.qty, 0)
 )
 
 onMounted(() => nextTick(() => textareaRef.value?.focus()))
@@ -230,10 +231,14 @@ async function lookupCard(entry) {
   if (cache.has(q)) return cache.get(q)
 
   try {
-    const res = await fetch(`${BASE}?q=${encodeURIComponent(q)}&pageSize=1`)
+    const res = await fetch(`${BASE}?q=${encodeURIComponent(q)}&pageSize=1`, { signal: AbortSignal.timeout(15000) })
     if (!res.ok) return null
     const data = await res.json()
     const card = data.data?.[0] || null
+    // me2pt5+ cards arrive URL-only — fill from the shared EN fallback
+    // BEFORE caching so getMarketPrice (and the import) sees the price.
+    // Strict no-op for live-priced cards and other games' lookups.
+    if (card) enrichPokemonCard(card, await getEnPriceMap())
     cache.set(q, card)
     return card
   } catch {
@@ -279,7 +284,7 @@ async function startLookup() {
         qty: entry.qty,
         rawName: entry.name,
         card,
-        price: priceResult?.price || null,
+        price: priceResult?.price ?? null,
         variant: priceResult?.variant || null,
         excluded: false,
       })
@@ -307,7 +312,9 @@ function doImport() {
   let added = 0
 
   for (const r of activeResolved.value) {
-    const purchasePrice = priceMode.value === 'market' ? (r.price || 0) : 0
+    // $0 market is real — never collapse with || to 0/null incorrectly
+    const market = (typeof r.price === 'number' && Number.isFinite(r.price)) ? r.price : null
+    const purchasePrice = priceMode.value === 'market' ? (market ?? 0) : 0
 
     store.addItem(props.portfolioId, {
       type: 'card',
@@ -316,7 +323,7 @@ function doImport() {
       cardData: r.card,
       quantity: r.qty,
       purchasePrice,
-      currentMarketPrice: r.price || null,
+      currentMarketPrice: market,
       priceVariant: r.variant || null,
       purchaseDate: today,
     })

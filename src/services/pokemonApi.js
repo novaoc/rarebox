@@ -1,4 +1,5 @@
-import db from '../db'
+import db from '../db.js'
+import { getEnPriceMap, enrichPokemonCard, hasLivePrices } from './tcg/enPrices.js'
 const BASE_URL = 'https://api.pokemontcg.io/v2'
 
 const cache = new Map()
@@ -83,6 +84,7 @@ export async function searchCards(query, page = 1, pageSize = 20) {
   const encoded = encodeURIComponent(term)
   const url = `${BASE_URL}/cards?q=name:${encoded}*&page=${page}&pageSize=${pageSize}&orderBy=-set.releaseDate&select=id,name,number,set,supertype,rarity,tcgplayer,images`
   const data = await fetchWithCache(url, { durable: false })
+  await enrichEnCards(data?.data)
   return data
 }
 
@@ -93,6 +95,7 @@ export async function getCard(id, lang = null) {
   }
   const url = `${BASE_URL}/cards/${id}`
   const data = await fetchWithCache(url)
+  await enrichEnCards([data.data])
   return data.data
 }
 
@@ -127,27 +130,45 @@ export async function getCardsBySet(setId, page = 1, pageSize = 36) {
   // collector number, so display order is unchanged.
   const url = `${BASE_URL}/cards?q=set.id:${setId}&page=${page}&pageSize=${pageSize}&orderBy=id&select=id,name,number,set,supertype,rarity,tcgplayer,images`
   const data = await fetchWithCache(url)
+  await enrichEnCards(data?.data)
   return data
 }
 
-// Extract the best available market price from a card's TCGPlayer data
+// Fill missing live prices from the CI-built static TCGplayer fallback
+// (/en-prices.json — scripts/build_en_prices.py). Since Ascended Heroes
+// (me2pt5) pokemontcg.io returns the tcgplayer URL only for new sets; older
+// sets still carry live prices, which always win — enrichment is a strict
+// no-op when tcgplayer.prices has usable data (see services/tcg/enPrices.js).
+async function enrichEnCards(cards) {
+  if (!Array.isArray(cards) || cards.length === 0) return
+  if (cards.every(c => hasLivePrices(c?.tcgplayer))) return
+  const priceMap = await getEnPriceMap()
+  for (const c of cards) enrichPokemonCard(c, priceMap)
+}
+
+// Extract the best available market price from a card's TCGPlayer data.
+// $0 is a real price and survives; only null/undefined/non-finite is unknown.
 export function getMarketPrice(card, variantKey = null) {
   const prices = card?.tcgplayer?.prices
   if (!prices) return null
+  const num = v => (typeof v === 'number' && Number.isFinite(v) ? v : null)
 
   if (variantKey && prices[variantKey]) {
-    return prices[variantKey].market || prices[variantKey].mid || null
+    return num(prices[variantKey].market) ?? num(prices[variantKey].mid)
   }
 
-  // Priority order
+  // Priority order. market ?? mid per variant so mid-only live data (which
+  // hasLivePrices accepts) still resolves — matches the variantKey branch.
   const priority = ['holofoil', '1stEditionHolofoil', 'unlimitedHolofoil', 'reverseHolofoil', 'normal', '1stEditionNormal']
   for (const key of priority) {
-    if (prices[key]?.market) return { price: prices[key].market, variant: key }
+    const p = num(prices[key]?.market) ?? num(prices[key]?.mid)
+    if (p != null) return { price: p, variant: key }
   }
 
   // fallback: first available
   for (const key of Object.keys(prices)) {
-    if (prices[key]?.market) return { price: prices[key].market, variant: key }
+    const p = num(prices[key]?.market) ?? num(prices[key]?.mid)
+    if (p != null) return { price: p, variant: key }
   }
   return null
 }

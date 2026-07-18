@@ -8,6 +8,7 @@
 
 import { searchCache, isGameCached } from './cardCache.js'
 import { getProvider, getOpPriceMap, opPriceFor, opVariantSlug, getYgoPriceMap, ygoPriceFor } from './providers.js'
+import { getEnPriceMap, enrichPokemonCard, hasLivePrices } from './enPrices.js'
 import { tokenMatch } from '../../utils/search.js'
 
 const TIMEOUT = 8000
@@ -28,12 +29,25 @@ function num(v) {
 }
 
 // ── Pokémon ─────────────────────────────────────────────────────────────────
+// Live pokemontcg.io results, with missing tcgplayer.prices (me2pt5 and later
+// sets) filled from the static TCGplayer fallback asset — live prices always
+// win, so old sets are untouched. Keeps `_raw` enriched for the synchronous
+// getMarketPrice consumers (AddItemModal, SearchView, deck import).
+async function enrichPokemonResults(raw) {
+  if (!Array.isArray(raw) || raw.length === 0) return raw
+  if (raw.every(c => hasLivePrices(c?.tcgplayer))) return raw
+  const priceMap = await getEnPriceMap()
+  for (const c of raw) enrichPokemonCard(c, priceMap)
+  return raw
+}
+
 async function searchPokemon(query, page, pageSize) {
   const term = query.replace(/\s+/g, '*')
   const url = `https://api.pokemontcg.io/v2/cards?q=name:${encodeURIComponent(term)}*&page=${page}&pageSize=${pageSize}&orderBy=-set.releaseDate&select=id,name,number,set,supertype,rarity,tcgplayer,images`
   const d = await fetchJson(url)
+  const raw = await enrichPokemonResults(d.data || [])
   return {
-    cards: (d.data || []).map(c => ({
+    cards: raw.map(c => ({
       id: c.id,
       name: c.name,
       number: c.number || '',
@@ -48,15 +62,23 @@ async function searchPokemon(query, page, pageSize) {
   }
 }
 
-function extractPokemonPrice(card) {
+// Canonical priority extraction for the normalized row's `price` — mirrors
+// getMarketPrice's variant order (incl. 1stEditionNormal), market ?? mid per
+// variant so mid-only live data resolves, then first finite odd-key fallback.
+// num() keeps $0 (a real price); unknown stays null. Exported for harness evals.
+export function extractPokemonPrice(card) {
   const prices = card?.tcgplayer?.prices
   if (!prices) return null
-  const variants = ['holofoil', '1stEditionHolofoil', 'unlimitedHolofoil', 'reverseHolofoil', 'normal']
+  const variants = ['holofoil', '1stEditionHolofoil', 'unlimitedHolofoil', 'reverseHolofoil', 'normal', '1stEditionNormal']
   for (const v of variants) {
-    if (prices[v]?.market) return prices[v].market
+    const p = num(prices[v]?.market) ?? num(prices[v]?.mid)
+    if (p != null) return p
   }
-  const first = Object.values(prices)[0]
-  return first?.market || first?.mid || null
+  for (const key of Object.keys(prices)) {
+    const p = num(prices[key]?.market) ?? num(prices[key]?.mid)
+    if (p != null) return p
+  }
+  return null
 }
 
 // ── MTG: Scryfall ───────────────────────────────────────────────────────────
@@ -414,6 +436,7 @@ async function resolvePokemonCard(cardId) {
   const url = `https://api.pokemontcg.io/v2/cards/${encodeURIComponent(cardId)}`
   const d = await fetchJson(url)
   if (!d.data) return null
+  await enrichPokemonResults([d.data])
   return {
     id: d.data.id,
     name: d.data.name,

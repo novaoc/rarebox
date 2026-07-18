@@ -245,7 +245,8 @@ function clearSearch() {
 function getPrice(card) {
   if (card.price != null) return card.price
   const r = getMarketPrice(card)
-  return r?.price || null
+  const p = typeof r === 'number' ? r : r?.price
+  return (typeof p === 'number' && Number.isFinite(p)) ? p : null
 }
 
 function addCard(card) {

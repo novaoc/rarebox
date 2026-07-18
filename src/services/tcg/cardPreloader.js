@@ -10,6 +10,7 @@
 
 import { saveGameCards, isCacheFresh, getGameCards } from './cardCache.js'
 import { getOpPriceMap, opPriceFor, opVariantSlug, getYgoPriceMap, ygoPriceFor } from './providers.js'
+import { getEnPriceAsset, getEnPriceMap, enPriceForCardId } from './enPrices.js'
 import { getProvider } from './providers.js'
 
 const BULK_TIMEOUT = 300_000   // 5 min for large downloads
@@ -66,13 +67,78 @@ async function fetchWithRetry(fn, retries = 2, onProgress = () => {}) {
 
 const PKM_BULK = 'https://cdn.jsdelivr.net/gh/PokemonTCG/pokemon-tcg-data@master'
 
-function pickPokemonPrice(tcgplayer) {
+// Mirrors getMarketPrice priority/fallback: market ?? mid per variant so
+// mid-only live data (accepted by hasLivePrices) resolves; $0 survives via
+// num()+??. Includes 1stEditionNormal and first finite odd-key fallback.
+// Exported for the harness evals.
+export function pickPokemonPrice(tcgplayer) {
   const prices = tcgplayer?.prices || {}
-  return num(
-    prices.holofoil?.market || prices['1stEditionHolofoil']?.market ||
-    prices.unlimitedHolofoil?.market || prices.reverseHolofoil?.market ||
-    prices.normal?.market
-  )
+  const variants = ['holofoil', '1stEditionHolofoil', 'unlimitedHolofoil', 'reverseHolofoil', 'normal', '1stEditionNormal']
+  for (const v of variants) {
+    const p = num(prices[v]?.market) ?? num(prices[v]?.mid)
+    if (p != null) return p
+  }
+  // fallback: first available finite market/mid on any odd key
+  for (const key of Object.keys(prices)) {
+    const p = num(prices[key]?.market) ?? num(prices[key]?.mid)
+    if (p != null) return p
+  }
+  return null
+}
+
+// Static TCGplayer fallback (public/en-prices.json, CI-built — see
+// services/tcg/enPrices.js): pokemontcg.io omits tcgplayer.prices for
+// me2pt5 and later sets, so the live price pass leaves those cards
+// priceless forever. Fill ONLY still-null prices — live data (including a
+// live $0) stays authoritative — so cached search/browse gets real market
+// prices. priceMap is injectable for tests. Exported for the harness evals.
+export async function applyEnFallbackPrices(allCards, priceMap = null) {
+  if (priceMap == null) {
+    try { priceMap = await getEnPriceMap() } catch { return 0 }
+  }
+  let filled = 0
+  for (const card of allCards) {
+    if (card.price != null) continue // live-priced already — never overwrite
+    const p = enPriceForCardId(priceMap, card.id)
+    if (p != null) { card.price = p; filled++ }
+  }
+  return filled
+}
+
+// Fill-only EN fallback for ALREADY-cached Pokémon rows, gated on the
+// fallback ASSET's stamp (rarebox_en_price_fill) — deliberately separate
+// from the rarebox_tcgp_price_merge daily stamp, which an older build may
+// already have set today, and from the >30% live-resume threshold below.
+// Either would strand priceless me2pt5+ rows until the next cache rebuild.
+// The asset stamp re-runs the fill when CI ships a new map (e.g. a new
+// set's mapping lands); a failed/empty asset load is NOT stamped, so the
+// next launch retries.
+const EN_FILL_KEY = 'rarebox_en_price_fill'
+let _enFillPromise = null
+function fillPokemonEnFallbackPrices(rows = null) {
+  if (_enFillPromise) return _enFillPromise
+  _enFillPromise = (async () => {
+    try {
+      const asset = await getEnPriceAsset()
+      const prices = asset?.prices || {}
+      if (!asset?.stamp || Object.keys(prices).length === 0) return 0 // failed/empty — retry next launch
+      if (localStorage.getItem(EN_FILL_KEY) === asset.stamp) return 0
+      const pkmRows = rows ?? await getGameCards('pokemon')
+      if (!pkmRows.length) return 0
+      let changed = 0
+      for (const r of pkmRows) {
+        if (r.price != null) continue // live-derived price stays authoritative
+        const next = enPriceForCardId(prices, r.id)
+        if (next != null) { r.price = next; changed++ }
+      }
+      if (changed) await saveGameCards('pokemon', pkmRows)
+      localStorage.setItem(EN_FILL_KEY, asset.stamp)
+      return changed
+    } finally {
+      _enFillPromise = null
+    }
+  })()
+  return _enFillPromise
 }
 
 /** Run `fn(item)` over items with a fixed concurrency. Failures are skipped. */
@@ -144,7 +210,9 @@ async function fetchPokemonPrices(allCards, onProgress) {
     }
   })
 
-  return applyPrices()
+  const priced = applyPrices()
+  const filled = await applyEnFallbackPrices(allCards)
+  return priced + filled
 }
 
 // If the cached Pokémon DB is fresh but mostly priceless (the user closed the
@@ -156,6 +224,10 @@ async function resumePokemonPricesIfNeeded() {
   try {
     const rows = await getGameCards('pokemon')
     if (rows.length === 0) return
+    // Cheap fill-only EN fallback FIRST — the >30% live-resume threshold
+    // must not strand rows the static asset already covers (asset-stamp
+    // gated inside; a no-op once today's asset has been applied).
+    await fillPokemonEnFallbackPrices(rows)
     const priced = rows.filter(c => c.price != null).length
     if (priced / rows.length >= 0.3) return
     const cards = rows.map(({ game, cachedAt, cid, ...c }) => c)
@@ -235,6 +307,7 @@ async function fetchPokemonPaginated(onProgress) {
   }
 
   if (allCards.length === 0) throw new Error('No cards fetched')
+  await applyEnFallbackPrices(allCards)
   await saveGameCards('pokemon', allCards)
   return allCards.length
 }
@@ -358,12 +431,16 @@ async function fetchOnePiece(onProgress) {
 }
 
 /** Daily price refresh for ALREADY-downloaded card caches — the cards don't
- *  change, the market does. TCGplayer-asset games only; stamp-gated. */
+ *  change, the market does. TCGplayer-asset games only; stamp-gated.
+ *  (Named for its first game; also merges Yu-Gi-Oh!. Priceless EN Pokémon
+ *  rows are handled by fillPokemonEnFallbackPrices above — fill-only, gated
+ *  on the fallback asset's own stamp so it runs promptly after deploy even
+ *  when today's tcgp merge stamp is already set.) */
 export async function refreshOnePiecePrices() {
+  try { await fillPokemonEnFallbackPrices() } catch { /* best effort */ }
   try {
     const today = new Date().toISOString().slice(0, 10)
     if (localStorage.getItem('rarebox_tcgp_price_merge') === today) return
-    let touched = false
 
     const opRows = await getGameCards('one-piece')
     if (opRows.length) {
@@ -374,7 +451,6 @@ export async function refreshOnePiecePrices() {
         if (next != null && next !== r.price) { r.price = next; changed++ }
       }
       if (changed) await saveGameCards('one-piece', opRows)
-      touched = true
     }
 
     const ygoRows = await getGameCards('yugioh')
@@ -386,10 +462,11 @@ export async function refreshOnePiecePrices() {
         if (next != null && next !== r.price) { r.price = next; changed++ }
       }
       if (changed) await saveGameCards('yugioh', ygoRows)
-      touched = true
     }
 
-    if (touched || true) localStorage.setItem('rarebox_tcgp_price_merge', today)
+    // Stamp a COMPLETED merge pass (changed or not) so it runs once a day;
+    // an exception above skips the stamp and the next launch retries.
+    localStorage.setItem('rarebox_tcgp_price_merge', today)
   } catch { /* best effort — browse/search overrides still apply */ }
 }
 

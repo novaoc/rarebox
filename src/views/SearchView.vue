@@ -80,7 +80,7 @@
               {{ card.set }}
             </div>
             <div class="card-price-row">
-              <span v-if="getPrice(card)" class="card-price">${{ getPrice(card)?.toFixed(2) }}</span>
+              <span v-if="getPrice(card) != null" class="card-price">${{ getPrice(card)?.toFixed(2) }}</span>
               <span v-else class="text-muted" style="font-size:11px">No price</span>
               <span class="card-rarity badge badge-accent" v-if="card.rarity">{{ shortRarity(card.rarity) }}</span>
             </div>
@@ -357,12 +357,13 @@ function openAddModal(card) {
 const addingTcgCard = ref(null)
 
 function getPrice(card) {
-  // Multi-TCG cards have price pre-extracted
+  // Multi-TCG cards have price pre-extracted ($0 is real)
   if (card.price != null) return card.price
   // Pokémon cards from old flow use getMarketPrice on _raw
   if (card._raw) {
     const r = getMarketPrice(card._raw)
-    return r?.price || null
+    const p = typeof r === 'number' ? r : r?.price
+    return (typeof p === 'number' && Number.isFinite(p)) ? p : null
   }
   return null
 }

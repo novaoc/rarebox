@@ -30,7 +30,12 @@ export async function fetchSetCards({ game, setId, setName, lang }) {
       rarity: c.rarity,
       supertype: c.supertype,
       set: { id: c.set?.id || setId, name: c.set?.name || setName },
-      price: (() => { const r = getMarketPrice(c); return r?.price || r || 0 })(),
+      // Numeric only — never persist a getMarketPrice result object. $0 stays 0.
+      price: (() => {
+        const r = getMarketPrice(c)
+        const p = typeof r === 'number' ? r : r?.price
+        return (typeof p === 'number' && Number.isFinite(p)) ? p : 0
+      })(),
       _lang: lang === 'ja' ? 'ja' : null,
       game: 'pokemon',
     }))
@@ -43,7 +48,7 @@ export async function fetchSetCards({ game, setId, setName, lang }) {
     images: { small: c.image },
     rarity: c.rarity,
     set: { id: setId, name: setName },
-    price: c.price || 0,
+    price: (typeof c.price === 'number' && Number.isFinite(c.price)) ? c.price : 0,
     _lang: null,
     game,
   }))

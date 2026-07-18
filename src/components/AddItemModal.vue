@@ -34,7 +34,7 @@
           <div class="card-preview-info">
             <div class="card-preview-name">{{ card.name }}</div>
             <div class="card-preview-set">{{ card.set?.name }} · #{{ card.number }}</div>
-            <div class="card-preview-price" v-if="currentPrice">
+            <div class="card-preview-price" v-if="currentPrice != null">
               Market: <span class="text-accent font-bold">${{ currentPrice.toFixed(2) }}</span>
             </div>
           </div>
@@ -375,12 +375,15 @@ const variants = computed(() => {
 
 const currentPrice = computed(() => {
   if (!props.card) return null
+  const num = v => (typeof v === 'number' && Number.isFinite(v) ? v : null)
   if (form.value.priceVariant) {
     const v = variants.value.find(v => v.key === form.value.priceVariant)
-    return v?.market || null
+    // market ?? mid so mid-only variants still show; $0 market wins over mid
+    return num(v?.market) ?? num(v?.mid)
   }
   const result = getMarketPrice(props.card)
-  return result?.price || null
+  // Default path returns {price,variant}; never collapse $0 with ||
+  return num(result?.price) ?? (typeof result === 'number' ? num(result) : null)
 })
 
 const canSubmit = computed(() => {

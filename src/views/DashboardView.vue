@@ -390,11 +390,11 @@ async function refreshShowcasePrice(card) {
   if (!l) return
   try {
     if (l.t === 'ptcg') {
-      const r = await fetch(`https://api.pokemontcg.io/v2/cards/${l.id}?select=tcgplayer`)
-      const ps = (await r.json())?.data?.tcgplayer?.prices || {}
-      for (const v of ['holofoil', '1stEditionHolofoil', 'unlimitedHolofoil', 'reverseHolofoil', 'normal']) {
-        if (ps[v]?.market) { card.price = ps[v].market; return }
-      }
+      // Shared enriched getCard: me2pt5+ sets come back URL-only from the
+      // live API and get filled from the static fallback inside getCard.
+      const fetched = await getCard(l.id)
+      const p = getMarketPrice(fetched)?.price
+      if (typeof p === 'number' && Number.isFinite(p)) card.price = p
     } else if (l.t === 'scry') {
       const r = await fetch(`https://api.scryfall.com/cards/${l.id}`)
       const d = await r.json()
@@ -494,8 +494,8 @@ async function refreshAllPrices() {
     try {
       const card = await getCard(item.cardId, item._lang)
       const result = getMarketPrice(card, item.priceVariant)
-      const price = result?.price || result
-      if (price) store.updateItem(item.portfolioId, item.id, { currentMarketPrice: price, lastPriceUpdate: new Date().toISOString() })
+      const price = result?.price ?? result
+      if (typeof price === 'number' && Number.isFinite(price)) store.updateItem(item.portfolioId, item.id, { currentMarketPrice: price, lastPriceUpdate: new Date().toISOString() })
     } catch (e) {
       console.warn(`Failed to refresh EN card ${item.cardId}:`, e.message)
     }
@@ -508,8 +508,8 @@ async function refreshAllPrices() {
     try {
       const card = await getCard(item.cardId, item._lang)
       const result = getMarketPrice(card, item.priceVariant)
-      const price = result?.price || result
-      if (price) store.updateItem(item.portfolioId, item.id, { currentMarketPrice: price, lastPriceUpdate: new Date().toISOString() })
+      const price = result?.price ?? result
+      if (typeof price === 'number' && Number.isFinite(price)) store.updateItem(item.portfolioId, item.id, { currentMarketPrice: price, lastPriceUpdate: new Date().toISOString() })
     } catch (e) {
       console.warn(`Failed to refresh JP card ${item.cardId}:`, e.message)
     }

@@ -21,7 +21,8 @@
 import { multiSearch } from '../services/tcg/multiSearch'
 import { searchSealed } from '../services/sealedIndex'
 import { searchJapanese } from '../services/jpSearch'
-import { getSets as getPokemonSets, getJapaneseSets, JP_EN_NAMES } from '../services/pokemonApi'
+import { getSets as getPokemonSets, getJapaneseSets, JP_EN_NAMES, getMarketPrice } from '../services/pokemonApi'
+import { getEnPriceMap, enrichPokemonCard, hasLivePrices } from '../services/tcg/enPrices'
 import { getProvider } from '../services/tcg/providers'
 
 const LANG_JA = /^(jp|jpn|jap|japanese)$/i
@@ -393,13 +394,22 @@ async function searchPokemonInSets(text, setIds, pageSize, number = null) {
   const res = await fetch(url, { signal: AbortSignal.timeout(8000) })
   if (!res.ok) throw new Error(`http_${res.status}`)
   const d = await res.json()
-  return (d.data || []).map(c => ({
+  const raw = d.data || []
+  // Shared EN fallback (services/tcg/enPrices.js): exact new-set/code/number
+  // searches hit me2pt5+ cards that arrive URL-only — fill from the static
+  // asset (a strict no-op for live-priced cards), then read the price
+  // through getMarketPrice's canonical priority. No fuzzy price matching.
+  if (raw.length && !raw.every(c => hasLivePrices(c?.tcgplayer))) {
+    const priceMap = await getEnPriceMap()
+    for (const c of raw) enrichPokemonCard(c, priceMap)
+  }
+  return raw.map(c => ({
     id: c.id,
     name: c.name,
     number: c.number || '',
     set: c.set?.name || '',
     image: c.images?.small || '',
-    price: (() => { const p = c.tcgplayer?.prices; if (!p) return null; for (const k of ['holofoil', 'normal', 'reverseHolofoil']) if (p[k]?.market) return p[k].market; const f = Object.values(p)[0]; return f?.market || f?.mid || null })(),
+    price: getMarketPrice(c)?.price ?? null,
     rarity: c.rarity || '',
     game: 'pokemon',
   }))

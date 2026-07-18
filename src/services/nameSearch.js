@@ -10,6 +10,8 @@
 // else returned zero cards.
 
 import { tokenMatch } from '../utils/search.js'
+import { getMarketPrice } from './pokemonApi.js'
+import { getEnPriceMap, enrichPokemonCard, hasLivePrices } from './tcg/enPrices.js'
 
 let _index = null
 let _loading = null
@@ -73,13 +75,18 @@ export async function hydratePokemonRescues(rescues) {
       { signal: AbortSignal.timeout(6000) })
     if (!res.ok) return rescues
     const d = await res.json()
-    const byId = new Map((d.data || []).map(c => [c.id, c]))
+    const rows = d.data || []
+    // Shared EN fallback: me2pt5+ rescues hydrate URL-only — fill from the
+    // static asset (no-op for live-priced rows) before reading prices.
+    if (rows.length && !rows.every(c => hasLivePrices(c?.tcgplayer))) {
+      const priceMap = await getEnPriceMap()
+      for (const c of rows) enrichPokemonCard(c, priceMap)
+    }
+    const byId = new Map(rows.map(c => [c.id, c]))
     return rescues.map((r) => {
       const c = byId.get(r.id)
       if (!c) return r
-      const p = c.tcgplayer?.prices
-      let price = null
-      if (p) { for (const k of ['holofoil', 'normal', 'reverseHolofoil']) if (p[k]?.market) { price = p[k].market; break } }
+      const price = getMarketPrice(c)?.price ?? null
       return { ...r, name: c.name, number: c.number || r.number, set: c.set?.name || r.set, image: c.images?.small || '', price, rarity: c.rarity || '' }
     })
   } catch { return rescues }
