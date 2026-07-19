@@ -28,8 +28,8 @@ const routes = [
   { path: '/designs/tactile', name: 'DesignTactile', component: () => import('../views/designs/DesignTactileView.vue'), meta: { bare: true, title: 'Design — Tactile' } },
   { path: '/designs/atelier', name: 'DesignAtelier', component: () => import('../views/designs/DesignAtelierView.vue'), meta: { bare: true, title: 'Design — Atelier' } },
   { path: '/designs/pulse', name: 'DesignPulse', component: () => import('../views/designs/DesignPulseView.vue'), meta: { bare: true, title: 'Design — Pulse' } },
-  // Shelf alias — friendly URL for portfolio pages
-  { path: '/shelf/:id', redirect: to => ({ path: '/portfolio/' + to.params.id }) },
+  // Shelf alias — friendly URL for portfolio pages (named route keeps params encoding-safe)
+  { path: '/shelf/:id', redirect: to => ({ name: 'Portfolio', params: { id: to.params.id } }) },
   // 404 catch-all — redirect to dashboard
   { path: '/:pathMatch(.*)*', redirect: '/' },
 ]

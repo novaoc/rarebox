@@ -9,6 +9,7 @@ const evals = [
   'scripts/evals/price-parser.mjs',
   'scripts/evals/en-prices-fallback.mjs',
   'scripts/evals/route-safety.mjs',
+  'scripts/evals/shelf-link.mjs',
   'scripts/evals/backup-roundtrip.mjs',
   'scripts/evals/riftbound-graded.mjs',
   'scripts/evals/pricecharting-full-grades.mjs',
