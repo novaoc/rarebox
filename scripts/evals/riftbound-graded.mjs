@@ -781,7 +781,7 @@ runEval('portfolio refresh never routes graded non-Pokémon through raw getTcgPr
   // priceServer refuses raw fallback for graded
   assert(/no_graded_data/.test(priceServer), 'priceServer throws no_graded_data when graded missing')
   assert(/never the\s*\n?\s*raw price|never the raw price/i.test(priceServer) ||
-    /Quoting raw as/.test(priceServer),
+    /Quoting raw as/.test(priceServer) || /never substitute[^\n]*raw market/i.test(priceServer),
     'priceServer documents no raw fallback for graded')
   assert(/if \(price == null\)/.test(priceServer),
     'priceServer must treat only null as missing (preserve $0)')
