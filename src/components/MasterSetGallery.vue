@@ -11,7 +11,25 @@
         </div>
         <div class="msg-head-actions">
           <span v-if="foundToday" class="sticker msg-today">{{ foundToday }} found today <RbIcon name="confetti" :size="13" /></span>
-          <button v-if="needCount && !loading" class="btn btn-secondary btn-sm" :disabled="isoDone" @click="isoTheRest">
+          <!-- Session-only density: component-instance state. Resets when gallery
+               is hidden/unmounted/reopened (parent v-if). No Pinia/Dexie/localStorage. -->
+          <button
+            type="button"
+            class="msg-density-toggle"
+            :aria-pressed="compact ? 'true' : 'false'"
+            :aria-label="compact ? 'Switch to comfortable layout' : 'Switch to compact layout'"
+            :disabled="loading"
+            @click="compact = !compact"
+          >
+            {{ compact ? 'Comfortable' : 'Compact' }}
+          </button>
+          <button
+            v-if="needCount && !loading"
+            type="button"
+            class="btn btn-secondary msg-iso-btn"
+            :disabled="isoDone"
+            @click="isoTheRest"
+          >
             {{ isoDone ? '✓ On your wantlist' : `🎯 ISO the rest (${needCount})` }}
           </button>
         </div>
@@ -20,7 +38,15 @@
       <!-- Filters — only when there's actually something to filter (i.e.
            you don't own the whole set yet) -->
       <div v-if="!loading && hasUnowned" class="msg-filters">
-        <button v-for="f in filters" :key="f.id" class="msg-filter-btn" :class="{ active: filter === f.id }" @click="filter = f.id">
+        <button
+          v-for="f in filters"
+          :key="f.id"
+          type="button"
+          class="msg-filter-btn"
+          :class="{ active: filter === f.id }"
+          :aria-pressed="filter === f.id ? 'true' : 'false'"
+          @click="filter = f.id"
+        >
           {{ f.label }} <span class="msg-filter-count">{{ f.count }}</span>
         </button>
       </div>
@@ -30,27 +56,84 @@
         <div v-if="loading" class="msg-loading">Fetching the full set…</div>
         <div v-else-if="error" class="msg-error">{{ error }}</div>
         <template v-else>
-          <p v-if="needCount" class="msg-hint">Tap a card you don't own to mark it as found — then add your finds to the shelf below.</p>
-          <div class="msg-grid">
-          <div
-            v-for="card in visibleCards"
-            :key="card.id"
-            class="msg-card"
-            :class="{ need: !isOwned(card) && !marks[card.id], got: marks[card.id] }"
-            @click="tapCard(card)"
-          >
-            <div class="msg-img-wrap">
-              <img v-if="card.images?.small" :src="card.images.small" :alt="card.name" loading="lazy" class="msg-img" />
-              <div v-else class="msg-img-ph">{{ card.number }}</div>
-              <span v-if="!isOwned(card) && !marks[card.id]" class="msg-tag msg-tag-need">NOT OWNED</span>
-              <span v-else-if="marks[card.id]" class="msg-tag msg-tag-got">FOUND ✓</span>
+          <p v-if="needCount" class="msg-hint">
+            {{ compact
+              ? 'Tap a number you don\'t own to mark it found — preview via the magnifier. Add finds below.'
+              : 'Tap a card you don\'t own to mark it as found — then add your finds to the shelf below.' }}
+          </p>
+
+          <!-- Comfortable (default): image grid -->
+          <div v-if="!compact" class="msg-grid">
+            <div
+              v-for="card in visibleCards"
+              :key="card.id"
+              class="msg-card"
+              :class="{ need: !isOwned(card) && !marks[card.id], got: marks[card.id] && !isOwned(card) }"
+              @click="tapCard(card)"
+            >
+              <div class="msg-img-wrap">
+                <img v-if="card.images?.small" :src="card.images.small" :alt="card.name" loading="lazy" class="msg-img" />
+                <div v-else class="msg-img-ph">{{ card.number }}</div>
+                <span v-if="!isOwned(card) && !marks[card.id]" class="msg-tag msg-tag-need">NOT OWNED</span>
+                <span v-else-if="marks[card.id] && !isOwned(card)" class="msg-tag msg-tag-got">FOUND ✓</span>
+              </div>
+              <div class="msg-card-name">{{ card.name }}</div>
+              <div class="msg-card-num">#{{ card.number }}</div>
+              <!-- Owned cards enlarge on tap; not-owned tap marks found, so
+                   they get an explicit button to show the card to a vendor -->
+              <button
+                v-if="!isOwned(card)"
+                type="button"
+                class="msg-enlarge"
+                @click.stop="preview = card"
+              ><RbIcon name="magnifier" :size="13" /> Show bigger</button>
             </div>
-            <div class="msg-card-name">{{ card.name }}</div>
-            <div class="msg-card-num">#{{ card.number }}</div>
-            <!-- Owned cards enlarge on tap; not-owned tap marks found, so
-                 they get an explicit button to show the card to a vendor -->
-            <button v-if="!isOwned(card)" class="msg-enlarge" @click.stop="preview = card"><RbIcon name="magnifier" :size="13" /> Show bigger</button>
           </div>
+
+          <!-- Compact: number-first cells from the same canonical visibleCards
+               only — never synthetic 1..setSize placeholders. No extra fetch. -->
+          <div v-else class="msg-grid msg-grid-compact" data-msg-compact-grid>
+            <div
+              v-for="card in visibleCards"
+              :key="card.id"
+              class="msg-compact-item"
+              :class="{
+                need: !isOwned(card) && !marks[card.id],
+                got: marks[card.id] && !isOwned(card),
+                owned: isOwned(card),
+              }"
+            >
+              <button
+                type="button"
+                class="msg-compact-primary"
+                :aria-label="compactPrimaryLabel(card)"
+                :aria-pressed="isOwned(card) ? undefined : (marks[card.id] ? 'true' : 'false')"
+                @click="tapCard(card)"
+              >
+                <span class="msg-compact-num" :title="card.number != null && card.number !== '' ? `#${card.number}` : undefined">#{{ card.number }}</span>
+                <span class="msg-compact-name" :title="card.name || undefined">{{ card.name }}</span>
+                <span
+                  class="msg-compact-status"
+                  :class="{
+                    'is-owned': isOwned(card),
+                    'is-need': !isOwned(card) && !marks[card.id],
+                    'is-found': marks[card.id] && !isOwned(card),
+                  }"
+                >{{ compactStatusLabel(card) }}</span>
+              </button>
+              <!-- Missing preview: separate non-overlapping ≥44px control.
+                   Label text hides at narrow widths (icon-only); aria-label stays. -->
+              <button
+                v-if="!isOwned(card)"
+                type="button"
+                class="msg-compact-preview"
+                :aria-label="`Preview ${card.name || 'card'} #${card.number || ''}`"
+                @click="preview = card"
+              >
+                <RbIcon name="magnifier" :size="16" />
+                <span class="msg-compact-preview-txt">View</span>
+              </button>
+            </div>
           </div>
         </template>
       </div>
@@ -58,7 +141,7 @@
       <!-- Footer: promote the day's finds to the shelf -->
       <div v-if="markedCards.length" class="msg-footer">
         <span class="msg-footer-note">{{ markedCards.length }} found — adding sets today's date as the purchase date</span>
-        <button class="btn btn-primary" :disabled="adding" @click="addFound">{{ adding ? 'Adding…' : `Add ${markedCards.length} to shelf` }}</button>
+        <button type="button" class="btn btn-primary msg-add-found-btn" :disabled="adding" @click="addFound">{{ adding ? 'Adding…' : `Add ${markedCards.length} to shelf` }}</button>
       </div>
 
     <!-- Card preview lightbox — big enough to show a vendor. Swipe (or
@@ -72,7 +155,7 @@
         @touchstart.passive="onPreviewTouchStart"
         @touchend.passive="onPreviewTouchEnd"
       >
-        <button v-if="previewList.length > 1" class="msg-preview-nav msg-preview-nav-prev" @click.stop="previewStep(-1)" aria-label="Previous card">‹</button>
+        <button v-if="previewList.length > 1" type="button" class="msg-preview-nav msg-preview-nav-prev" @click.stop="previewStep(-1)" aria-label="Previous card">‹</button>
         <div class="msg-preview-inner" @click.stop>
           <transition :name="slideDir < 0 ? 'msg-slide-r' : 'msg-slide-l'" mode="out-in">
             <img :key="preview.id" :src="preview.images?.large || preview.images?.small" :alt="preview.name" class="msg-preview-img" />
@@ -84,9 +167,9 @@
               {{ previewIndex + 1 }} / {{ previewList.length }} {{ isOwned(preview) ? 'owned' : 'still needed' }} · swipe for next
             </div>
           </div>
-          <button class="msg-preview-close" @click="preview = null" aria-label="Close">✕</button>
+          <button type="button" class="msg-preview-close" @click="preview = null" aria-label="Close">✕</button>
         </div>
-        <button v-if="previewList.length > 1" class="msg-preview-nav msg-preview-nav-next" @click.stop="previewStep(1)" aria-label="Next card">›</button>
+        <button v-if="previewList.length > 1" type="button" class="msg-preview-nav msg-preview-nav-next" @click.stop="previewStep(1)" aria-label="Next card">›</button>
       </div>
     </Teleport>
   </div>
@@ -111,6 +194,11 @@ const filter = ref('all')
 const adding = ref(false)
 const preview = ref(null)
 
+// Session-only density preference (v1). Component-instance ref — resets when
+// the gallery is hidden/unmounted/reopened. Do not write Pinia, Dexie, or
+// localStorage/sessionStorage for this flag.
+const compact = ref(false)
+
 // Owned matching: cardId when the item has one, otherwise name|number
 // (items added before Browse stored cardIds), otherwise bare name (items
 // added before card numbers were stored)
@@ -132,11 +220,15 @@ function isOwned(card) {
 }
 const ownedCount = computed(() => cards.value.filter(c => isOwned(c)).length)
 const needCount = computed(() => cards.value.filter(c => !isOwned(c) && !props.marks[c.id]).length)
-const markedCards = computed(() => cards.value.filter(c => props.marks[c.id]))
+
+// Safe marked set: only marks that are still not owned. Prevents stale-mark
+// duplication when a card became owned elsewhere (Add found / other path).
+// foundToday, filter counts, and footer all use this set.
+const markedCards = computed(() => cards.value.filter(c => props.marks[c.id] && !isOwned(c)))
 const hasUnowned = computed(() => cards.value.some(c => !isOwned(c)))
 const foundToday = computed(() => {
   const dayStart = new Date(); dayStart.setHours(0, 0, 0, 0)
-  return Object.values(props.marks).filter(ts => ts >= dayStart.getTime()).length
+  return markedCards.value.filter(c => props.marks[c.id] >= dayStart.getTime()).length
 })
 
 // Owned tab dropped — the header already shows "N/M owned"
@@ -152,9 +244,23 @@ const visibleCards = computed(() => {
   return cards.value
 })
 
+function compactStatusLabel(card) {
+  if (isOwned(card)) return 'Owned'
+  if (props.marks[card.id]) return 'Found'
+  return 'Need'
+}
+
+function compactPrimaryLabel(card) {
+  const num = card.number != null && card.number !== '' ? `#${card.number}` : 'card'
+  const name = card.name || 'Unknown'
+  if (isOwned(card)) return `Preview owned ${name} ${num}`
+  if (props.marks[card.id]) return `Unmark found ${name} ${num}`
+  return `Mark found ${name} ${num}`
+}
+
 function tapCard(card) {
   // Owned cards enlarge for admiring; missing ones toggle the found mark
-  // (they enlarge via the explicit "Show bigger" button instead)
+  // (they enlarge via the explicit "Show bigger" / compact preview control)
   if (isOwned(card)) { preview.value = card; return }
   emit('toggle-mark', card.id)
 }
@@ -303,6 +409,7 @@ onMounted(async () => {
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
+  flex-wrap: wrap;
   padding: 16px 18px 10px;
 }
 .msg-title { font-size: 18px; font-weight: 800; }
@@ -314,15 +421,67 @@ onMounted(async () => {
   border: 1.5px solid var(--ink);
   border-radius: 99px;
 }
-.msg-head-actions { display: flex; align-items: center; gap: 10px; }
+.msg-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
 .msg-today { font-size: 10.5px; }
 
-.msg-filters { display: flex; gap: 8px; padding: 0 18px 12px; }
+/* Density toggle — session-only; ≥44px hit target */
+.msg-density-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 8px 14px;
+  font-size: 12.5px;
+  font-weight: 800;
+  font-family: inherit;
+  color: var(--ink);
+  background: var(--bg-card);
+  border: var(--bw) solid var(--ink);
+  border-radius: 99px;
+  box-shadow: var(--shadow-pressed);
+  cursor: pointer;
+  transition: background 0.12s, box-shadow 0.1s, transform 0.1s;
+}
+.msg-density-toggle:active:not(:disabled) {
+  box-shadow: none;
+  transform: translate(1px, 1px);
+}
+.msg-density-toggle[aria-pressed="true"] {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+.msg-density-toggle:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* ISO — local ≥44px without changing global .btn-sm */
+.msg-iso-btn {
+  min-height: 44px;
+  min-width: 44px;
+  padding: 8px 14px;
+}
+
+.msg-filters {
+  display: flex;
+  gap: 8px;
+  padding: 0 18px 12px;
+  flex-wrap: wrap;
+}
 .msg-filter-btn {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 7px;
-  padding: 7px 14px;
+  min-height: 44px;
+  min-width: 44px;
+  padding: 8px 14px;
   font-size: 12.5px;
   font-weight: 700;
   font-family: inherit;
@@ -344,7 +503,10 @@ onMounted(async () => {
   background: var(--bg-secondary);
   color: var(--text-secondary);
 }
-.msg-filter-btn.active .msg-filter-count { background: rgba(20, 20, 20, 0.15); color: var(--on-accent); }
+.msg-filter-btn.active .msg-filter-count {
+  background: var(--bg-card);
+  color: var(--ink);
+}
 
 .msg-grid-wrap { overflow-y: auto; overscroll-behavior: contain; padding: 4px 18px 18px; flex: 1; }
 .msg-hint { font-size: 12px; color: var(--text-secondary); font-weight: 600; margin: 0 0 12px; }
@@ -375,8 +537,12 @@ onMounted(async () => {
    tap and leave cards dimmed inconsistently */
 @media (hover: hover) {
   .msg-filter-btn:hover { background: var(--bg-hover); }
+  .msg-density-toggle:hover:not(:disabled) { background: var(--bg-hover); }
+  .msg-density-toggle[aria-pressed="true"]:hover:not(:disabled) { background: var(--accent); }
   .msg-card.need:hover .msg-img { filter: grayscale(0.6) brightness(0.85); }
   .msg-enlarge:hover { background: var(--bg-hover); }
+  .msg-compact-primary:hover { background: var(--bg-hover); }
+  .msg-compact-preview:hover { background: var(--bg-hover); }
 }
 
 .msg-tag {
@@ -401,7 +567,9 @@ onMounted(async () => {
 .msg-enlarge {
   margin-top: 6px;
   width: 100%;
-  padding: 9px 8px;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 10px 8px;
   font-size: 11px;
   font-weight: 800;
   font-family: inherit;
@@ -414,12 +582,155 @@ onMounted(async () => {
 }
 .msg-enlarge:active { box-shadow: none; transform: translate(1px, 1px); }
 
-/* Lightbox */
+/* ── Compact grid: number-first, no card images, same visibleCards ──
+   minmax(60px) keeps tracks wide enough for ≥44px targets + clamped text.
+   At ~280px viewport (~244px grid content after panel padding), auto-fill
+   yields 3 columns (4 when content ≥ ~258px). No hard max-column cap. */
+.msg-grid-compact {
+  grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
+  gap: 8px;
+  max-width: 100%;
+}
+.msg-compact-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+}
+.msg-compact-primary {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  gap: 2px;
+  width: 100%;
+  min-width: 44px;
+  min-height: 44px;
+  max-width: 100%;
+  padding: 6px 5px;
+  text-align: left;
+  font-family: inherit;
+  color: var(--ink);
+  background: var(--bg-card);
+  border: var(--bw) solid var(--ink);
+  border-radius: 8px;
+  box-shadow: var(--shadow-pressed);
+  cursor: pointer;
+  overflow: hidden;
+  transition: background 0.12s, box-shadow 0.1s, transform 0.1s;
+}
+.msg-compact-primary:active {
+  box-shadow: none;
+  transform: translate(1px, 1px);
+}
+.msg-compact-item.need .msg-compact-primary {
+  border-style: dashed;
+  background: var(--bg-secondary);
+}
+.msg-compact-item.got .msg-compact-primary {
+  border-color: var(--accent-text);
+  box-shadow: var(--shadow-pressed), 0 0 0 2px var(--accent);
+}
+.msg-compact-item.owned .msg-compact-primary {
+  background: var(--bg-card);
+}
+/* Long collector numbers must not paint outside the cell */
+.msg-compact-num {
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+  font-size: 13px;
+  font-weight: 900;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  word-break: break-all;
+}
+/* Long names clamp to 2 lines inside the track */
+.msg-compact-name {
+  display: -webkit-box;
+  min-width: 0;
+  max-width: 100%;
+  font-size: 9.5px;
+  font-weight: 700;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  color: var(--text-secondary);
+}
+.msg-compact-status {
+  margin-top: 2px;
+  max-width: 100%;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.msg-compact-status.is-owned { color: var(--text-secondary); }
+.msg-compact-status.is-need { color: var(--text-muted); }
+.msg-compact-status.is-found {
+  color: var(--on-accent);
+  background: var(--accent);
+  border: 1.5px solid var(--ink);
+  border-radius: 4px;
+  padding: 1px 4px;
+  align-self: flex-start;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+/* Separate preview control — full-width in track; icon-only when narrow */
+.msg-compact-preview {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: 100%;
+  min-width: 44px;
+  min-height: 44px;
+  max-width: 100%;
+  padding: 6px 4px;
+  font-size: 10px;
+  font-weight: 800;
+  font-family: inherit;
+  color: var(--ink);
+  background: var(--bg-card);
+  border: var(--bw) solid var(--ink);
+  border-radius: 8px;
+  box-shadow: var(--shadow-pressed);
+  cursor: pointer;
+  overflow: hidden;
+  transition: background 0.12s, box-shadow 0.1s, transform 0.1s;
+}
+.msg-compact-preview:active {
+  box-shadow: none;
+  transform: translate(1px, 1px);
+}
+.msg-compact-preview-txt {
+  line-height: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+/* Lightbox — always-dark scrim + always-light meta (theme-stable tokens) */
 .msg-preview {
   position: fixed;
   inset: 0;
   z-index: 400;
-  background: rgba(20, 18, 12, 0.78);
+  background: var(--scrim);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -437,7 +748,7 @@ onMounted(async () => {
   box-shadow: var(--shadow-lg);
   background: var(--bg-card);
 }
-.msg-preview-meta { text-align: center; color: #fff; }
+.msg-preview-meta { text-align: center; color: var(--on-scrim); }
 .msg-preview-name { font-size: 16px; font-weight: 800; }
 .msg-preview-sub { font-size: 12.5px; opacity: 0.85; font-weight: 600; margin-top: 2px; }
 .msg-preview-count {
@@ -450,6 +761,8 @@ onMounted(async () => {
   flex-shrink: 0;
   width: 46px;
   height: 46px;
+  min-width: 44px;
+  min-height: 44px;
   border-radius: 50%;
   background: var(--bg-card);
   border: 2px solid var(--ink);
@@ -483,8 +796,10 @@ onMounted(async () => {
   position: absolute;
   top: -14px;
   right: -14px;
-  width: 36px;
-  height: 36px;
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
   border-radius: 50%;
   background: var(--bg-card);
   border: 2px solid var(--ink);
@@ -494,6 +809,7 @@ onMounted(async () => {
   cursor: pointer;
   color: var(--ink);
 }
+.msg-preview-close:active { box-shadow: none; transform: translate(1px, 1px); }
 
 .msg-footer {
   display: flex;
@@ -506,9 +822,44 @@ onMounted(async () => {
   background: var(--bg-card);
 }
 .msg-footer-note { font-size: 12px; color: var(--text-secondary); font-weight: 600; }
+.msg-add-found-btn {
+  min-height: 44px;
+  min-width: 44px;
+}
 
 @media (max-width: 640px) {
   .msg-panel { max-height: 82vh; }
-  .msg-grid { grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 9px; }
+  .msg-grid:not(.msg-grid-compact) { grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 9px; }
+  /* 280px: minmax(60px) + 6px gap → 3 non-overlapping columns in ~244px content */
+  .msg-grid-compact {
+    grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
+    gap: 6px;
+  }
+  /* Icon-only preview at narrow widths — aria-label remains on the button */
+  .msg-compact-preview-txt {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+  .msg-compact-preview { position: relative; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .msg-panel { animation: none; }
+  .msg-density-toggle,
+  .msg-filter-btn,
+  .msg-compact-primary,
+  .msg-compact-preview,
+  .msg-enlarge {
+    transition: none;
+  }
+  .msg-slide-l-enter-active, .msg-slide-l-leave-active,
+  .msg-slide-r-enter-active, .msg-slide-r-leave-active { transition: none; }
 }
 </style>

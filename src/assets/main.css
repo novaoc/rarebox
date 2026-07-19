@@ -62,6 +62,9 @@
   --accent-text: #b8860b;      /* readable gold text on the page surface */
   --danger-text: #c93540;      /* readable red text on the page surface */
   --scroll-thumb: #d8d0bf;
+  /* Lightbox / modal scrims stay dark in both themes; text on them stays light */
+  --scrim: rgba(20, 20, 20, 0.78);
+  --on-scrim: #faf6ef;
 }
 
 /* ── Dark Tactile ─────────────────────────────────────────────────────
