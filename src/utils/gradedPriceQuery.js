@@ -69,12 +69,16 @@ export function pcGradeForItem(item) {
   if (!item || item.type !== 'graded') return 'ungraded'
   const company = String(item.gradingCompany || 'PSA').toLowerCase()
   const grade = String(item.grade || '10')
-  if (company === 'psa') return grade === '10' ? 'psa10' : grade
-  if (company === 'bgs') return grade === '10' ? 'bgs10' : grade
-  if (company === 'cgc') return grade === '10' ? 'cgc10' : grade
-  if (company === 'sgc') return grade === '10' ? 'sgc10' : grade
-  if (company === 'ace') return grade === '10' ? 'ace10' : grade
-  return grade
+  if (grade !== '10') return `grade${grade.replace('.', '_')}`
+  if (company === 'psa') return 'psa10'
+  if (company === 'bgs') return 'bgs10'
+  if (company === 'bgs black') return 'bgs10_black'
+  if (company === 'cgc') return 'cgc10'
+  if (company === 'cgc pristine') return 'cgc10_pristine'
+  if (company === 'sgc') return 'sgc10'
+  if (company === 'ace') return 'ace10'
+  if (company === 'tag') return 'tag10'
+  return 'unsupported10'
 }
 
 /**

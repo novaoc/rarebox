@@ -77,7 +77,11 @@
               <option value="PSA">PSA</option>
               <option value="BGS">BGS</option>
               <option value="CGC">CGC</option>
+              <option value="CGC Pristine">CGC Pristine</option>
+              <option value="SGC">SGC</option>
               <option value="ACE">ACE</option>
+              <option value="TAG">TAG</option>
+              <option value="BGS Black">BGS Black Label</option>
               <option value="Other">Other</option>
             </select>
           </div>
@@ -115,7 +119,7 @@
           <div v-else-if="riftboundGradedBlockReason" class="text-muted mt-1" style="font-size:12px" role="status">{{ riftboundGradedBlockReason }}</div>
           <div v-if="gradingPcResult" class="pc-result-box mt-2">
             <div class="pc-result-price-main">${{ gradingPcResult.price.toFixed(2) }}</div>
-            <div class="pc-result-meta">{{ gradingPcResult.product_name }} · Grade {{ gradingPcResult.grade }}</div>
+            <div class="pc-result-meta">{{ gradingPcResult.product_name }} · {{ gradingPcResult.grade_label || gradingPcResult.grade }}</div>
             <button class="btn btn-primary pc-apply-btn mt-2" @click="applyGradingPCPrice">Apply Price</button>
           </div>
           <p v-if="isRiftbound" class="text-muted mt-2" style="font-size:11px;line-height:1.4">
@@ -306,9 +310,13 @@ const selectedIsSealed = ref(false)
 
 const gradesByCompany = {
   PSA:   ['10', '9', '8', '7', '6', '5', '4', '3', '2', '1'],
-  BGS:   ['10', '9.5', '9', '8.5', '8', '7.5', '7', '6', '5', '4', '3', '2', '1'],
-  CGC:   ['10', '9.5', '9', '8.5', '8', '7.5', '7', '6', '5', '4', '3', '2', '1'],
+  BGS:   ['10', '9.5', '9', '8', '7', '6', '5', '4', '3', '2', '1'],
+  CGC:   ['10', '9.5', '9', '8', '7', '6', '5', '4', '3', '2', '1'],
+  'CGC Pristine': ['10'],
+  SGC:   ['10', '9.5', '9', '8', '7', '6', '5', '4', '3', '2', '1'],
   ACE:   ['10', '9', '8', '7', '6', '5', '4', '3', '2', '1'],
+  TAG:   ['10', '9.5', '9', '8', '7', '6', '5', '4', '3', '2', '1'],
+  'BGS Black': ['10'],
   Other: ['10', '9.5', '9', '8', '7', '6', '5', '4', '3', '2', '1'],
 }
 const gradeOptions = computed(() => gradesByCompany[form.value.gradingCompany] || gradesByCompany.PSA)
@@ -524,7 +532,9 @@ function submit() {
         },
         gradingCompany: form.value.gradingCompany,
         grade: form.value.grade,
-        currentValue: value,
+        // Missing graded data stays unknown. Never manufacture a tracked $0
+        // or purchase-price market value; an explicit manual $0 remains valid.
+        currentValue: num(form.value.currentValue),
         lastPriceUpdate: num(form.value.currentValue) != null ? new Date().toISOString() : null,
       }
     } else if (kind === 'sealed') {
@@ -591,7 +601,7 @@ function submit() {
       gradingCompany: form.value.gradingCompany,
       grade: form.value.grade,
       // Explicit $0 graded market is valid; only fall back when unset.
-      currentValue: num(form.value.currentValue) ?? num(form.value.purchasePrice) ?? 0,
+      currentValue: num(form.value.currentValue),
     }
   } else {
     const num = v => (typeof v === 'number' && Number.isFinite(v) ? v : null)
@@ -689,6 +699,13 @@ watch(itemType, (t) => {
 
 // A fetched price is only valid for the grade it was fetched with
 watch(() => form.value.grade, () => {
+  gradingPcResult.value = null
+  gradingPcError.value = ''
+})
+
+watch(() => form.value.gradingCompany, (company) => {
+  const options = gradesByCompany[company] || gradesByCompany.PSA
+  if (!options.includes(String(form.value.grade))) form.value.grade = options[0]
   gradingPcResult.value = null
   gradingPcError.value = ''
 })
