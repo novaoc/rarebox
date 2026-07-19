@@ -1,5 +1,23 @@
 <template>
-  <div class="portfolio-view" v-if="portfolio">
+  <!-- Three-state gate: wait for store init before claiming missing shelf -->
+  <div v-if="!store.initialized" class="portfolio-view shelf-gate" aria-busy="true" aria-live="polite">
+    <div class="empty-state shelf-gate-state">
+      <div class="spinner spinner-lg" aria-hidden="true"></div>
+      <h3>Loading shelf…</h3>
+      <p class="text-secondary">Opening your local collection</p>
+    </div>
+  </div>
+
+  <div v-else-if="!portfolio" class="portfolio-view shelf-gate" data-shelf-not-found>
+    <div class="empty-state shelf-gate-state">
+      <div class="icon"><RbIcon name="mailbox" :size="44" /></div>
+      <h3>Shelf not found</h3>
+      <p class="text-secondary">This shelf is not in your local collection on this device.</p>
+      <router-link to="/" class="btn btn-primary mt-3 shelf-not-found-cta">Dashboard</router-link>
+    </div>
+  </div>
+
+  <div class="portfolio-view" v-else>
     <PullToRefresh :refreshing="refreshing" @refresh="refreshPrices" aria-label="Pull to refresh">
       <!-- Header -->
       <div class="portfolio-header">
@@ -27,20 +45,22 @@
           
           <!-- Dropdown for secondary actions on mobile -->
           <div class="action-dropdown" v-if="isMobile">
-            <button class="btn btn-secondary btn-icon" @click="showActionsMenu = !showActionsMenu">
+            <button type="button" class="btn btn-secondary btn-icon shelf-more-actions-btn" @click="showActionsMenu = !showActionsMenu" aria-label="More shelf actions">
               <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>
             </button>
             <transition name="fade">
               <div v-if="showActionsMenu" class="dropdown-menu" @click="showActionsMenu = false">
-                <button @click="showBulkImport = true">↑ Bulk Import</button>
-                <button :disabled="refreshing" @click="refreshPrices">↻ Refresh Prices</button>
-                <button @click="exportPortfolio">↓ Export Excel</button>
-                <button class="text-danger" @click="confirmDelete = true">Delete Shelf</button>
+                <button type="button" class="shelf-link-menu-item" @click.stop="copyShelfLink">{{ linkCopied ? 'Copied' : 'Copy link' }}</button>
+                <button type="button" @click="showBulkImport = true">↑ Bulk Import</button>
+                <button type="button" :disabled="refreshing" @click="refreshPrices">↻ Refresh Prices</button>
+                <button type="button" @click="exportPortfolio">↓ Export Excel</button>
+                <button type="button" class="text-danger" @click="confirmDelete = true">Delete Shelf</button>
               </div>
             </transition>
           </div>
           
           <template v-else>
+            <button type="button" class="btn btn-secondary btn-sm shelf-link-btn" @click="copyShelfLink">{{ linkCopied ? 'Copied' : 'Copy link' }}</button>
             <button class="btn btn-secondary btn-sm" @click="showBulkImport = true">↑ Import</button>
             <button class="btn btn-secondary btn-sm" :disabled="refreshing" @click="refreshPrices">
               <span v-if="refreshing" class="spinner spinner-sm"></span>
@@ -50,6 +70,23 @@
             <button class="btn btn-danger btn-sm" @click="confirmDelete = true">Delete</button>
           </template>
         </div>
+        <p class="shelf-link-help text-muted">
+          This link opens this shelf on the same device and browser only. Nothing is uploaded. On another device, use Export or Local Sync.
+        </p>
+        <div v-if="linkCopyError || showLinkFallback" class="shelf-link-fallback" data-shelf-link-fallback>
+          <p v-if="linkCopyError" class="shelf-link-error" role="alert">{{ linkCopyError }}</p>
+          <label class="shelf-link-fallback-label text-muted" for="shelf-link-url-input">Shelf link</label>
+          <input
+            id="shelf-link-url-input"
+            ref="shelfLinkInputRef"
+            class="input shelf-link-input"
+            type="text"
+            readonly
+            :value="shelfLinkUrl"
+            @focus="selectShelfLinkInput"
+          />
+        </div>
+        <div class="sr-only" aria-live="polite">{{ linkAriaLive }}</div>
         <div v-if="refreshStatus" class="refresh-status-banner text-muted">{{ refreshStatus }}</div>
       </div>
 
@@ -515,7 +552,7 @@
 
 <script setup>
 import RbIcon from '../components/icons/RbIcon.vue'
-import { ref, computed, watch, nextTick, onMounted, reactive } from 'vue'
+import { ref, computed, watch, nextTick, onBeforeUnmount, reactive } from 'vue'
 import { tokenMatch } from '../utils/search.js'
 import { useRoute, useRouter } from 'vue-router'
 import { usePortfolioStore } from '../stores/portfolio'
@@ -573,14 +610,40 @@ function msCanonicalKey(item) {
   return key
 }
 
+// Route/store + instance shelf identity must exist before loadMsSetMeta/setup.
+// Capture id once at setup as a primitive — App fullPath key mounts a new instance
+// per navigation, but the leaving instance stays alive ~300ms while the global route
+// already points at B. Binding portfolio/setup to live route.params.id would make A
+// rebind to B and start duplicate B work. Fading A stays A; new B owns B setup.
+const route = useRoute()
+const router = useRouter()
+const store = usePortfolioStore()
+const _rawRouteId = route.params.id
+const instanceShelfId = typeof _rawRouteId === 'string'
+  ? _rawRouteId
+  : (Array.isArray(_rawRouteId) ? String(_rawRouteId[0] ?? '') : String(_rawRouteId ?? ''))
+
 // Set totals + logos, filled lazily from the cached set lists (no extra
 // network beyond what Browse already caches)
 const msSetMeta = ref({})
-async function loadMsSetMeta() {
+/** Bumps on each load / unmount so a slower prior shelf cannot overwrite meta. */
+let msMetaGen = 0
+/** True after unmount — dead instance must not start setup/refresh. */
+let disposed = false
+async function loadMsSetMeta(forShelfId) {
+  if (disposed) return
+  // Prefer explicit id; fall back to this instance's captured shelf identity
+  const shelfId = forShelfId ?? (instanceShelfId || null)
+  if (!shelfId) return
+  // Missing shelf after init: zero set-list/API work (not-found UI only)
+  const shelf = store.portfolios.find(p => p.id === shelfId)
+  if (!shelf) return
+  const gen = ++msMetaGen
+  const items = shelf.items || []
   const meta = {}
   const games = new Set(['pokemon'])
   for (const g of getTcgPrefs() || []) games.add(g)
-  for (const item of portfolio.value?.items || []) if (item.game) games.add(item.game)
+  for (const item of items) if (item.game) games.add(item.game)
   await Promise.allSettled([...games].map(async (g) => {
     if (g === 'pokemon') {
       const [en, jp] = await Promise.allSettled([getPokemonSets(), getJapaneseSets()])
@@ -610,10 +673,12 @@ async function loadMsSetMeta() {
       }
     }
   }))
+  // Dead instance / stale completion: never write meta for another shelf
+  if (disposed || gen !== msMetaGen) return
+  if (instanceShelfId !== shelfId) return
   msSetMeta.value = meta
   migrateMasterSetKeys()
 }
-onMounted(loadMsSetMeta)
 
 // Showcases saved before set-id keys existed are stored under name-based
 // keys ("riftbound:origins"); move them to the canonical id key so they
@@ -826,13 +891,11 @@ async function confirmAddMasterSet() {
   }
 }
 import PullToRefresh from '../components/PullToRefresh.vue'
+import { buildShelfLink } from '../utils/shelfLink'
 
-const route = useRoute()
-const router = useRouter()
-const store = usePortfolioStore()
-
-const portfolio = computed(() => store.portfolios.find(p => p.id === route.params.id))
-const stats = computed(() => store.getPortfolioStats(route.params.id) || { totalValue: 0, totalCost: 0, gain: 0, gainPct: 0, itemCount: 0 })
+// portfolio/stats resolve from instance-captured id (see setup block above)
+const portfolio = computed(() => store.portfolios.find(p => p.id === instanceShelfId))
+const stats = computed(() => store.getPortfolioStats(instanceShelfId) || { totalValue: 0, totalCost: 0, gain: 0, gainPct: 0, itemCount: 0 })
 
 const activeFilter = ref('all')
 const itemSearch = ref('')
@@ -851,10 +914,84 @@ const refreshing = ref(false)
 const refreshStatus = ref('')
 const showActionsMenu = ref(false)
 const activeItemMenu = ref(null)
+const linkCopied = ref(false)
+const linkCopyError = ref('')
+const showLinkFallback = ref(false)
+const shelfLinkInputRef = ref(null)
+let linkCopiedTimer = null
+let refreshStatusTimer = null
+/** Last shelf id that received post-init setup/refresh on this instance (avoids duplicate work). */
+const lastSetupShelfId = ref(null)
+/**
+ * Safety net only: if setup is deferred while refresh is in-flight on this same
+ * instance, retry after settle. Primary A→B isolation is instanceShelfId + fullPath key
+ * (leaving A never rebinds to B).
+ */
+let pendingSetupShelfId = null
+
+const shelfLinkUrl = computed(() => {
+  if (!portfolio.value?.id) return ''
+  return buildShelfLink(portfolio.value.id)
+})
+
+const linkAriaLive = computed(() => {
+  if (linkCopied.value) return 'Copied'
+  if (linkCopyError.value) return linkCopyError.value
+  return ''
+})
+
+function selectShelfLinkInput(e) {
+  e?.target?.select?.()
+}
+
+async function focusShelfLinkFallback() {
+  await nextTick()
+  const el = shelfLinkInputRef.value
+  if (!el || typeof el.focus !== 'function') return
+  try {
+    el.focus()
+    el.select?.()
+  } catch {
+    // Not focusable in this environment — fallback remains visible/selectable
+  }
+}
+
+async function copyShelfLink() {
+  const url = shelfLinkUrl.value
+  if (!url) return
+  linkCopyError.value = ''
+  showLinkFallback.value = false
+  if (linkCopiedTimer) {
+    clearTimeout(linkCopiedTimer)
+    linkCopiedTimer = null
+  }
+  try {
+    if (!navigator.clipboard?.writeText) {
+      throw new Error('clipboard_unavailable')
+    }
+    await navigator.clipboard.writeText(url)
+    linkCopied.value = true
+    linkCopiedTimer = setTimeout(() => {
+      linkCopied.value = false
+      linkCopiedTimer = null
+    }, 2000)
+  } catch {
+    linkCopied.value = false
+    showLinkFallback.value = true
+    linkCopyError.value = 'Could not copy automatically — select the link below.'
+    // Close overflow so the readonly URL fallback is not covered on mobile
+    showActionsMenu.value = false
+    await focusShelfLinkFallback()
+  }
+}
 
 const isMobile = ref(window.innerWidth <= 768)
 let _resizeTimer
-window.addEventListener('resize', () => { clearTimeout(_resizeTimer); _resizeTimer = setTimeout(() => { isMobile.value = window.innerWidth <= 768 }, 150) })
+function onWindowResize() {
+  clearTimeout(_resizeTimer)
+  _resizeTimer = setTimeout(() => { isMobile.value = window.innerWidth <= 768 }, 150)
+}
+window.addEventListener('resize', onWindowResize)
 
 // Bulk Selection
 const selectedIds = reactive(new Set())
@@ -1050,135 +1187,281 @@ async function mapPool(items, limit, fn) {
 }
 
 async function refreshPrices() {
-  if (!portfolio.value || refreshing.value) return
+  if (disposed || !portfolio.value || refreshing.value) return
+  // Use this instance's shelf — portfolio is bound to instanceShelfId, not live route
+  const shelfId = portfolio.value.id
+  const itemsSnapshot = portfolio.value.items.slice()
   refreshing.value = true
   refreshStatus.value = 'Refreshing prices…'
+  if (refreshStatusTimer) {
+    clearTimeout(refreshStatusTimer)
+    refreshStatusTimer = null
+  }
 
   const isPokemonItem = i => !i.game || i.game === 'pokemon'
-  const cardItems = portfolio.value.items.filter(i => i.type === 'card' && i.cardId && isPokemonItem(i))
-  const ebayItems = portfolio.value.items.filter(i => (i.type === 'graded' || i.type === 'sealed') && isPokemonItem(i))
+  const cardItems = itemsSnapshot.filter(i => i.type === 'card' && i.cardId && isPokemonItem(i))
+  const ebayItems = itemsSnapshot.filter(i => (i.type === 'graded' || i.type === 'sealed') && isPokemonItem(i))
   // Non-Pokémon raw cards + sealed only — graded never goes through getTcgPrice.
-  const otherTcgRawItems = portfolio.value.items.filter(
+  const otherTcgRawItems = itemsSnapshot.filter(
     i => i.game && i.game !== 'pokemon' && i.type !== 'graded'
   )
   // All non-Pokémon graded slabs (Riftbound and others) — grade-aware PC only.
-  const otherTcgGradedItems = portfolio.value.items.filter(
+  const otherTcgGradedItems = itemsSnapshot.filter(
     i => i.game && i.game !== 'pokemon' && i.type === 'graded'
   )
   let updated = 0
   const REFRESH_CONCURRENCY = 4
 
-  await Promise.allSettled([
-    // Raw EN cards — pokemontcg.io (bulk-friendly)
-    mapPool(cardItems.filter(i => !store.isJPCard(i)), REFRESH_CONCURRENCY, async item => {
-      try {
-        const card = await getCard(item.cardId, item._lang)
-        const priceResult = getMarketPrice(card, item.priceVariant)
-        const price = priceResult?.price ?? priceResult
-        if (typeof price === 'number' && Number.isFinite(price)) {
-          store.updateItem(portfolio.value.id, item.id, { currentMarketPrice: price, lastPriceUpdate: new Date().toISOString() })
-          updated++
+  try {
+    await Promise.allSettled([
+      // Raw EN cards — pokemontcg.io (bulk-friendly)
+      mapPool(cardItems.filter(i => !store.isJPCard(i)), REFRESH_CONCURRENCY, async item => {
+        try {
+          const card = await getCard(item.cardId, item._lang)
+          const priceResult = getMarketPrice(card, item.priceVariant)
+          const price = priceResult?.price ?? priceResult
+          if (typeof price === 'number' && Number.isFinite(price)) {
+            store.updateItem(shelfId, item.id, { currentMarketPrice: price, lastPriceUpdate: new Date().toISOString() })
+            updated++
+          }
+        } catch {}
+      }),
+      // JP cards — tcgdex (one request per card, stagger)
+      mapPool(cardItems.filter(i => store.isJPCard(i)), 2, async (item, idx) => {
+        await new Promise(r => setTimeout(r, idx * 500))
+        try {
+          const card = await getCard(item.cardId, item._lang)
+          const priceResult = getMarketPrice(card, item.priceVariant)
+          const price = priceResult?.price ?? priceResult
+          if (typeof price === 'number' && Number.isFinite(price)) {
+            store.updateItem(shelfId, item.id, { currentMarketPrice: price, lastPriceUpdate: new Date().toISOString() })
+            updated++
+          }
+        } catch {}
+      }),
+      // Pokémon graded slabs + sealed — PriceCharting (direct browser API)
+      mapPool(ebayItems, REFRESH_CONCURRENCY, async item => {
+        const query = pcQueryForItem(item)
+        const grade = pcGradeForItem(item)
+        if (!query) return
+        try {
+          const result = await fetchPrice(query, grade)
+          if (!isFiniteGradedPrice(result) && item.type === 'graded') return // retain stale/manual
+          if (result && typeof result.price === 'number' && Number.isFinite(result.price)) {
+            const updates = { currentValue: result.price, lastPriceUpdate: new Date().toISOString() }
+            // Always update image for sealed items on refresh — corrects wrong images from generic queries
+            if (item.type === 'sealed' && result.image) updates.imageUrl = result.image
+            store.updateItem(shelfId, item.id, updates)
+            updated++
+          }
+        } catch {
+          // Graded/sealed miss or offline — keep existing value
         }
-      } catch {}
-    }),
-    // JP cards — tcgdex (one request per card, stagger)
-    mapPool(cardItems.filter(i => store.isJPCard(i)), 2, async (item, idx) => {
-      await new Promise(r => setTimeout(r, idx * 500))
-      try {
-        const card = await getCard(item.cardId, item._lang)
-        const priceResult = getMarketPrice(card, item.priceVariant)
-        const price = priceResult?.price ?? priceResult
-        if (typeof price === 'number' && Number.isFinite(price)) {
-          store.updateItem(portfolio.value.id, item.id, { currentMarketPrice: price, lastPriceUpdate: new Date().toISOString() })
+      }),
+      // Non-Pokémon graded — fetchPrice(query, grade) only. Never getTcgPrice/raw.
+      mapPool(otherTcgGradedItems, REFRESH_CONCURRENCY, async item => {
+        const query = pcQueryForItem(item)
+        const grade = pcGradeForItem(item)
+        if (!query) return
+        // Riftbound without collector # — refuse fuzzy graded auto-price.
+        const guard = riftboundGradedFetchGuard({
+          game: item.game,
+          number: item.cardData?.number,
+          name: item.cardData?.name || item.name,
+          cardData: item.cardData,
+        }, query)
+        if (!guard.ok) return
+        try {
+          const result = await fetchPrice(query, grade)
+          if (!isFiniteGradedPrice(result)) return // retain Collectr/manual/stale
+          store.updateItem(shelfId, item.id, {
+            currentValue: result.price,
+            lastPriceUpdate: new Date().toISOString(),
+          })
           updated++
+        } catch {
+          // no_graded_data / offline / timeout — never raw fallback
         }
-      } catch {}
-    }),
-    // Pokémon graded slabs + sealed — PriceCharting (direct browser API)
-    mapPool(ebayItems, REFRESH_CONCURRENCY, async item => {
-      const query = pcQueryForItem(item)
-      const grade = pcGradeForItem(item)
-      if (!query) return
-      try {
-        const result = await fetchPrice(query, grade)
-        if (!isFiniteGradedPrice(result) && item.type === 'graded') return // retain stale/manual
-        if (result && typeof result.price === 'number' && Number.isFinite(result.price)) {
-          const updates = { currentValue: result.price, lastPriceUpdate: new Date().toISOString() }
-          // Always update image for sealed items on refresh — corrects wrong images from generic queries
-          if (item.type === 'sealed' && result.image) updates.imageUrl = result.image
-          store.updateItem(portfolio.value.id, item.id, updates)
-          updated++
-        }
-      } catch {
-        // Graded/sealed miss or offline — keep existing value
-      }
-    }),
-    // Non-Pokémon graded — fetchPrice(query, grade) only. Never getTcgPrice/raw.
-    mapPool(otherTcgGradedItems, REFRESH_CONCURRENCY, async item => {
-      const query = pcQueryForItem(item)
-      const grade = pcGradeForItem(item)
-      if (!query) return
-      // Riftbound without collector # — refuse fuzzy graded auto-price.
-      const guard = riftboundGradedFetchGuard({
-        game: item.game,
-        number: item.cardData?.number,
-        name: item.cardData?.name || item.name,
-        cardData: item.cardData,
-      }, query)
-      if (!guard.ok) return
-      try {
-        const result = await fetchPrice(query, grade)
-        if (!isFiniteGradedPrice(result)) return // retain Collectr/manual/stale
-        store.updateItem(portfolio.value.id, item.id, {
-          currentValue: result.price,
-          lastPriceUpdate: new Date().toISOString(),
-        })
-        updated++
-      } catch {
-        // no_graded_data / offline / timeout — never raw fallback
-      }
-    }),
-    // Non-Pokémon raw cards + sealed — priceFeedService routes per game
-    mapPool(otherTcgRawItems, REFRESH_CONCURRENCY, async item => {
-      const query = item.name || item.cardData?.name
-      if (!query) return
-      try {
-        const price = await getTcgPrice(query, item.game)
-        if (typeof price === 'number' && Number.isFinite(price)) {
-          const updates = item.type === 'card'
-            ? { currentMarketPrice: price, lastPriceUpdate: new Date().toISOString() }
-            : { currentValue: price, lastPriceUpdate: new Date().toISOString() }
-          store.updateItem(portfolio.value.id, item.id, updates)
-          updated++
-        }
-      } catch {}
-    }),
-  ])
+      }),
+      // Non-Pokémon raw cards + sealed — priceFeedService routes per game
+      mapPool(otherTcgRawItems, REFRESH_CONCURRENCY, async item => {
+        const query = item.name || item.cardData?.name
+        if (!query) return
+        try {
+          const price = await getTcgPrice(query, item.game)
+          if (typeof price === 'number' && Number.isFinite(price)) {
+            const updates = item.type === 'card'
+              ? { currentMarketPrice: price, lastPriceUpdate: new Date().toISOString() }
+              : { currentValue: price, lastPriceUpdate: new Date().toISOString() }
+            store.updateItem(shelfId, item.id, updates)
+            updated++
+          }
+        } catch {}
+      }),
+    ])
 
-  if (updated > 0) store.recordSnapshot(portfolio.value.id)
+    if (updated > 0) store.recordSnapshot(shelfId)
 
-  // Check price alerts
-  const priceMap = new Map()
-  for (const item of portfolio.value.items) {
-    if (item.type === 'card' && item.cardId) {
-      priceMap.set(item.cardId, item.currentMarketPrice || item.purchasePrice || 0)
+    // Check price alerts against the shelf we refreshed (captured id; $0 is valid)
+    const refreshedShelf = store.portfolios.find(p => p.id === shelfId)
+    const alertItems = refreshedShelf?.items || itemsSnapshot
+    const priceMap = new Map()
+    for (const item of alertItems) {
+      if (item.type === 'card' && item.cardId) {
+        priceMap.set(item.cardId, finiteMoney(item.currentMarketPrice) ?? finiteMoney(item.purchasePrice) ?? 0)
+      }
     }
-  }
-  const triggered = checkAlerts(priceMap)
-  if (triggered.length > 0) notifyTriggered(triggered)
+    const triggered = checkAlerts(priceMap)
+    if (triggered.length > 0) notifyTriggered(triggered)
 
-  refreshStatus.value = updated > 0 ? `Updated ${updated} item${updated > 1 ? 's' : ''}` : 'No updates'
-  setTimeout(() => { refreshStatus.value = '' }, 3000)
-  refreshing.value = false
+    // Dead instance: finish captured writes/alerts only — no UI timers or setup handoff
+    if (disposed) return
+
+    refreshStatus.value = updated > 0 ? `Updated ${updated} item${updated > 1 ? 's' : ''}` : 'No updates'
+    refreshStatusTimer = setTimeout(() => {
+      refreshStatus.value = ''
+      refreshStatusTimer = null
+    }, 3000)
+  } finally {
+    refreshing.value = false
+    // Live instance only: flush same-instance deferred setup if any
+    if (!disposed) flushPendingShelfSetup()
+  }
 }
 
-onMounted(() => { refreshPrices() })
+/**
+ * Run post-init setup for a shelf id once on this instance. Marks complete only when
+ * work starts (not when deferred due to in-flight refresh). Dead instances never start work.
+ * Missing non-empty ids (no matching portfolio) do zero setup/API work.
+ */
+function startShelfSetup(id) {
+  if (disposed || !id || lastSetupShelfId.value === id) return
+  // Only ever set up this instance's captured shelf
+  if (id !== instanceShelfId) return
+  // Require a real local shelf after store init — not-found must not hit APIs
+  if (!store.initialized || !store.portfolios.some(p => p.id === id)) return
+  lastSetupShelfId.value = id
+  loadMsSetMeta(id)
+  refreshPrices()
+}
+
+/** After in-flight refresh settles, run deferred setup for this instance if still needed. */
+function flushPendingShelfSetup() {
+  if (disposed) return
+  const queued = pendingSetupShelfId
+  pendingSetupShelfId = null
+  // Identity is instance-captured — never read live route.params here
+  const currentId = instanceShelfId || null
+  const target = (queued && currentId === queued)
+    ? queued
+    : (currentId && lastSetupShelfId.value !== currentId ? currentId : null)
+  if (!target || !store.initialized) return
+  if (lastSetupShelfId.value === target) return
+  // Missing shelf: do not start setup/API work from the flush path either
+  if (!store.portfolios.some(p => p.id === target)) return
+  startShelfSetup(target)
+}
+
+// After store init only: run setup + price refresh once for this instance's captured id
+// when a matching portfolio exists. Empty id and missing non-empty id never trigger
+// loadMsSetMeta/refreshPrices. Cold direct-open waits for init (no false not-found).
+// Primary A→B isolation is instanceShelfId (leaving A stays A). pendingSetupShelfId is
+// only a same-instance deferral if refresh is already in-flight when setup would run.
+watch(
+  () => ({
+    ready: store.initialized,
+    id: instanceShelfId || null,
+    hasShelf: !!(instanceShelfId && store.portfolios.some(p => p.id === instanceShelfId)),
+  }),
+  ({ ready, id, hasShelf }) => {
+    if (disposed || !ready || !id || !hasShelf) return
+    if (lastSetupShelfId.value === id) return
+    if (refreshing.value) {
+      pendingSetupShelfId = id
+      return
+    }
+    pendingSetupShelfId = null
+    startShelfSetup(id)
+  },
+  { immediate: true },
+)
+
+onBeforeUnmount(() => {
+  disposed = true
+  window.removeEventListener('resize', onWindowResize)
+  if (_resizeTimer) {
+    clearTimeout(_resizeTimer)
+    _resizeTimer = null
+  }
+  if (linkCopiedTimer) {
+    clearTimeout(linkCopiedTimer)
+    linkCopiedTimer = null
+  }
+  if (refreshStatusTimer) {
+    clearTimeout(refreshStatusTimer)
+    refreshStatusTimer = null
+  }
+  // Invalidate in-flight meta loads and drop deferred setup
+  msMetaGen++
+  pendingSetupShelfId = null
+})
+
 function exportPortfolio() { if (portfolio.value) exportPortfolioToExcel(portfolio.value) }
 function deletePortfolio() { store.deletePortfolio(portfolio.value.id); router.push('/') }
 </script>
 
 <style scoped>
 .portfolio-view { max-width: 1200px; margin: 0 auto; padding-bottom: 80px; }
+
+.shelf-gate { min-height: 40vh; display: flex; align-items: center; justify-content: center; padding: 24px 16px; }
+.shelf-gate-state { width: 100%; max-width: 360px; }
+.shelf-not-found-cta { min-height: 44px; min-width: 44px; }
+
+.shelf-link-btn {
+  min-height: 44px;
+  min-width: 44px;
+  padding: 10px 14px;
+}
+.shelf-link-help {
+  font-size: 12px;
+  line-height: 1.45;
+  max-width: 52rem;
+  margin: 0;
+}
+.shelf-link-fallback {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-width: 100%;
+  min-width: 0;
+}
+.shelf-link-fallback-label { font-size: 11px; font-weight: 700; }
+.shelf-link-error {
+  margin: 0;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--danger-text);
+  line-height: 1.4;
+}
+.shelf-link-input {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 12px;
+  min-height: 44px;
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
 
 .portfolio-header { display: flex; flex-direction: column; gap: 16px; margin-bottom: 24px; position: relative; }
 
@@ -1254,9 +1537,27 @@ function deletePortfolio() { store.deletePortfolio(portfolio.value.id); router.p
 
 /* Action Dropdown */
 .action-dropdown { position: relative; }
-.dropdown-menu { position: absolute; top: 100%; right: 0; background: var(--bg-card); border: var(--bw) solid var(--ink); border-radius: var(--radius); box-shadow: var(--shadow-sm); width: 200px; z-index: 50; padding: 6px; display: flex; flex-direction: column; }
-.dropdown-menu button { padding: 10px 14px; text-align: left; background: none; border: none; color: var(--text-primary); font-weight: 600; cursor: pointer; border-radius: 8px; font-size: 14px; }
+/* Mobile more-actions trigger (entry to Copy link) — ≥44px touch target */
+.shelf-more-actions-btn {
+  min-height: 44px;
+  min-width: 44px;
+}
+.dropdown-menu { position: absolute; top: 100%; right: 0; background: var(--bg-card); border: var(--bw) solid var(--ink); border-radius: var(--radius); box-shadow: var(--shadow-sm); width: 200px; max-width: min(200px, calc(100vw - 32px)); z-index: 50; padding: 6px; display: flex; flex-direction: column; }
+.dropdown-menu button {
+  padding: 10px 14px;
+  min-height: 44px;
+  text-align: left;
+  background: none;
+  border: none;
+  color: var(--text-primary);
+  font-weight: 600;
+  cursor: pointer;
+  border-radius: 8px;
+  font-size: 14px;
+}
 .dropdown-menu button:hover { background: var(--bg-hover); }
+.dropdown-menu button:disabled { opacity: 0.55; cursor: not-allowed; }
+.shelf-link-menu-item { min-height: 44px; }
 
 /* Bulk Action Bar */
 .bulk-action-bar { position: fixed; bottom: 20px; left: 16px; right: 16px; background: var(--bg-card); border: var(--bw) solid var(--ink); border-radius: var(--radius); box-shadow: var(--shadow); padding: 12px 16px; z-index: 80; }
