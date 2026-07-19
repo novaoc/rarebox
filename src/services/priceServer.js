@@ -1,15 +1,10 @@
-// Rarebox Price Service — PriceCharting JSON API, runs directly in the browser.
-// No backend, no API key. CORS is fully open on PriceCharting's search endpoint.
+// Rarebox Price Service — PriceCharting search runs directly in the browser;
+// complete graded guides use a read-only same-origin endpoint. No API key.
 //
-// Price fields from the search API — VERIFIED EMPIRICALLY 2026-06-12
-// (Base Set Charizard 1st Ed: price2 $435k ↔ PSA 10 market, price3 $49k ↔
-// PSA 9 market; consistent across Pokémon/MTG/YGO/One Piece/Lorcana/
-// Riftbound samples — price2 > price3 everywhere):
-//   price1 = ungraded / loose (raw cards and sealed)
-//   price2 = TOP grade (PSA 10 / gem tier)
-//   price3 = Grade 9
-// The old mapping had 2↔3 swapped AND fell back to the raw price when
-// graded data was missing — which quoted raw prices as "PSA 10".
+// The CORS-open search JSON exposes only loose, PSA 10, and Grade 9. For a
+// graded request we resolve the exact product first, then call Rarebox's
+// same-origin /api/pricecharting_grades endpoint for PriceCharting's complete
+// public grade guide (1-9.5 plus company-specific 10 tiers).
 
 import {
   extractCollectorNumber,
@@ -21,6 +16,8 @@ const PC_BASE = 'https://www.pricecharting.com'
 // In-memory cache — 1 hour TTL, max 200 entries
 const _cache = new Map()
 const CACHE_TTL = 60 * 60 * 1000
+const FULL_GRADE_TIMEOUT = 15000
+const _gradeCache = new Map()
 
 function cacheGet(key) {
   const entry = _cache.get(key)
@@ -104,27 +101,48 @@ function parsePrice(val) {
 }
 
 /**
- * Pick the right price field based on grade.
- * Grade 10 family (PSA/BGS/CGC/ACE 10) → price2 (top grade)
- * Grade 9–9.5 → price3 (grade 9)
- * Ungraded → price1
- * A graded request with no graded market data returns NULL — never the
- * raw price. Quoting raw as "PSA 10" is how mispriced slabs happen.
+ * Select one exact normalized full-guide tier. Missing data returns null;
+ * never substitute PSA 10, Grade 9, raw market, or another company.
  */
-function priceForGrade(product, grade) {
-  const g = String(grade || 'ungraded').toLowerCase()
-  if (g === '10' || g.endsWith('10') || g === 'bgs10b') {
-    return parsePrice(product.price2)
+export function priceForGrade(product, grade, fullPrices = null) {
+  const key = String(grade || 'ungraded').toLowerCase()
+  if (key === 'ungraded') return parsePrice(product?.price1)
+  if (!fullPrices || key === 'unsupported10') return null
+  return parsePrice(fullPrices[key])
+}
+
+function gradeLabel(key) {
+  const labels = {
+    psa10: 'PSA 10', bgs10: 'BGS 10', bgs10_black: 'BGS 10 Black',
+    cgc10: 'CGC 10', cgc10_pristine: 'CGC 10 Pristine', sgc10: 'SGC 10',
+    ace10: 'ACE 10', tag10: 'TAG 10', unsupported10: 'Unsupported 10',
   }
-  if (g.includes('9')) {
-    return parsePrice(product.price3)
+  if (labels[key]) return labels[key]
+  const m = String(key).match(/^grade(\d+)(?:_(\d+))?$/)
+  return m ? `Grade ${m[1]}${m[2] ? `.${m[2]}` : ''}` : String(key)
+}
+
+async function fetchFullGradePrices(productId) {
+  const id = String(productId || '')
+  if (!/^\d{1,20}$/.test(id)) throw new Error('no_graded_data')
+  const hit = _gradeCache.get(id)
+  if (hit && Date.now() < hit.expires) return hit.data
+  let res
+  try {
+    res = await fetch(`/api/pricecharting_grades?id=${encodeURIComponent(id)}`, {
+      signal: AbortSignal.timeout(FULL_GRADE_TIMEOUT),
+    })
+  } catch (e) {
+    if (e?.name === 'TimeoutError' || e?.name === 'AbortError') throw new Error('timeout')
+    throw new Error('server_down')
   }
-  if (g !== 'ungraded' && /\d/.test(g)) {
-    // grade 8 and below: PC's search API has no field for it — grade 9 is
-    // the nearest graded anchor; null when even that's missing
-    return parsePrice(product.price3)
-  }
-  return parsePrice(product.price1)
+  if (!res.ok) throw new Error(res.status === 404 ? 'no_graded_data' : 'server_down')
+  const data = await res.json()
+  const prices = data?.prices && typeof data.prices === 'object' ? data.prices : null
+  if (!prices) throw new Error('no_graded_data')
+  const value = { prices, product_url: data.product_url || '' }
+  _gradeCache.set(id, { data: value, expires: Date.now() + CACHE_TTL })
+  return value
 }
 
 /**
@@ -213,7 +231,9 @@ export async function fetchPrice(query, grade = 'ungraded') {
     product = (scored[0]?.score > 0 ? scored[0].p : filtered[0])
   }
 
-  const price = priceForGrade(product, grade)
+  let fullGradeData = null
+  if (isGraded) fullGradeData = await fetchFullGradePrices(product.id)
+  const price = priceForGrade(product, grade, fullGradeData?.prices)
   // $0 is a valid market price — only null means missing graded/raw data.
   // Graded requests must never fall through to raw price1 (priceForGrade
   // already returns null when graded fields are absent).
@@ -222,16 +242,13 @@ export async function fetchPrice(query, grade = 'ungraded') {
   const result = {
     query: q,
     grade,
+    grade_label: gradeLabel(grade),
     price,
     product_name: product.productName || '',
     product_set: product.consoleName || '',
-    product_url: product.id ? `${PC_BASE}/game/${product.id}` : '',
+    product_url: fullGradeData?.product_url || (product.id ? `${PC_BASE}/game/${product.id}` : ''),
     image: product.imageUri || '',
-    all_grades: {
-      ungraded: parsePrice(product.price1),
-      grade9:   parsePrice(product.price3),
-      grade10:  parsePrice(product.price2),
-    },
+    all_grades: { ungraded: parsePrice(product.price1), ...(fullGradeData?.prices || {}) },
     cached: false,
   }
 

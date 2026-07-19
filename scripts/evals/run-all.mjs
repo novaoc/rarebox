@@ -11,6 +11,8 @@ const evals = [
   'scripts/evals/route-safety.mjs',
   'scripts/evals/backup-roundtrip.mjs',
   'scripts/evals/riftbound-graded.mjs',
+  'scripts/evals/pricecharting-full-grades.mjs',
+  ['python3', 'scripts/evals/pricecharting_full_grades.py'],
 ]
 
 let failed = false

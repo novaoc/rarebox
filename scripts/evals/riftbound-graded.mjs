@@ -60,7 +60,7 @@ runEval('graded PC query keeps Riftbound identity + variant text', () => {
 
   assert(pcGradeForItem({ type: 'graded', gradingCompany: 'PSA', grade: '10' }) === 'psa10',
     'PSA 10 grade token')
-  assert(pcGradeForItem({ type: 'graded', gradingCompany: 'BGS', grade: '9.5' }) === '9.5',
+  assert(pcGradeForItem({ type: 'graded', gradingCompany: 'BGS', grade: '9.5' }) === 'grade9_5',
     'BGS 9.5 grade token')
   assert(pcGradeForItem({ type: 'card' }) === 'ungraded', 'non-graded is ungraded')
 
