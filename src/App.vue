@@ -19,6 +19,9 @@
         <router-link to="/search" class="nav-item" @click="sidebarOpen = false">
           <span class="nav-icon">⌕</span> Search Cards
         </router-link>
+        <router-link to="/pokedex" class="nav-item" @click="sidebarOpen = false">
+          <span class="nav-icon">📖</span> Pokédex Tracker
+        </router-link>
         <router-link to="/sets" class="nav-item" @click="sidebarOpen = false">
           <span class="nav-icon">◫</span> Browse Sets
         </router-link>
@@ -170,6 +173,7 @@ const portfolioColors = [
 const currentPageTitle = computed(() => {
   if (route.name === 'Dashboard') return 'Dashboard'
   if (route.name === 'Search') return 'Search Cards'
+  if (route.name === 'Pokedex') return 'Pokédex Tracker'
   if (route.name === 'Sets') return 'Browse Sets'
   if (route.name === 'Settings') return 'Settings'
   if (route.name === 'Terms') return 'Terms & Conditions'
