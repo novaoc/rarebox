@@ -275,6 +275,41 @@
         <PortfolioChart :portfolios="store.portfolios" :height="300" label="All Portfolios" />
       </div>
 
+      <!-- Trade Log Section -->
+      <div class="card mb-4">
+        <div class="section-header">
+          <div>
+            <div class="section-title">Trade Log</div>
+            <div class="section-subtitle">History of your manual trades</div>
+          </div>
+          <button class="btn btn-secondary btn-sm" @click="showTradeModal = true">+ Log Trade</button>
+        </div>
+        
+        <div v-if="store.tradeLog.length === 0" class="empty-state py-4 text-center text-muted">
+          No trades logged yet. Track your card swaps and deals here.
+        </div>
+        
+        <div v-else class="trade-list">
+          <div v-for="trade in store.tradeLog" :key="trade.id" class="trade-entry">
+            <div class="trade-date">{{ new Date(trade.date).toLocaleDateString() }}</div>
+            <div class="trade-main">
+              <div class="trade-side">
+                <span class="text-danger">Out:</span> {{ trade.gave }}
+              </div>
+              <div class="trade-side">
+                <span class="text-success">In:</span> {{ trade.received }}
+              </div>
+            </div>
+            <div class="trade-val" v-if="trade.valueDifference">
+              <span :class="trade.valueDifference >= 0 ? 'text-success' : 'text-danger'">
+                {{ trade.valueDifference >= 0 ? '+' : '' }}${{ trade.valueDifference.toFixed(2) }}
+              </span>
+            </div>
+            <button class="btn-icon text-muted" @click="store.deleteTrade(trade.id)">×</button>
+          </div>
+        </div>
+      </div>
+
       <!-- Individual portfolio cards -->
       <div class="section-header">
         <div class="section-title">Portfolios</div>
@@ -328,6 +363,29 @@
         </router-link>
       </div>
     </div>
+
+    <!-- Trade Modal -->
+    <div v-if="showTradeModal" class="modal-overlay" @click.self="showTradeModal = false">
+      <div class="modal-content">
+        <h3>Log Trade</h3>
+        <div class="form-group mb-3">
+          <label>Items Given</label>
+          <input v-model="newTrade.gave" placeholder="e.g. Charizard ex, $10" class="input-field" />
+        </div>
+        <div class="form-group mb-3">
+          <label>Items Received</label>
+          <input v-model="newTrade.received" placeholder="e.g. Mew ex OBF" class="input-field" />
+        </div>
+        <div class="form-group mb-3">
+          <label>Value Difference ($)</label>
+          <input type="number" v-model.number="newTrade.valueDifference" placeholder="0.00" class="input-field" />
+        </div>
+        <div class="modal-actions">
+          <button class="btn btn-secondary" @click="showTradeModal = false">Cancel</button>
+          <button class="btn btn-primary" @click="saveTrade">Save Trade</button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -340,6 +398,9 @@ import PortfolioChart from '../components/PortfolioChart.vue'
 const store = usePortfolioStore()
 const featuresRef = ref(null)
 
+const showTradeModal = ref(false)
+const newTrade = ref({ gave: '', received: '', valueDifference: 0 })
+
 // New user = every portfolio has 0 items (store auto-creates one empty portfolio on init)
 const isNewUser = computed(() => {
   return store.portfolios.every(p => p.items.length === 0)
@@ -347,6 +408,13 @@ const isNewUser = computed(() => {
 
 function scrollToFeatures() {
   featuresRef.value?.scrollIntoView({ behavior: 'smooth' })
+}
+
+function saveTrade() {
+  if (!newTrade.value.gave || !newTrade.value.received) return
+  store.logTrade({ ...newTrade.value })
+  newTrade.value = { gave: '', received: '', valueDifference: 0 }
+  showTradeModal.value = false
 }
 
 const totalGain = computed(() => store.totalPortfolioValue - store.totalCostBasis)
@@ -412,6 +480,39 @@ onMounted(async () => {
 
 <style scoped>
 .dashboard { max-width: 1200px; margin: 0 auto; }
+
+/* ── Trade Log Styles ── */
+.trade-list { display: flex; flex-direction: column; }
+.trade-entry {
+  display: flex;
+  align-items: center;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  gap: 12px;
+}
+.trade-entry:last-child { border-bottom: none; }
+.trade-date { font-size: 12px; color: var(--text-secondary); width: 80px; flex-shrink: 0; }
+.trade-main { flex: 1; display: flex; flex-direction: column; gap: 2px; }
+.trade-side { font-size: 14px; font-weight: 500; }
+.trade-val { font-size: 14px; font-weight: 600; width: 70px; text-align: right; }
+.btn-icon { background: none; border: none; font-size: 18px; cursor: pointer; padding: 4px; border-radius: 4px; }
+.btn-icon:hover { background: var(--bg-secondary); }
+
+/* ── Modal Styles (generic for dashboard) ── */
+.modal-overlay {
+  position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 1000;
+}
+.modal-content {
+  background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-lg);
+  padding: 24px; width: 100%; max-width: 400px;
+}
+.modal-content h3 { margin-bottom: 16px; }
+.input-field {
+  width: 100%; padding: 10px; border-radius: var(--radius); border: 1px solid var(--border);
+  background: var(--bg-primary); color: var(--text-primary); margin-top: 4px;
+}
+.modal-actions { display: flex; gap: 12px; justify-content: flex-end; margin-top: 20px; }
 
 /* ── Landing Page ── */
 .landing {
@@ -672,49 +773,30 @@ onMounted(async () => {
   transition: all 0.2s;
   text-decoration: none;
   color: inherit;
-  display: block;
-  position: relative;
-}
-.portfolio-card:hover {
-  border-color: var(--p-color, var(--accent));
-  transform: translateY(-2px);
-  box-shadow: 0 8px 24px rgba(0,0,0,0.3);
-  text-decoration: none;
-}
-.portfolio-card-accent {
-  height: 3px;
-  background: var(--p-color, var(--accent));
-}
-.portfolio-card-body { padding: 16px; }
-
-.portfolio-card-header {
   display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 14px;
+  flex-direction: column;
 }
+
+.portfolio-card:hover { border-color: var(--accent); transform: translateY(-2px); }
+
+.portfolio-card-accent { height: 4px; background: var(--p-color); }
+.portfolio-card-body { padding: 16px; flex: 1; display: flex; flex-direction: column; }
+.portfolio-card-header { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
 .portfolio-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
-.portfolio-card-name { font-size: 15px; font-weight: 700; }
-
-.portfolio-card-stats { display: flex; gap: 16px; margin-bottom: 14px; }
+.portfolio-card-name { font-weight: 700; font-size: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.portfolio-card-stats { display: flex; gap: 16px; margin-bottom: 16px; }
 .p-stat { display: flex; flex-direction: column; gap: 2px; }
-.p-stat-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); }
-.p-stat-val { font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.p-stat-label { font-size: 11px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; }
+.p-stat-val { font-size: 14px; font-weight: 600; }
 
-.portfolio-mini-items {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-.mini-card-img { width: 30px; height: 42px; object-fit: contain; border-radius: 2px; pointer-events: none; -webkit-user-drag: none; user-drag: none; }
-.mini-more { font-size: 11px; color: var(--text-muted); margin-left: 4px; }
-.portfolio-empty-items { font-size: 12px; height: 42px; display: flex; align-items: center; }
+.portfolio-mini-items { display: flex; align-items: center; gap: -8px; margin-top: auto; }
+.mini-card-img { width: 40px; height: 56px; object-fit: cover; border-radius: 4px; border: 1px solid var(--border); margin-left: -12px; background: var(--bg-secondary); }
+.mini-card-img:first-child { margin-left: 0; }
+.mini-more { margin-left: 8px; font-size: 12px; color: var(--text-secondary); font-weight: 500; }
+.portfolio-empty-items { font-size: 12px; margin-top: auto; font-style: italic; }
 
 @media (max-width: 640px) {
-  .dashboard { padding: 0; }
-  .stats-row { grid-template-columns: 1fr 1fr; gap: 8px; }
-  .portfolios-grid { grid-template-columns: 1fr; gap: 12px; }
-  .portfolio-card-stats { gap: 12px; }
-  .portfolio-card-body { padding: 12px; }
+  .stats-row { grid-template-columns: 1fr 1fr; }
+  .portfolios-grid { grid-template-columns: 1fr; }
 }
 </style>
