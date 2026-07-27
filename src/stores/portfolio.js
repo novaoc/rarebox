@@ -27,6 +27,7 @@ export const usePortfolioStore = defineStore('portfolio', () => {
   const activePortfolioId = ref(null)
   const settings = ref({ currency: 'USD', defaultPortfolioId: null })
   const snapshots = ref({})
+  const tradeLog = ref([])
   const initialized = ref(false)
 
   // ── Persistence ──────────────────────────────────────────────────────
@@ -37,6 +38,7 @@ export const usePortfolioStore = defineStore('portfolio', () => {
       activePortfolioId: activePortfolioId.value,
       settings: settings.value,
       snapshots: snapshots.value,
+      tradeLog: tradeLog.value,
     }))
   }
 
@@ -45,6 +47,7 @@ export const usePortfolioStore = defineStore('portfolio', () => {
     if (state.activePortfolioId) activePortfolioId.value = state.activePortfolioId
     if (state.settings) settings.value = { ...settings.value, ...state.settings }
     if (state.snapshots) snapshots.value = state.snapshots
+    if (state.tradeLog) tradeLog.value = state.tradeLog
   }
 
   // Debounced save to IDB
@@ -245,6 +248,24 @@ export const usePortfolioStore = defineStore('portfolio', () => {
     })
   }
 
+  // ── Trade Log ───────────────────────────────────────────────────────
+
+  function logTrade(trade) {
+    const entry = {
+      id: generateId(),
+      date: new Date().toISOString(),
+      ...trade
+    }
+    tradeLog.value.unshift(entry)
+    if (tradeLog.value.length > 100) tradeLog.value.pop()
+    persist()
+  }
+
+  function deleteTrade(id) {
+    tradeLog.value = tradeLog.value.filter(t => t.id !== id)
+    persist()
+  }
+
   // ── Helpers ──────────────────────────────────────────────────────────
 
   function isJPCard(item) {
@@ -364,6 +385,7 @@ export const usePortfolioStore = defineStore('portfolio', () => {
     portfolios.value = []
     activePortfolioId.value = null
     snapshots.value = {}
+    tradeLog.value = []
     settings.value = { currency: 'USD', defaultPortfolioId: null }
     // Clear both IDB and any leftover localStorage
     await saveState(null)
@@ -405,6 +427,7 @@ export const usePortfolioStore = defineStore('portfolio', () => {
     activePortfolio,
     settings,
     snapshots,
+    tradeLog,
     initialized,
     totalPortfolioValue,
     totalCostBasis,
@@ -419,6 +442,8 @@ export const usePortfolioStore = defineStore('portfolio', () => {
     updateItem,
     removeItem,
     updateCardPrice,
+    logTrade,
+    deleteTrade,
     getPortfolioStats,
     recordSnapshot,
     getItemHistory,
