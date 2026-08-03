@@ -30,7 +30,7 @@
       </div>
 
       <apexchart
-        type="area"
+        type="line"
         :height="height"
         :options="chartOptions"
         :series="chartSeries"
@@ -95,7 +95,7 @@ const totalChangePct = computed(() => totalCost.value > 0 ? (totalChange.value /
 
 const chartOptions = ref({
   chart: {
-    type: 'area',
+    type: 'line',
     background: 'transparent',
     toolbar: { show: false },
     zoom: { enabled: false },
@@ -103,17 +103,15 @@ const chartOptions = ref({
   },
   theme: { mode: 'dark' },
   dataLabels: { enabled: false },
-  stroke: { curve: 'smooth', width: 2 },
-  fill: {
-    type: 'gradient',
-    gradient: {
-      shadeIntensity: 1,
-      opacityFrom: 0.3,
-      opacityTo: 0.02,
-      stops: [0, 100]
-    }
+  stroke: { 
+    curve: 'smooth', 
+    width: [3, 2],
+    dashArray: [0, 5] 
   },
-  colors: ['#f5a623'],
+  fill: {
+    type: 'solid'
+  },
+  colors: ['#f5a623', '#8b949e'],
   xaxis: {
     type: 'datetime',
     labels: { style: { colors: '#8b949e', fontSize: '11px' } },
@@ -136,7 +134,13 @@ const chartOptions = ref({
     strokeDashArray: 3,
     padding: { left: 4, right: 4 }
   },
-  markers: { size: 0, hover: { size: 5 } }
+  markers: { size: 0, hover: { size: 5 } },
+  legend: {
+    show: true,
+    position: 'top',
+    horizontalAlign: 'right',
+    labels: { colors: '#8b949e' }
+  }
 })
 
 // Find which portfolio an item belongs to
@@ -230,9 +234,12 @@ async function buildPortfolioHistory() {
 
   // LOCF: for every timestamp, each item contributes its most recent known price
   const points = sortedTs.map(ts => {
-    let total = 0
+    let totalValue = 0
+    let totalCostBasis = 0
     for (const item of allItems) {
       const qty = item.quantity || 1
+      const cost = (item.purchasePrice || 0) * qty
+      
       const series = itemSeriesMap[item.id]
       if (series) {
         let price = item.purchasePrice || 0
@@ -240,10 +247,16 @@ async function buildPortfolioHistory() {
           if (pt.x <= ts) price = pt.y
           else break
         }
-        total += price * qty
+        totalValue += price * qty
+      }
+
+      // Cost basis logic: only count cost if purchase date is <= ts
+      const itemPurchaseTs = item.purchaseDate ? new Date(item.purchaseDate).getTime() : 0
+      if (itemPurchaseTs <= ts) {
+        totalCostBasis += cost
       }
     }
-    return { x: ts, y: Math.round(total * 100) / 100 }
+    return { x: ts, y: Math.round(totalValue * 100) / 100, cost: Math.round(totalCostBasis * 100) / 100 }
   })
 
   applyRange(points)
@@ -268,7 +281,7 @@ function applyRange(points) {
     const before = points.filter(p => p.x < cutoff)
     if (before.length > 0) {
       const anchor = before[before.length - 1]
-      filtered = [{ x: cutoff, y: anchor.y }, ...filtered]
+      filtered = [{ x: cutoff, y: anchor.y, cost: anchor.cost }, ...filtered]
     }
   }
 
@@ -282,7 +295,7 @@ function applyRange(points) {
   const dtFmt = rangeDateFormats[activeRange.value] || { format: 'MMM yyyy' }
   chartOptions.value = {
     ...chartOptions.value,
-    colors: [color],
+    colors: [color, '#8b949e'],
     xaxis: {
       ...chartOptions.value.xaxis,
       labels: {
@@ -298,7 +311,11 @@ function applyRange(points) {
       tickAmount: activeRange.value === '7d' ? 7 : activeRange.value === '1m' ? 6 : undefined,
     },
   }
-  chartSeries.value = [{ name: props.label, data: display }]
+  
+  chartSeries.value = [
+    { name: props.label, data: display.map(p => ({ x: p.x, y: p.y })) },
+    { name: 'Cost Basis', data: display.map(p => ({ x: p.x, y: p.cost })) }
+  ]
 }
 
 // Debounce rebuild so rapid price refreshes don't trigger multiple full chart rebuilds
