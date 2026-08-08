@@ -179,7 +179,7 @@
 import RbIcon from './icons/RbIcon.vue'
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { fetchSetCards, sortByNumber } from '../utils/masterSets'
-import { loadWantlist, saveWantlist, generateWantId, wantKey } from '../utils/wantlist'
+import { isoCards } from '../utils/wantlist'
 
 const props = defineProps({
   group: { type: Object, required: true }, // { key, name, game, gameLabel, setId, lang, items, hunt }
@@ -323,26 +323,8 @@ onUnmounted(() => window.removeEventListener('keydown', onPreviewKey))
 const isoDone = ref(false)
 
 function isoTheRest() {
-  const wants = loadWantlist()
-  const have = new Set(wants.map(wantKey))
   const missing = cards.value.filter(c => !isOwned(c) && !props.marks[c.id])
-  for (const c of missing) {
-    const entry = {
-      id: generateWantId(),
-      type: 'card',
-      game: props.group.game || 'pokemon',
-      cardId: c.id,
-      name: c.name || '',
-      setName: c.set?.name || props.group.name || '',
-      number: c.number || '',
-      img: c.images?.small || '',
-      qty: 1,
-      maxPrice: 0,
-      addedAt: new Date().toISOString(),
-    }
-    if (!have.has(wantKey(entry))) { wants.unshift(entry); have.add(wantKey(entry)) }
-  }
-  saveWantlist(wants)
+  isoCards(missing, { game: props.group.game || 'pokemon', setName: props.group.name || '' })
   isoDone.value = true
 }
 

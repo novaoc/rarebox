@@ -48,6 +48,8 @@ export function binderRows(portfolios) {
         key,
         name: meta.name || key.split(':').pop().toUpperCase(),
         game: meta.game || key.split(':')[0],
+        setId: meta.setId || null,
+        lang: meta.lang || null,
         owned,
         total,
         pct,
@@ -60,6 +62,29 @@ export function binderRows(portfolios) {
     (a.complete ? 1 : 0) - (b.complete ? 1 : 0) ||
     (b.pct ?? -1) - (a.pct ?? -1)
   )
+}
+
+/**
+ * The cards from a fetched set list the shelf does NOT own — same matching
+ * rules as MasterSetGallery's isOwned: cardId when stored, name|number for
+ * older items, bare name for pre-number items. Feeds Home's "≈ $X to
+ * finish" line and its "want the rest" action.
+ */
+export function missingFromList(items, cards) {
+  const ids = new Set()
+  const nameKeys = new Set()
+  for (const i of items || []) {
+    if (i.cardId) ids.add(i.cardId)
+    const name = (i.cardData?.name || '').toLowerCase()
+    if (!name) continue
+    const num = String(i.cardData?.number || '')
+    nameKeys.add(num ? `${name}|${num}` : name)
+  }
+  return (cards || []).filter(c => {
+    if (ids.has(c.id)) return false
+    const name = (c.name || '').toLowerCase()
+    return !nameKeys.has(`${name}|${String(c.number || '')}`) && !nameKeys.has(name)
+  })
 }
 
 /** Per-game completion summary for the Sets hub tiles: game → { pct, sets } */

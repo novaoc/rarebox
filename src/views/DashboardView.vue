@@ -198,7 +198,7 @@
       </div>
 
       <div class="dash-grid">
-        <div class="dash-col dash-col-rail">
+        <div class="dash-col dash-rail-a">
       <!-- ── Today: contextual, renders only when a trigger is live ── -->
       <router-link v-if="todayCard" :to="todayCard.to" class="card today-card mb-4">
         <span class="badge badge-info">Today</span>
@@ -226,6 +226,52 @@
         </div>
       </template>
 
+        </div>
+        <div class="dash-col dash-col-main">
+
+      <!-- ── Binder progress ───────────────────────────────────────── -->
+      <template v-if="binderList.length">
+        <div class="section-header">
+          <div class="section-title">Binder progress</div>
+        </div>
+        <div class="binder-list mb-4">
+          <router-link
+            v-for="row in binderList.slice(0, 5)"
+            :key="row.portfolioId + row.key"
+            :to="`/shelf/${row.portfolioId}`"
+            class="card binder-row"
+          >
+            <div class="binder-head">
+              <span class="binder-name">{{ row.name }}</span>
+              <span class="binder-count">{{ row.owned }}/{{ row.total ?? '?' }}<template v-if="row.pct != null"> · {{ row.pct }}%</template></span>
+            </div>
+            <div class="progressbar" role="progressbar" :aria-valuenow="row.pct ?? 0" aria-valuemin="0" aria-valuemax="100" :aria-label="`${row.name} completion`">
+              <div class="progressbar-fill" :class="{ complete: row.complete }" :style="{ width: (row.pct ?? 0) + '%' }"></div>
+            </div>
+            <div class="binder-foot">
+              <span v-if="row.complete" class="badge badge-success">SET!</span>
+              <span v-else-if="row.missing != null" class="binder-missing">
+                {{ row.missing }} missing<template v-if="binderExtras[row.portfolioId + row.key]?.cost > 0"> · ≈ ${{ binderExtras[row.portfolioId + row.key].cost.toFixed(2) }} to finish</template>
+              </span>
+              <span v-else class="binder-missing">{{ row.owned }} owned</span>
+              <span class="binder-shelf">{{ row.portfolioName }}</span>
+            </div>
+            <!-- "Want the rest" rides the lazy set fetch: only rows whose
+                 missing cards are actually known offer the bulk-ISO -->
+            <button
+              v-if="!row.complete && binderExtras[row.portfolioId + row.key]?.missingCards?.length"
+              type="button"
+              class="btn btn-secondary btn-sm binder-iso-btn"
+              :disabled="binderExtras[row.portfolioId + row.key].isoDone"
+              @click.prevent.stop="wantTheRest(row)"
+            >{{ binderExtras[row.portfolioId + row.key].isoDone ? '✓ On your wantlist' : `🎯 Want the rest (${binderExtras[row.portfolioId + row.key].missingCards.length})` }}</button>
+          </router-link>
+        </div>
+      </template>
+
+        </div>
+        <div class="dash-col dash-rail-b">
+
       <!-- ── ISO wantlist preview ──────────────────────────────────── -->
       <template v-if="wantsPreview.length">
         <div class="section-header">
@@ -246,8 +292,6 @@
         </div>
       </template>
 
-        </div>
-        <div class="dash-col dash-col-main">
         </div>
       </div>
 
@@ -356,8 +400,9 @@ function hideIfOnline(e) {
 }
 import PortfolioChart from '../components/PortfolioChart.vue'
 import RbIcon from '../components/icons/RbIcon.vue'
-import { binderRows } from '../utils/binderProgress'
-import { loadWantlist } from '../utils/wantlist'
+import { binderRows, msItemKey, missingFromList } from '../utils/binderProgress'
+import { fetchSetCards } from '../utils/masterSets'
+import { loadWantlist, isoCards } from '../utils/wantlist'
 import { getTriggeredAlerts } from '../utils/alerts'
 import { loadJournal, todayEntries } from '../utils/boothJournal'
 import { loadBooths } from '../utils/booth'
@@ -452,6 +497,43 @@ const movers = computed(() => {
 })
 
 const binderList = computed(() => binderRows(visiblePortfolios.value))
+
+// ── "≈ $X to finish" + "want the rest" — lazy per-set fetch ───────────
+// Only the top 3 incomplete rows fetch their set list (fetchSetCards rides
+// the same cached layers as Browse, so repeat visits are free). Rows whose
+// showcase predates stored set ids keep the count-only fallback.
+const binderExtras = ref({}) // rowId → { cost, missingCards, isoDone }
+const _binderFetching = new Set()
+
+watch(binderList, (rows) => {
+  if (!navigator.onLine) return
+  const targets = (rows || []).filter(r => !r.complete && r.setId).slice(0, 3)
+  for (const row of targets) {
+    const id = row.portfolioId + row.key
+    if (binderExtras.value[id] || _binderFetching.has(id)) continue
+    _binderFetching.add(id)
+    fetchSetCards({ game: row.game, setId: row.setId, setName: row.name, lang: row.lang })
+      .then(cards => {
+        const p = store.portfolios.find(p => p.id === row.portfolioId)
+        const items = (p?.items || []).filter(i => msItemKey(i) === row.key)
+        const missingCards = missingFromList(items, cards)
+        const cost = missingCards.reduce((s, c) => s + (c.price || 0), 0)
+        binderExtras.value = { ...binderExtras.value, [id]: { cost, missingCards, isoDone: false } }
+      })
+      .catch(() => { /* count-only fallback stays */ })
+      .finally(() => _binderFetching.delete(id))
+  }
+}, { immediate: true })
+
+function wantTheRest(row) {
+  const id = row.portfolioId + row.key
+  const extra = binderExtras.value[id]
+  if (!extra || extra.isoDone) return
+  isoCards(extra.missingCards, { game: row.game || 'pokemon', setName: row.name || '' })
+  binderExtras.value = { ...binderExtras.value, [id]: { ...extra, isoDone: true } }
+  // The Hunting module reads the same wantlist — refresh it in place
+  try { wants.value = loadWantlist() } catch { /* keep current */ }
+}
 
 const wants = ref([])
 const wantsPreview = computed(() => wants.value.slice(0, 3))
@@ -1406,6 +1488,7 @@ async function refreshAllPrices() {
 .binder-foot { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 8px; }
 .binder-missing { font-size: 12.5px; color: var(--text-secondary); }
 .binder-shelf { font-size: 11.5px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.binder-iso-btn { margin-top: 10px; width: 100%; }
 
 .wants-row { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); }
 .want-tile { display: flex; align-items: center; gap: 12px; padding: 10px 12px; text-decoration: none; color: var(--ink); }
@@ -1421,22 +1504,28 @@ async function refreshAllPrices() {
 }
 
 
-/* ── Desktop review posture (6.8): two-column dashboard ≥1280px ────── */
-.dash-col { display: contents; } /* below 1280 the wrappers vanish — DOM order = mobile order */
+/* ── Desktop review posture (6.8): two-column dashboard ≥1280px ──────
+   Three wrappers so BOTH layouts hold: below 1280 they dissolve
+   (display:contents) and DOM order = the phone's value → change →
+   progress → wants sequence; at ≥1280 binder progress takes the left
+   column while Today/movers (rail-a) and the wantlist (rail-b) stack
+   in the right rail. */
+.dash-col { display: contents; }
 
 @media (min-width: 1280px) {
-  .dash-col { display: block; }
   .dash-grid {
     display: grid;
     grid-template-columns: 5fr 4fr;
-    gap: 20px;
+    grid-template-rows: auto auto;
+    gap: 0 20px;
     align-items: start;
     max-width: 1160px;
     margin: 0 auto;
   }
-  .dash-col { min-width: 0; }
-  .dash-col-main { order: 1; }
-  .dash-col-rail { order: 2; }
+  .dash-col { display: block; min-width: 0; }
+  .dash-col-main { grid-column: 1; grid-row: 1 / span 2; }
+  .dash-rail-a { grid-column: 2; grid-row: 1; }
+  .dash-rail-b { grid-column: 2; grid-row: 2; }
 }
 
 </style>

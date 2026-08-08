@@ -41,6 +41,35 @@ function normNumber(n) {
   return String(n || '').trim().toLowerCase().replace(/^0+(?=\d)/, '')
 }
 
+/**
+ * Bulk-ISO a list of set cards (the "ISO the rest" / "want the rest"
+ * action): each card becomes a wantlist entry unless an identical one is
+ * already there. Returns how many were added.
+ */
+export function isoCards(cards, { game, setName } = {}) {
+  const wants = loadWantlist()
+  const have = new Set(wants.map(wantKey))
+  let added = 0
+  for (const c of cards || []) {
+    const entry = {
+      id: generateWantId(),
+      type: 'card',
+      game: c.game || game || 'pokemon',
+      cardId: c.id,
+      name: c.name || '',
+      setName: c.set?.name || setName || '',
+      number: c.number || '',
+      img: c.images?.small || '',
+      qty: 1,
+      maxPrice: 0,
+      addedAt: new Date().toISOString(),
+    }
+    if (!have.has(wantKey(entry))) { wants.unshift(entry); have.add(wantKey(entry)); added++ }
+  }
+  saveWantlist(wants)
+  return added
+}
+
 /** Does a single booth item satisfy a single want? */
 export function itemMatchesWant(item, want) {
   const ik = item.cardId ? `${item.type || 'card'}:${item.game || ''}:${item.cardId}` : ''
