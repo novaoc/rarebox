@@ -1,5 +1,6 @@
 import db from '../db.js'
 import { getEnPriceMap, enrichPokemonCard, hasLivePrices } from './tcg/enPrices.js'
+import { dsPokemonSets, dsPokemonSetCards, dsJapaneseSetCards, dsCardById } from './datasetFallback.js'
 const BASE_URL = 'https://api.pokemontcg.io/v2'
 
 const cache = new Map()
@@ -102,7 +103,17 @@ export async function getCard(id, lang = null) {
     throw new Error('extra card not in supplement')
   }
   const url = `${BASE_URL}/cards/${id}`
-  const data = await fetchWithCache(url)
+  let data
+  try {
+    data = await fetchWithCache(url)
+  } catch (e) {
+    // pokemontcg.io down (500s for hours are routine) — the public dataset
+    // snapshot has the same card, at most a day behind
+    const card = await dsCardById(id).catch(() => null)
+    if (!card) throw e
+    await enrichEnCards([card])
+    return card
+  }
   await enrichEnCards([data.data])
   return data.data
 }
@@ -124,8 +135,17 @@ export async function getSets() {
     }
   } catch { /* corrupt cache — refetch */ }
   const url = `${BASE_URL}/sets?orderBy=-releaseDate&select=id,name,series,ptcgoCode,total,printedTotal,releaseDate,images`
-  const data = await fetchWithCache(url)
-  const sets = data.data
+  let sets
+  try {
+    sets = (await fetchWithCache(url)).data
+  } catch (e) {
+    // stale localStorage beats an error; the dataset snapshot beats both
+    try {
+      if (cached) return JSON.parse(cached)
+    } catch { /* corrupt — try the dataset */ }
+    sets = await dsPokemonSets().catch(() => null)
+    if (!sets) throw e
+  }
   localStorage.setItem(LS_KEY, JSON.stringify(sets))
   localStorage.setItem(LS_TS, String(Date.now()))
   return sets
@@ -137,7 +157,16 @@ export async function getCardsBySet(setId, page = 1, pageSize = 36) {
   // (verified on me2pt5: number→250 unique of 295, id→295). Ids embed the
   // collector number, so display order is unchanged.
   const url = `${BASE_URL}/cards?q=set.id:${setId}&page=${page}&pageSize=${pageSize}&orderBy=id&select=id,name,number,set,supertype,rarity,tcgplayer,images`
-  const data = await fetchWithCache(url)
+  let data
+  try {
+    data = await fetchWithCache(url)
+  } catch (e) {
+    // API down — serve the dataset snapshot, paged the same way
+    const all = await dsPokemonSetCards(setId).catch(() => null)
+    if (!all) throw e
+    const start = (page - 1) * pageSize
+    data = { data: all.slice(start, start + pageSize), totalCount: all.length }
+  }
   await enrichEnCards(data?.data)
   return data
 }
@@ -432,7 +461,24 @@ function jpIndexImages(jpIdx, setId, localId, key) {
 export async function getJapaneseCardsBySet(setId, page = 1, pageSize = 36) {
   // Fetch the set to get card list (names, numbers)
   const url = `https://api.tcgdex.net/v2/ja/sets/${setId}`
-  const setData = await fetchWithCache(url)
+  let setData
+  try {
+    setData = await fetchWithCache(url)
+  } catch (e) {
+    // tcgdex down — the dataset snapshot already carries the merged list
+    // (including the secret rares tcgdex omits); attach prices the same way
+    const rows = await dsJapaneseSetCards(setId).catch(() => null)
+    if (!rows) throw e
+    const jpPrices = await getJpPriceMap()
+    const all = rows.map(c => {
+      const price = jpPrices[jpPriceKey(setId, c.number)]
+      return price != null
+        ? { ...c, tcgplayer: { prices: { normal: { market: price, low: null, mid: price } } } }
+        : c
+    })
+    const start = (page - 1) * pageSize
+    return { data: all.slice(start, start + pageSize), totalCount: all.length }
+  }
   const series = jpSetToSeries(setId)
   const enName = JP_EN_NAMES[setId] || setData.name
   

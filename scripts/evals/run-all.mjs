@@ -17,6 +17,7 @@ const evals = [
   'scripts/evals/sealed-sku-scoring.mjs',
   'scripts/evals/jp-secret-heal.mjs',
   'scripts/evals/en-extras.mjs',
+  'scripts/evals/dataset-fallback.mjs',
   ['python3', 'scripts/evals/pricecharting_full_grades.py'],
 ]
 

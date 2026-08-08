@@ -61,6 +61,10 @@ jobs:
       - name: One Piece TCGplayer prices
         run: python3 scripts/build_op_prices.py
 
+      - name: One Piece Japanese prices (PriceCharting, rotating shard)
+        run: python3 scripts/build_op_jp_prices.py
+        continue-on-error: true # a PC hiccup shouldn't block the other feeds
+
       - name: Yu-Gi-Oh! TCGplayer prices
         run: python3 scripts/build_ygo_prices.py
 
