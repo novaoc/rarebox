@@ -21,15 +21,45 @@
           <div class="tcg-tagline">{{ t.tagline }}</div>
         </div>
         <span v-if="!t.available" class="badge tcg-soon">Soon</span>
-        <span v-else class="tcg-arrow" aria-hidden="true">→</span>
+        <template v-else>
+          <!-- Binder completion, visible at the hub level -->
+          <span v-if="completion[t.id]" class="badge badge-accent tcg-completion">{{ completion[t.id].pct }}%</span>
+          <span class="tcg-arrow" aria-hidden="true">→</span>
+        </template>
       </component>
+    </div>
+
+    <!-- Browse-adjacent destinations (relocated from the old More tab) -->
+    <div class="hub-links mt-4">
+      <router-link to="/decks" class="card hub-link">
+        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 2h10"/><path d="M5 6h14"/><rect width="18" height="12" x="3" y="10" rx="2"/></svg>
+        <span class="hub-link-body">
+          <span class="hub-link-name">Decks</span>
+          <span class="hub-link-sub">Build, price, and import the current meta</span>
+        </span>
+        <span class="tcg-arrow" aria-hidden="true">→</span>
+      </router-link>
+      <router-link to="/booth" class="card hub-link">
+        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9l1.5-5h15L21 9"/><path d="M3 9a3 3 0 0 0 6 0 3 3 0 0 0 6 0 3 3 0 0 0 6 0"/><path d="M5 11.5V21h14v-9.5"/><path d="M9 21v-6h6v6"/></svg>
+        <span class="hub-link-body">
+          <span class="hub-link-name">Card Booth</span>
+          <span class="hub-link-sub">Sell IRL — QR booth, table mode, wantlist matching</span>
+        </span>
+        <span class="tcg-arrow" aria-hidden="true">→</span>
+      </router-link>
     </div>
   </div>
 </template>
 
 <script setup>
+import { computed } from 'vue'
 import { TCGS } from '../services/tcg/providers'
+import { usePortfolioStore } from '../stores/portfolio'
+import { gameCompletion } from '../utils/binderProgress'
+
 const tcgs = TCGS
+const store = usePortfolioStore()
+const completion = computed(() => gameCompletion(store.portfolios))
 </script>
 
 <style scoped>
@@ -95,4 +125,14 @@ const tcgs = TCGS
 @media (max-width: 480px) {
   .tcg-logo { width: 118px; min-width: 118px; height: 54px; }
 }
+
+.tcg-completion { font-family: var(--font-mono, monospace); flex-shrink: 0; }
+
+.hub-links { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr)); }
+.hub-link { display: flex; align-items: center; gap: 14px; padding: 16px 18px; text-decoration: none; color: var(--ink); min-height: 64px; }
+.hub-link:hover { text-decoration: none; transform: translate(-1px, -1px); box-shadow: var(--shadow-sm); }
+.hub-link-body { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.hub-link-name { font-weight: 800; font-size: 15px; }
+.hub-link-sub { font-size: 12.5px; color: var(--text-secondary); }
+
 </style>

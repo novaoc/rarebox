@@ -41,7 +41,28 @@
           <svg v-if="theme === 'dark'" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32 1.41 1.41M2 12h2m16 0h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
           <svg v-else xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
         </button>
-        <router-link to="/search" class="btn btn-primary btn-sm add-card-btn">+ Add Card</router-link>
+        <!-- Desktop "+ Add": same three actions as the phone disc's fan.
+             Scan works here too — the viewfinder falls back to file upload
+             when there's no webcam. -->
+        <div class="add-menu-wrap add-card-btn">
+          <button class="btn btn-primary btn-sm" :aria-expanded="addMenuOpen" aria-haspopup="menu" @click="addMenuOpen = !addMenuOpen">+ Add</button>
+          <transition name="fade">
+            <div v-if="addMenuOpen" class="add-menu" role="menu" aria-label="Add to your shelf">
+              <button class="add-menu-item" role="menuitem" @click="fanScan">
+                <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>
+                Scan card
+              </button>
+              <button class="add-menu-item" role="menuitem" @click="fanGo('/search')">
+                <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                Search
+              </button>
+              <button class="add-menu-item" role="menuitem" @click="fanSealed">
+                <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>
+                Sealed
+              </button>
+            </div>
+          </transition>
+        </div>
         <router-link to="/settings" class="btn btn-ghost btn-icon settings-btn" aria-label="Settings">
           <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
         </router-link>
@@ -70,71 +91,61 @@
     </main>
 
     <!-- ── Bottom tab bar (phones / foldables / small tablets) ──────── -->
+    <!-- Home · Shelf · Add(disc) · Sets · Trade — the disc is the app's
+         most reachable control, so it carries the most frequent action:
+         adding. Trade is a standard tab; "More" is gone (its contents
+         live in the top bar, Home, and the Sets hub). -->
     <nav class="tabbar" aria-label="Primary">
       <router-link to="/" class="tab" :class="{ active: isTab('home') }">
         <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="7" height="7" x="3" y="3" rx="1.5"/><rect width="7" height="7" x="14" y="3" rx="1.5"/><rect width="7" height="7" x="14" y="14" rx="1.5"/><rect width="7" height="7" x="3" y="14" rx="1.5"/></svg>
         <span>Home</span>
       </router-link>
-      <router-link to="/search" class="tab" :class="{ active: isTab('search') }">
-        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
-        <span>Search</span>
-      </router-link>
-      <router-link to="/trade" class="tab tab-hero" :class="{ active: isTab('trade') }" aria-label="Trade analyzer">
-        <span class="tab-hero-disc">
-          <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3 4 7l4 4"/><path d="M4 7h16"/><path d="m16 21 4-4-4-4"/><path d="M20 17H4"/></svg>
+      <component :is="shelfTabTo ? 'router-link' : 'button'" :to="shelfTabTo || undefined" class="tab" :class="{ active: isTab('shelf') }" @click="!shelfTabTo && (showNewPortfolioModal = true)">
+        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h16v4H4z"/><path d="M4 12h16v4H4z"/><path d="M7 8v4"/><path d="M17 8v4"/><path d="M4 20h16"/></svg>
+        <span>Shelf</span>
+      </component>
+      <button class="tab tab-hero" :aria-expanded="fanOpen" aria-label="Add to your shelf" @click="toggleFan">
+        <span class="tab-hero-disc" :class="{ open: fanOpen }">
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
         </span>
-        <span>Trade</span>
-      </router-link>
+        <span>Add</span>
+        <!-- One-time retrain callout (R2): Trade lived here for three releases -->
+        <span v-if="showDiscCallout" class="sticker sticker-pink disc-callout" aria-hidden="true">Add lives here now</span>
+      </button>
       <router-link to="/sets" class="tab" :class="{ active: isTab('browse') }">
         <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12.83 2.18a2 2 0 0 0-1.66 0L2.1 6.27a2 2 0 0 0 0 3.46l9.07 4.09a2 2 0 0 0 1.66 0l9.07-4.09a2 2 0 0 0 0-3.46z"/><path d="m2.1 14.74 9.07 4.09a2 2 0 0 0 1.66 0l9.07-4.09"/></svg>
-        <span>Browse</span>
+        <span>Sets</span>
       </router-link>
-      <button class="tab" :class="{ active: moreOpen }" @click="moreOpen = !moreOpen" aria-label="More options" :aria-expanded="moreOpen">
-        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="1"/><circle cx="5" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg>
-        <span>More</span>
-      </button>
+      <router-link to="/trade" class="tab" :class="{ active: isTab('trade') }">
+        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3 4 7l4 4"/><path d="M4 7h16"/><path d="m16 21 4-4-4-4"/><path d="M20 17H4"/></svg>
+        <span>Trade</span>
+      </router-link>
     </nav>
 
-    <!-- More sheet -->
+    <!-- Add fan: scrim + three sticker-buttons springing from the disc.
+         Search is the universal path; Sealed jumps straight to the sealed
+         add flow; Scan identifies a card from the camera. -->
     <transition name="fade">
-      <div v-if="moreOpen" class="more-overlay" @click.self="moreOpen = false">
-        <div class="more-sheet" role="menu">
-          <router-link to="/decks" class="more-item" role="menuitem" @click="moreOpen = false">
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 2h10"/><path d="M5 6h14"/><rect width="18" height="12" x="3" y="10" rx="2"/></svg>
-            Decks
-          </router-link>
-          <router-link to="/booth" class="more-item" role="menuitem" @click="moreOpen = false">
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9l1.5-5h15L21 9"/><path d="M3 9a3 3 0 0 0 6 0 3 3 0 0 0 6 0 3 3 0 0 0 6 0"/><path d="M5 11.5V21h14v-9.5"/><path d="M9 21v-6h6v6"/></svg>
-            Card Booth
-          </router-link>
-          <button class="more-item" role="menuitem" @click="toggleTheme">
-            <svg v-if="theme === 'dark'" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32 1.41 1.41M2 12h2m16 0h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
-            <svg v-else xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
-            {{ theme === 'dark' ? 'Light mode' : 'Dark mode' }}
+      <div v-if="fanOpen" class="fan-overlay" @click.self="fanOpen = false">
+        <div class="fan" role="menu" aria-label="Add to your shelf">
+          <button class="fan-btn" role="menuitem" style="--fan-i: 0" @click="fanScan">
+            <svg xmlns="http://www.w3.org/2000/svg" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>
+            Scan card
           </button>
-          <button class="more-item" role="menuitem" @click="moreOpen = false; showNewPortfolioModal = true">
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
-            New Shelf
+          <button class="fan-btn" role="menuitem" style="--fan-i: 1" @click="fanGo('/search')">
+            <svg xmlns="http://www.w3.org/2000/svg" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+            Search
           </button>
-          <button v-if="canShare" class="more-item" role="menuitem" @click="shareRarebox">
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
-            Share Rarebox
+          <button class="fan-btn" role="menuitem" style="--fan-i: 2" @click="fanSealed">
+            <svg xmlns="http://www.w3.org/2000/svg" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>
+            Sealed
           </button>
-          <router-link to="/guide/shelves" class="more-item" role="menuitem" @click="moreOpen = false">
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>
-            How shelves work
-          </router-link>
-          <router-link to="/settings" class="more-item" role="menuitem" @click="moreOpen = false">
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 1v4m0 14v4m11-11h-4M5 12H1m17.66-6.34-2.83 2.83M8.17 15.17l-2.83 2.83m12.49 0-2.83-2.83M8.17 8.83 5.34 6"/></svg>
-            Settings
-          </router-link>
-          <router-link to="/terms" class="more-item" role="menuitem" @click="moreOpen = false">
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg>
-            Terms &amp; Privacy
-          </router-link>
         </div>
       </div>
     </transition>
+
+    <!-- Scan-to-add: camera → identify → prefilled add modal -->
+    <ScanAddModal v-if="scanOpen" @close="scanOpen = false" />
 
     <!-- New Portfolio Modal -->
     <transition name="fade">
@@ -205,6 +216,7 @@ import XFollowPrompt from './components/XFollowPrompt.vue'
 import TourModal from './components/TourModal.vue'
 import CardDatabaseLoader from './components/CardDatabaseLoader.vue'
 import CardLoadIndicator from './components/CardLoadIndicator.vue'
+import ScanAddModal from './components/ScanAddModal.vue'
 import { isCardDatabaseReady, buildSearchIndex, saveCardDatabaseReady, getTcgPrefs, saveTcgPrefs } from './services/tcg/cardCache.js'
 import { preloadGames } from './services/tcg/cardPreloader.js'
 import { applyTheme, setThemePref, getThemePref, resolvedTheme } from './utils/theme.js'
@@ -214,8 +226,56 @@ const deckStore = useDeckStore()
 const route = useRoute()
 const router = useRouter()
 
-const moreOpen = ref(false)
+const fanOpen = ref(false)
+const addMenuOpen = ref(false)
+const scanOpen = ref(false)
 const theme = ref(resolvedTheme())
+
+// Desktop add-menu closes on any click outside its wrapper
+document.addEventListener('click', (e) => {
+  if (addMenuOpen.value && !e.target.closest?.('.add-menu-wrap')) addMenuOpen.value = false
+})
+
+// Shelf tab: the active shelf (or the first one). With no shelves the tab
+// offers to create one instead of leading nowhere.
+const shelfTabTo = computed(() => {
+  const id = store.activePortfolioId || store.portfolios[0]?.id
+  return id ? `/shelf/${id}` : null
+})
+
+// One-time muscle-memory callout: the disc was Trade for three releases.
+// Shows for the first three sessions after the switch, then never again.
+const DISC_CALLOUT_KEY = 'rarebox_add_disc_callout'
+const showDiscCallout = ref(false)
+try {
+  const seen = Number(localStorage.getItem(DISC_CALLOUT_KEY) || 0)
+  if (seen < 3) {
+    showDiscCallout.value = true
+    localStorage.setItem(DISC_CALLOUT_KEY, String(seen + 1))
+  }
+} catch { /* private mode */ }
+
+function toggleFan() {
+  fanOpen.value = !fanOpen.value
+  if (fanOpen.value) showDiscCallout.value = false
+}
+function fanGo(path) {
+  fanOpen.value = false
+  addMenuOpen.value = false
+  router.push(path)
+}
+function fanScan() {
+  fanOpen.value = false
+  addMenuOpen.value = false
+  scanOpen.value = true
+}
+function fanSealed() {
+  fanOpen.value = false
+  addMenuOpen.value = false
+  const id = store.activePortfolioId || store.portfolios[0]?.id
+  // The sealed add flow lives on a shelf; without one, search still works
+  router.push(id ? `/shelf/${id}?add=sealed` : '/search')
+}
 
 function toggleTheme() {
   // explicit user toggle overrides 'system'
@@ -253,12 +313,12 @@ const showTradeTour = ref(false)
 const showBoothTour = ref(false)
 const tourKey = ref(0)
 
-// Close the More sheet on navigation
-watch(() => route.fullPath, () => { moreOpen.value = false })
+// Close the fan + add menu on navigation
+watch(() => route.fullPath, () => { fanOpen.value = false; addMenuOpen.value = false })
 
 // Which tab is lit for the current route
 const TAB_FOR_ROUTE = {
-  Dashboard: 'home', Portfolio: 'home',
+  Dashboard: 'home', Portfolio: 'shelf',
   Search: 'search',
   Browse: 'browse', Sets: 'browse', TcgSets: 'browse',
   Decks: 'decks', MetaDecks: 'decks', DeckBuilder: 'decks',
@@ -350,16 +410,6 @@ function startBackgroundPreload() {
     saveCardDatabaseReady()
     indicator.finish()
   }).catch(() => indicator.finish())
-}
-
-const canShare = ref(!!navigator.share)
-function shareRarebox() {
-  moreOpen.value = false
-  navigator.share({
-    title: 'Rarebox — TCG Collection Tracker',
-    text: 'Track your TCG collection with Rarebox — offline-first, privacy-first, no account needed.',
-    url: 'https://rarebox.io'
-  }).catch(() => {})
 }
 
 onMounted(async () => {
@@ -508,7 +558,44 @@ onErrorCaptured((err, instance, info) => {
   flex-shrink: 0;
 }
 .add-card-btn { display: none; }
-.settings-btn { display: none; }
+
+/* ── Desktop add menu — the fan's three actions, dropdown posture ───── */
+.add-menu-wrap { position: relative; }
+.add-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 80;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 170px;
+  padding: 8px;
+  background: var(--bg-card);
+  border: var(--bw) solid var(--ink);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+}
+.add-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 12px;
+  background: transparent;
+  border: none;
+  border-radius: 10px;
+  font-size: 13.5px;
+  font-weight: 800;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+.add-menu-item:hover { background: var(--bg-hover); }
+.add-menu-item:active { background: var(--accent-dim); }
+/* With the More sheet gone, Settings lives in the top bar on every size */
+.settings-btn { display: inline-flex; }
 .theme-btn { display: inline-flex; }
 
 /* ── Main content ───────────────────────────────────────────────────── */
@@ -583,7 +670,7 @@ onErrorCaptured((err, instance, info) => {
 .tab.active > svg { background: var(--accent); border: var(--bw) solid var(--ink); border-radius: 9px; padding: 3px; width: 30px; height: 30px; box-shadow: var(--shadow-pressed); }
 .tab > svg { padding: 4px; width: 30px; height: 30px; }
 
-/* Center hero tab — the trade disc pops above the bar */
+/* Center hero tab — the Add disc pops above the bar */
 .tab-hero { position: relative; }
 .tab-hero-disc {
   display: flex;
@@ -597,48 +684,63 @@ onErrorCaptured((err, instance, info) => {
   border: var(--bw) solid var(--on-accent);
   box-shadow: var(--shadow-xs);
   color: var(--on-accent);
+  transition: transform 0.18s;
 }
-.tab-hero.active .tab-hero-disc { background: var(--accent); }
+.tab-hero-disc.open { transform: rotate(45deg); } /* + becomes × */
 .tab-hero:active .tab-hero-disc { box-shadow: var(--shadow-pressed); transform: translate(1px, 1px); }
+.tab-hero:active .tab-hero-disc.open { transform: rotate(45deg) translate(1px, 1px); }
 
-/* ── More sheet ─────────────────────────────────────────────────────── */
-.more-overlay {
+.disc-callout {
+  position: absolute;
+  bottom: calc(100% + 10px);
+  left: 50%;
+  transform: translateX(-50%) rotate(-2deg);
+  white-space: nowrap;
+  font-size: 11px;
+  pointer-events: none;
+}
+
+/* ── Add fan ────────────────────────────────────────────────────────── */
+.fan-overlay {
   position: fixed;
   inset: 0;
   z-index: 65;
   background: rgba(20, 20, 20, 0.35);
 }
-.more-sheet {
+.fan {
   position: absolute;
-  right: 10px;
-  bottom: calc(var(--tabbar-height) + env(safe-area-inset-bottom, 0px) + 10px);
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: calc(var(--tabbar-height) + env(safe-area-inset-bottom, 0px) + 22px);
   display: flex;
-  flex-direction: column;
-  gap: 6px;
-  background: var(--bg-primary);
-  border: var(--bw) solid var(--ink);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow);
-  padding: 8px;
-  min-width: 200px;
-}
-.more-item {
-  display: flex;
-  align-items: center;
   gap: 10px;
-  padding: 12px 14px;
-  min-height: 46px;
-  border: none;
-  background: transparent;
-  border-radius: 10px;
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--ink);
-  text-decoration: none;
-  cursor: pointer;
-  text-align: left;
 }
-.more-item:hover { background: var(--accent-dim); text-decoration: none; }
+.fan-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 12px 15px;
+  min-height: 46px;
+  background: var(--bg-card);
+  border: var(--bw) solid var(--ink);
+  border-radius: 999px;
+  box-shadow: var(--shadow-sm);
+  font-size: 13.5px;
+  font-weight: 800;
+  color: var(--ink);
+  cursor: pointer;
+  animation: fan-spring 0.22s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  animation-delay: calc(var(--fan-i) * 50ms);
+}
+.fan-btn:active { box-shadow: var(--shadow-pressed); transform: translate(1px, 1px); }
+@keyframes fan-spring {
+  from { opacity: 0; transform: translateY(14px) scale(0.9); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .fan-btn { animation: none; }
+  .tab-hero-disc { transition: none; }
+}
 
 /* ── Color swatches (new portfolio modal) ───────────────────────────── */
 .color-picker-row { display: flex; gap: 10px; flex-wrap: wrap; }
@@ -665,7 +767,7 @@ onErrorCaptured((err, instance, info) => {
   .add-card-btn { display: inline-flex; }
   .settings-btn { display: inline-flex; }
   .tabbar { display: none; }
-  .more-overlay { display: none; }
+  .fan-overlay { display: none; }
   .main-content { padding-bottom: 28px; }
 }
 

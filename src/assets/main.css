@@ -548,3 +548,103 @@ a:hover { text-decoration: underline; text-decoration-thickness: 2px; text-under
 }
 
 
+
+/* ── Tactile primitives added by the UX redesign ─────────────────────
+   .progressbar — binder completion (drawn bar with an ink meniscus)
+   .stepper     — mechanical quantity control, no bare number inputs
+   .keycap      — press-in selection keys (grades, ranges)
+   All pure token CSS; no new colors. */
+
+.progressbar {
+  height: 14px;
+  background: var(--bg-secondary);
+  border: var(--bw) solid var(--ink);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.progressbar-fill {
+  height: 100%;
+  background: var(--accent);
+  border-right: var(--bw) solid var(--ink); /* the ink meniscus */
+  border-radius: 0 999px 999px 0;
+  transition: width 0.3s ease;
+  min-width: 0;
+}
+.progressbar-fill[style*="width: 0%"] { border-right: none; }
+.progressbar-fill.complete { background: var(--success); border-right: none; }
+@media (prefers-reduced-motion: reduce) {
+  .progressbar-fill { transition: none; }
+}
+
+.stepper {
+  display: inline-flex;
+  align-items: stretch;
+  background: var(--bg-card);
+  border: var(--bw) solid var(--ink);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-xs);
+  overflow: hidden;
+}
+.stepper-btn {
+  min-width: 44px;
+  min-height: 42px;
+  border: none;
+  background: transparent;
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--ink);
+  cursor: pointer;
+}
+.stepper-btn:active { background: var(--accent-dim, var(--bg-secondary)); }
+.stepper-btn:disabled { opacity: 0.35; cursor: default; }
+.stepper-value {
+  min-width: 48px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-left: var(--bw) solid var(--ink);
+  border-right: var(--bw) solid var(--ink);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+/* .undobar — an undo strip that docks under a sticky header row instead
+   of floating over content near the thumbs (drawn, not a toast). */
+.undobar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  background: var(--accent-dim);
+  border: var(--bw) solid var(--ink);
+  border-radius: var(--radius);
+}
+.undobar-text {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.keycap {
+  min-height: 42px;
+  padding: 8px 14px;
+  background: var(--bg-card);
+  border: var(--bw) solid var(--ink);
+  border-radius: 10px;
+  box-shadow: var(--shadow-xs);
+  font-weight: 800;
+  font-size: 13px;
+  color: var(--ink);
+  cursor: pointer;
+}
+.keycap:active { box-shadow: var(--shadow-pressed); transform: translate(1px, 1px); }
+.keycap.selected {
+  background: var(--ink);
+  color: var(--bg-primary);
+  box-shadow: var(--shadow-pressed);
+  transform: translate(1px, 1px);
+}

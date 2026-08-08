@@ -357,26 +357,56 @@
       </div>
     </transition>
 
-    <!-- Item detail panel — Refined for mobile as a bottom sheet -->
+    <!-- Item detail panel (6.5) — grab-handle bottom sheet on phones,
+         inline card on desktop. Art rides a framed −2° mat; quantity is a
+         stepper and grades are key-caps, both persisting immediately. -->
     <transition name="slide-up">
       <div v-if="selectedItem" class="item-detail-panel card">
+        <button
+          type="button"
+          class="panel-grab-zone"
+          aria-label="Close details"
+          @click="selectedItem = null"
+          @touchstart.passive="sheetTouchY = $event.changedTouches[0].clientY"
+          @touchend="($event.changedTouches[0].clientY - sheetTouchY > 48) && (selectedItem = null)"
+        ><span class="panel-grab" aria-hidden="true"></span></button>
         <div class="panel-header-row">
           <h3>{{ getItemName(selectedItem) }}</h3>
           <button class="btn btn-ghost btn-icon" @click="selectedItem = null" aria-label="Close details">✕</button>
         </div>
         <div class="panel-body-row">
           <div class="panel-left" v-if="selectedItem.cardData?.images?.small || selectedItem.imageUrl">
-            <img :src="selectedItem.cardData?.images?.large || selectedItem.cardData?.images?.small || selectedItem.imageUrl" class="panel-img" @error="$event.target.style.display='none'" />
+            <div class="panel-art-frame">
+              <img :src="selectedItem.cardData?.images?.large || selectedItem.cardData?.images?.small || selectedItem.imageUrl" class="panel-img" @error="$event.target.style.display='none'" />
+            </div>
           </div>
           <div class="panel-right">
             <div class="panel-info-grid">
               <div class="info-row"><span class="info-label">Type</span><span class="badge" :class="typeBadgeClass(selectedItem.type)">{{ selectedItem.type }}</span></div>
-              <div class="info-row" v-if="selectedItem.gradingCompany"><span class="info-label">Grade</span><span>{{ selectedItem.gradingCompany }} {{ selectedItem.grade }}</span></div>
               <div class="info-row" v-if="selectedItem.priceVariant"><span class="info-label">Variant</span><span>{{ selectedItem.priceVariant }}</span></div>
-              <div class="info-row"><span class="info-label">Quantity</span><span>{{ selectedItem.quantity || 1 }}</span></div>
+              <div class="info-row"><span class="info-label">Quantity</span>
+                <div class="stepper" role="group" aria-label="Quantity">
+                  <button type="button" class="stepper-btn" :disabled="(selectedItem.quantity || 1) <= 1" aria-label="Decrease quantity" @click="bumpQuantity(-1)">−</button>
+                  <span class="stepper-value">{{ selectedItem.quantity || 1 }}</span>
+                  <button type="button" class="stepper-btn" aria-label="Increase quantity" @click="bumpQuantity(1)">+</button>
+                </div>
+              </div>
               <div class="info-row"><span class="info-label">Paid (each)</span><span>${{ (selectedItem.purchasePrice || 0).toFixed(2) }}</span></div>
               <div class="info-row"><span class="info-label">Current Value</span><span class="text-accent font-bold">${{ getCurrentValue(selectedItem).toFixed(2) }}</span></div>
               <div class="info-row"><span class="info-label">Purchased</span><span>{{ selectedItem.purchaseDate || '—' }}</span></div>
+            </div>
+
+            <!-- Grade key-caps: the slab's company + grade as physical keys,
+                 pressed-in on the current values. Changing one persists and
+                 refreshes the graded-fetch query for the new grade. -->
+            <div v-if="selectedItem.type === 'graded'" class="mt-4">
+              <div class="pc-fetch-label">Grade</div>
+              <div class="keycap-row">
+                <button v-for="c in GRADE_COMPANIES" :key="c" type="button" class="keycap keycap-sm" :class="{ selected: (selectedItem.gradingCompany || 'PSA') === c }" @click="setItemGradeCompany(c)">{{ c }}</button>
+              </div>
+              <div class="keycap-row mt-2">
+                <button v-for="g in itemGradeOptions" :key="g" type="button" class="keycap keycap-sm" :class="{ selected: String(selectedItem.grade) === g }" @click="setItemGrade(g)">{{ g }}</button>
+              </div>
             </div>
 
             <div v-if="selectedItem.type === 'graded' || selectedItem.type === 'sealed'" class="mt-4">
@@ -476,7 +506,11 @@
               </div>
               <div class="form-group">
                 <label class="form-label">Quantity</label>
-                <input v-model.number="editForm.quantity" class="input" type="number" min="1" />
+                <div class="stepper" role="group" aria-label="Quantity">
+                  <button type="button" class="stepper-btn" :disabled="(editForm.quantity || 1) <= 1" aria-label="Decrease quantity" @click="editForm.quantity = Math.max(1, (editForm.quantity || 1) - 1)">−</button>
+                  <span class="stepper-value">{{ editForm.quantity || 1 }}</span>
+                  <button type="button" class="stepper-btn" aria-label="Increase quantity" @click="editForm.quantity = (editForm.quantity || 1) + 1">+</button>
+                </div>
               </div>
             </div>
             <div v-if="editingItem.type !== 'card'" class="form-group">
@@ -903,7 +937,11 @@ const editingName = ref(false)
 const editName = ref('')
 const nameInputRef = ref(null)
 const selectedItem = ref(null)
-const showAddSealed = ref(false)
+const sheetTouchY = ref(0) // grab-handle swipe-down start
+// ?add=sealed (the tab-bar Add fan's "Sealed" action) opens the sealed add
+// flow directly; the query is cleared so back/refresh don't reopen it.
+const showAddSealed = ref(route.query.add === 'sealed')
+if (route.query.add) router.replace({ path: route.path })
 const showBulkImport = ref(false)
 const editingItem = ref(null)
 const editForm = ref({})
@@ -1140,6 +1178,54 @@ function formatDate(iso) { return iso ? new Date(iso).toLocaleDateString('en-US'
 function startEditName() { editName.value = portfolio.value.name; editingName.value = true; nextTick(() => nameInputRef.value?.focus()) }
 function saveName() { if (editName.value.trim()) store.updatePortfolio(portfolio.value.id, { name: editName.value.trim() }); editingName.value = false }
 function selectItem(item) { selectedItem.value = selectedItem.value?.id === item.id ? null : item; editCurrentValue.value = getCurrentValue(item) }
+
+// ── Detail-panel quick edits (6.5): stepper + grade key-caps ───────────
+// updateItem replaces the item object, so re-point the panel at the fresh
+// one (this also re-runs the selectedItem watcher, rebuilding the graded
+// fetch query — a grade change means the old fetched price is stale).
+function syncSelected() {
+  const id = selectedItem.value?.id
+  if (id) selectedItem.value = portfolio.value?.items.find(i => i.id === id) || null
+}
+
+function bumpQuantity(dir) {
+  const item = selectedItem.value
+  if (!item) return
+  const next = Math.max(1, (item.quantity || 1) + dir)
+  store.updateItem(portfolio.value.id, item.id, { quantity: next })
+  syncSelected()
+}
+
+// Same company/grade sets as the add flow — keep in sync with AddItemModal
+const GRADE_COMPANIES = ['PSA', 'BGS', 'CGC', 'CGC Pristine', 'SGC', 'ACE', 'TAG', 'BGS Black', 'Other']
+const GRADES_BY_COMPANY = {
+  PSA:   ['10', '9', '8', '7', '6', '5', '4', '3', '2', '1'],
+  BGS:   ['10', '9.5', '9', '8', '7', '6', '5', '4', '3', '2', '1'],
+  CGC:   ['10', '9.5', '9', '8', '7', '6', '5', '4', '3', '2', '1'],
+  'CGC Pristine': ['10'],
+  SGC:   ['10', '9.5', '9', '8', '7', '6', '5', '4', '3', '2', '1'],
+  ACE:   ['10', '9', '8', '7', '6', '5', '4', '3', '2', '1'],
+  TAG:   ['10', '9.5', '9', '8', '7', '6', '5', '4', '3', '2', '1'],
+  'BGS Black': ['10'],
+  Other: ['10', '9.5', '9', '8', '7', '6', '5', '4', '3', '2', '1'],
+}
+const itemGradeOptions = computed(() =>
+  GRADES_BY_COMPANY[selectedItem.value?.gradingCompany || 'PSA'] || GRADES_BY_COMPANY.PSA)
+
+function setItemGradeCompany(c) {
+  const item = selectedItem.value
+  if (!item) return
+  const grades = GRADES_BY_COMPANY[c] || GRADES_BY_COMPANY.PSA
+  const grade = grades.includes(String(item.grade)) ? String(item.grade) : grades[0]
+  store.updateItem(portfolio.value.id, item.id, { gradingCompany: c, grade })
+  syncSelected()
+}
+function setItemGrade(g) {
+  const item = selectedItem.value
+  if (!item) return
+  store.updateItem(portfolio.value.id, item.id, { grade: g })
+  syncSelected()
+}
 // The edit form carries only the editable fields — writing the whole item
 // snapshot back would clobber anything a background price refresh updated
 // while the modal was open (currentMarketPrice, lastPriceUpdate…).
@@ -1611,12 +1697,26 @@ function deletePortfolio() { store.deletePortfolio(portfolio.value.id); router.p
 .bottom-sheet-actions button:active { box-shadow: none; transform: translate(1px, 1px); }
 
 .item-detail-panel { margin-top: 24px; }
+.panel-grab-zone { display: none; } /* phones only — see the mobile block */
 .panel-header-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
 .panel-header-row h3 { font-size: 18px; font-weight: 800; letter-spacing: -0.01em; }
 .panel-body-row { display: flex; gap: 24px; }
 .panel-left { flex-shrink: 0; }
 .panel-right { flex: 1; min-width: 0; }
-.panel-img { width: 100%; max-width: 200px; border: var(--bw) solid var(--ink); border-radius: var(--radius); box-shadow: var(--shadow); margin: 0 auto; display: block; }
+/* 6.5: the art header is a framed mat, tilted like a card set down on paper */
+.panel-art-frame {
+  background: var(--bg-card);
+  border: var(--bw) solid var(--ink);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 10px;
+  transform: rotate(-2deg);
+  margin: 4px auto 0;
+  width: fit-content;
+}
+.panel-img { width: 100%; max-width: 200px; border-radius: 8px; margin: 0 auto; display: block; }
+.keycap-row { display: flex; gap: 6px; flex-wrap: wrap; }
+.keycap-sm { min-height: 42px; padding: 6px 11px; font-size: 12.5px; }
 .panel-chart-section { margin-top: 20px; border-top: var(--bw) solid var(--border-subtle); padding-top: 16px; }
 .info-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border-subtle); font-size: 14px; }
 .info-label { color: var(--text-secondary); font-weight: 600; }
@@ -1644,7 +1744,26 @@ function deletePortfolio() { store.deletePortfolio(portfolio.value.id); router.p
   .hide-mobile { display: none !important; }
   .show-mobile { display: block !important; }
   .mobile-item-list.show-mobile { display: flex !important; }
-  .item-detail-panel { position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 150; max-height: 100vh; overflow-y: auto; border: none; border-radius: 0; box-shadow: none; margin: 0; background: var(--bg-primary); }
+  /* 6.5: card detail is a grab-handle bottom sheet, not a full takeover —
+     the shelf stays visible above it and the handle says "swipe me away" */
+  .item-detail-panel {
+    position: fixed; left: 0; right: 0; bottom: 0; top: auto;
+    z-index: 150;
+    max-height: 92vh;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    border: none; border-top: var(--bw) solid var(--ink);
+    border-radius: 20px 20px 0 0;
+    box-shadow: none; margin: 0;
+    background: var(--bg-primary);
+    padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+  }
+  .panel-grab-zone {
+    display: flex; align-items: center; justify-content: center;
+    width: 100%; min-height: 28px; padding: 8px 0 4px;
+    background: transparent; border: none; cursor: grab;
+  }
+  .panel-grab { display: block; width: 44px; height: 4px; border-radius: 999px; background: var(--ink); }
   .panel-body-row { flex-direction: column; gap: 24px; padding: 0 16px 24px; }
 }
 </style>

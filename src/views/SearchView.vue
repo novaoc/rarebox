@@ -99,13 +99,23 @@
     <!-- Card detail panel -->
     <transition name="slide-up">
       <div v-if="selectedCard" class="card-detail-panel">
+        <button
+          type="button"
+          class="panel-grab-zone"
+          aria-label="Close details"
+          @click="selectedCard = null"
+          @touchstart.passive="sheetTouchY = $event.changedTouches[0].clientY"
+          @touchend="($event.changedTouches[0].clientY - sheetTouchY > 48) && (selectedCard = null)"
+        ><span class="panel-grab" aria-hidden="true"></span></button>
         <div class="panel-header">
           <h3>{{ selectedCard.name }}</h3>
           <button class="btn btn-ghost btn-icon" @click="selectedCard = null">✕</button>
         </div>
         <div class="panel-body">
           <div class="panel-top">
-            <img :src="selectedCard.image || selectedCard.images?.large || selectedCard.images?.small" class="panel-card-img" draggable="false" @error="$event.target.style.display='none'" />
+            <div class="panel-art-frame">
+              <img :src="selectedCard.image || selectedCard.images?.large || selectedCard.images?.small" class="panel-card-img" draggable="false" @error="$event.target.style.display='none'" />
+            </div>
             <div class="panel-card-info">
               <div class="panel-card-set">{{ selectedCard.set }} · #{{ selectedCard.number }}</div>
               <div class="panel-card-rarity">{{ selectedCard.rarity }}</div>
@@ -208,6 +218,7 @@ const page = ref(1)
 const pageSize = 20
 const totalPages = computed(() => Math.ceil(totalCount.value / pageSize))
 const selectedCard = ref(null)
+const sheetTouchY = ref(0) // grab-handle swipe-down start
 const showAddModal = ref(false)
 const modalCard = ref(null)
 
@@ -534,7 +545,20 @@ function onAdded() {
 
 .panel-body { padding: 20px 24px; }
 .panel-top { display: flex; gap: 24px; margin-bottom: 24px; }
-.panel-card-img { width: 140px; min-width: 140px; border: var(--bw) solid var(--border); border-radius: 8px; box-shadow: var(--shadow); pointer-events: none; -webkit-user-drag: none; user-drag: none; }
+/* 6.5: framed −2° art header — the card sits in a mat, not naked on the page */
+.panel-art-frame {
+  align-self: flex-start;
+  flex-shrink: 0;
+  background: var(--bg-card);
+  border: var(--bw) solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 8px;
+  transform: rotate(-2deg);
+  margin: 4px 6px 0;
+}
+.panel-card-img { width: 140px; min-width: 140px; border-radius: 6px; display: block; pointer-events: none; -webkit-user-drag: none; user-drag: none; }
+.panel-grab-zone { display: none; }
 .panel-card-info { flex: 1; }
 .panel-card-set { font-size: 13px; color: var(--text-secondary); margin-bottom: 4px; }
 .panel-card-rarity { display: inline-block; font-size: 12px; font-weight: 700; color: var(--ink); background: var(--accent-dim); border-radius: 4px; padding: 1px 6px; }
@@ -572,16 +596,13 @@ function onAdded() {
     max-height: 85vh;
     border-radius: var(--radius-lg) var(--radius-lg) 0 0;
   }
-  /* Drag handle */
-  .card-detail-panel::before {
-    content: '';
-    display: block;
-    width: 36px;
-    height: 4px;
-    border-radius: 2px;
-    background: var(--border);
-    margin: 8px auto 4px;
+  /* Grab handle — tap or swipe down to dismiss (6.5) */
+  .panel-grab-zone {
+    display: flex; align-items: center; justify-content: center;
+    width: 100%; min-height: 28px; padding: 8px 0 4px;
+    background: transparent; border: none; cursor: grab;
   }
+  .panel-grab { display: block; width: 44px; height: 4px; border-radius: 999px; background: var(--border); }
   .panel-top { flex-direction: column; align-items: center; }
   .panel-card-img { width: 160px; min-width: 160px; }
   .panel-body { padding: 12px 16px; }

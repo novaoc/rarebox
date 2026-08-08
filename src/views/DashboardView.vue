@@ -162,31 +162,136 @@
     </div>
 
     <div v-else>
-      <!-- Top stats -->
-      <div class="stats-row mb-4">
-        <div class="stat-tile">
-          <div class="label">Total Shelf Value</div>
-          <div class="value"><span class="sticker sticker-green total-value-sticker">${{ store.totalPortfolioValue.toFixed(2) }}</span></div>
-          <div class="sub">Across all shelves</div>
+      <!-- ── Hero: what's it worth ─────────────────────────────────── -->
+      <div class="card hero-card mb-4">
+        <div class="hero-label">Total shelf value</div>
+        <div class="hero-value-row">
+          <span class="hero-value">${{ store.totalPortfolioValue.toFixed(2) }}</span>
+          <!-- Home's single rotation: only when the shelf crosses its previous peak -->
+          <span v-if="isAllTimeHigh" class="sticker sticker-green hero-ath">All-time high</span>
         </div>
-        <div class="stat-tile">
-          <div class="label">Total Cost Basis</div>
-          <div class="value">${{ store.totalCostBasis.toFixed(2) }}</div>
-          <div class="sub">Amount invested</div>
+        <div class="hero-sub">
+          <span v-if="todayDelta != null" class="badge hero-delta" :class="todayDelta >= 0 ? 'badge-success' : 'badge-danger'">
+            {{ todayDelta >= 0 ? '+' : '−' }}${{ Math.abs(todayDelta).toFixed(2) }} today
+          </span>
+          <span class="hero-cost">
+            Cost basis ${{ store.totalCostBasis.toFixed(2) }} ·
+            <span :class="totalGain >= 0 ? 'text-success' : 'text-danger'">{{ totalGain >= 0 ? '+' : '' }}${{ Math.abs(totalGain).toFixed(2) }} ({{ totalGainPct.toFixed(1) }}%)</span>
+            · {{ totalItems }} items
+          </span>
         </div>
-        <div class="stat-tile">
-          <div class="label">Total Gain/Loss</div>
-          <div class="value" :class="totalGain >= 0 ? 'text-success' : 'text-danger'">
-            {{ totalGain >= 0 ? '+' : '' }}${{ Math.abs(totalGain).toFixed(2) }}
-          </div>
-          <div class="sub" :class="totalGainPct >= 0 ? 'text-success' : 'text-danger'">
-            {{ totalGainPct >= 0 ? '+' : '' }}{{ totalGainPct.toFixed(1) }}%
-          </div>
+        <PortfolioChart :portfolios="store.portfolios" :height="240" label="All Shelves" />
+      </div>
+
+      <!-- ── Shelf chips: filter movers + binder below ─────────────── -->
+      <div v-if="store.portfolios.length > 1" class="shelf-chips mb-4">
+        <button class="shelf-chip" :class="{ active: !selectedShelfId }" @click="selectedShelfId = null">All</button>
+        <button
+          v-for="p in store.portfolios"
+          :key="p.id"
+          class="shelf-chip"
+          :class="{ active: selectedShelfId === p.id }"
+          @click="selectedShelfId = selectedShelfId === p.id ? null : p.id"
+        >
+          <span class="shelf-chip-dot" :style="{ background: p.color }"></span>{{ p.name }}
+        </button>
+      </div>
+
+      <div class="dash-grid">
+        <div class="dash-col dash-rail-a">
+      <!-- ── Today: contextual, renders only when a trigger is live ── -->
+      <router-link v-if="todayCard" :to="todayCard.to" class="card today-card mb-4">
+        <span class="badge badge-info">Today</span>
+        <span class="today-text">{{ todayCard.text }}</span>
+        <span v-if="todayCard.more" class="today-more">+{{ todayCard.more }} more</span>
+        <span class="today-arrow" aria-hidden="true">→</span>
+      </router-link>
+
+      <!-- ── Movers today ──────────────────────────────────────────── -->
+      <template v-if="movers.length">
+        <div class="section-header">
+          <div class="section-title">Movers today</div>
         </div>
-        <div class="stat-tile">
-          <div class="label">Total Items</div>
-          <div class="value">{{ totalItems }}</div>
-          <div class="sub">{{ store.portfolios.length }} shelves</div>
+        <div class="movers-rail mb-4">
+          <router-link v-for="m in movers" :key="m.id" :to="`/shelf/${m.portfolioId}`" class="mover-tile">
+            <span class="mover-frame">
+              <img v-if="m.img" :src="m.img" :alt="m.name" loading="lazy" draggable="false" @error="$event.target.style.display='none'" />
+            </span>
+            <span class="badge mover-delta" :class="m.delta >= 0 ? 'badge-success' : 'badge-danger'">
+              {{ m.delta >= 0 ? '+' : '−' }}{{ Math.abs(m.pct).toFixed(1) }}%
+            </span>
+            <span class="mover-name">{{ m.name }}</span>
+            <span class="mover-price">${{ m.value.toFixed(2) }}</span>
+          </router-link>
+        </div>
+      </template>
+
+        </div>
+        <div class="dash-col dash-col-main">
+
+      <!-- ── Binder progress ───────────────────────────────────────── -->
+      <template v-if="binderList.length">
+        <div class="section-header">
+          <div class="section-title">Binder progress</div>
+        </div>
+        <div class="binder-list mb-4">
+          <router-link
+            v-for="row in binderList.slice(0, 5)"
+            :key="row.portfolioId + row.key"
+            :to="`/shelf/${row.portfolioId}`"
+            class="card binder-row"
+          >
+            <div class="binder-head">
+              <span class="binder-name">{{ row.name }}</span>
+              <span class="binder-count">{{ row.owned }}/{{ row.total ?? '?' }}<template v-if="row.pct != null"> · {{ row.pct }}%</template></span>
+            </div>
+            <div class="progressbar" role="progressbar" :aria-valuenow="row.pct ?? 0" aria-valuemin="0" aria-valuemax="100" :aria-label="`${row.name} completion`">
+              <div class="progressbar-fill" :class="{ complete: row.complete }" :style="{ width: (row.pct ?? 0) + '%' }"></div>
+            </div>
+            <div class="binder-foot">
+              <span v-if="row.complete" class="badge badge-success">SET!</span>
+              <span v-else-if="row.missing != null" class="binder-missing">
+                {{ row.missing }} missing<template v-if="binderExtras[row.portfolioId + row.key]?.cost > 0"> · ≈ ${{ binderExtras[row.portfolioId + row.key].cost.toFixed(2) }} to finish</template>
+              </span>
+              <span v-else class="binder-missing">{{ row.owned }} owned</span>
+              <span class="binder-shelf">{{ row.portfolioName }}</span>
+            </div>
+            <!-- "Want the rest" rides the lazy set fetch: only rows whose
+                 missing cards are actually known offer the bulk-ISO -->
+            <button
+              v-if="!row.complete && binderExtras[row.portfolioId + row.key]?.missingCards?.length"
+              type="button"
+              class="btn btn-secondary btn-sm binder-iso-btn"
+              :disabled="binderExtras[row.portfolioId + row.key].isoDone"
+              @click.prevent.stop="wantTheRest(row)"
+            >{{ binderExtras[row.portfolioId + row.key].isoDone ? '✓ On your wantlist' : `🎯 Want the rest (${binderExtras[row.portfolioId + row.key].missingCards.length})` }}</button>
+          </router-link>
+        </div>
+      </template>
+
+        </div>
+        <div class="dash-col dash-rail-b">
+
+      <!-- ── ISO wantlist preview ──────────────────────────────────── -->
+      <template v-if="wantsPreview.length">
+        <div class="section-header">
+          <div class="section-title">Hunting</div>
+          <router-link to="/booth" class="btn btn-ghost btn-sm">Wantlist →</router-link>
+        </div>
+        <div class="wants-row mb-4">
+          <router-link v-for="w in wantsPreview" :key="w.id" to="/booth" class="card want-tile">
+            <span class="mover-frame want-frame">
+              <img v-if="w.img" :src="w.img" :alt="w.name" loading="lazy" draggable="false" @error="$event.target.style.display='none'" />
+            </span>
+            <span class="want-info">
+              <span class="mover-name">{{ w.name }}</span>
+              <span class="want-set">{{ w.setName }}</span>
+            </span>
+            <span v-if="w.maxPrice > 0" class="badge want-cap">max ${{ w.maxPrice }}</span>
+          </router-link>
+        </div>
+      </template>
+
         </div>
       </div>
 
@@ -221,17 +326,6 @@
             </div>
           </router-link>
         </div>
-      </div>
-
-      <!-- Combined portfolio chart -->
-      <div class="card mb-4">
-        <div class="section-header">
-          <div>
-            <div class="section-title">All Shelves</div>
-            <div class="section-subtitle">All shelves combined</div>
-          </div>
-        </div>
-        <PortfolioChart :portfolios="store.portfolios" :height="300" label="All Shelves" />
       </div>
 
       <!-- Individual portfolio cards -->
@@ -294,7 +388,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, onActivated, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { usePortfolioStore } from '../stores/portfolio'
 import { getCard, getMarketPrice, getSets } from '../services/pokemonApi'
 import { getPrice as getTcgPrice } from '../services/priceFeedService'
@@ -306,9 +400,167 @@ function hideIfOnline(e) {
 }
 import PortfolioChart from '../components/PortfolioChart.vue'
 import RbIcon from '../components/icons/RbIcon.vue'
+import { binderRows, msItemKey, missingFromList } from '../utils/binderProgress'
+import { fetchSetCards } from '../utils/masterSets'
+import { loadWantlist, isoCards } from '../utils/wantlist'
+import { getTriggeredAlerts } from '../utils/alerts'
+import { loadJournal, todayEntries } from '../utils/boothJournal'
+import { loadBooths } from '../utils/booth'
 
 const store = usePortfolioStore()
 const featuresRef = ref(null)
+
+// ── Home modules: change → progress → wants ───────────────────────────
+
+const selectedShelfId = ref(null)
+const visiblePortfolios = computed(() =>
+  selectedShelfId.value
+    ? store.portfolios.filter(p => p.id === selectedShelfId.value)
+    : store.portfolios
+)
+
+// Per-unit display value, matching getPortfolioValue's rules
+function itemUnitValue(item) {
+  return item.type === 'card'
+    ? (finiteMoney(item.currentMarketPrice) ?? finiteMoney(item.purchasePrice) ?? 0)
+    : (finiteMoney(item.currentValue) ?? finiteMoney(item.purchasePrice) ?? 0)
+}
+
+// The most recent snapshot strictly before today, per shelf — the baseline
+// for "what moved today". Snapshots store per-unit values keyed by item id.
+function prevSnapshot(portfolioId) {
+  const today = new Date().toISOString().split('T')[0]
+  const list = store.snapshots[portfolioId] || []
+  for (let i = list.length - 1; i >= 0; i--) {
+    if (list[i].date < today) return list[i]
+  }
+  return null
+}
+
+// Today's price movement: Σ (current − previous) × qty over items that
+// existed at the previous snapshot. Adds/removals don't count as "movement".
+const todayDelta = computed(() => {
+  let delta = 0
+  let matched = false
+  for (const p of store.portfolios) {
+    const prev = prevSnapshot(p.id)
+    if (!prev) continue
+    for (const item of p.items) {
+      const before = prev.values[item.id]
+      if (typeof before !== 'number') continue
+      matched = true
+      delta += (itemUnitValue(item) - before) * (item.quantity || 1)
+    }
+  }
+  return matched ? delta : null
+})
+
+// All-time-high sticker: only when the total crosses its previously stored
+// peak — scarcity is what makes it land. Peak persists across sessions.
+const ATH_KEY = 'rarebox_ath_peak'
+const isAllTimeHigh = ref(false)
+watch(() => store.totalPortfolioValue, (total) => {
+  if (!total || total <= 0) return
+  let peak = 0
+  try { peak = Number(localStorage.getItem(ATH_KEY) || 0) } catch { /* private mode */ }
+  if (total > peak) {
+    if (peak > 0) isAllTimeHigh.value = true // first-ever value isn't a "high"
+    try { localStorage.setItem(ATH_KEY, String(total)) } catch { /* private mode */ }
+  }
+}, { immediate: true })
+
+// Movers: |Δ| ≥ 2% day-over-day, top 8 by absolute dollar move
+const movers = computed(() => {
+  const out = []
+  for (const p of visiblePortfolios.value) {
+    const prev = prevSnapshot(p.id)
+    if (!prev) continue
+    for (const item of p.items) {
+      const before = prev.values[item.id]
+      if (typeof before !== 'number' || before <= 0) continue
+      const now = itemUnitValue(item)
+      const delta = now - before
+      const pct = (delta / before) * 100
+      if (Math.abs(pct) < 2) continue
+      out.push({
+        id: item.id,
+        portfolioId: p.id,
+        name: item.cardData?.name || item.name || 'Card',
+        img: item.cardData?.images?.small || item.imageUrl || '',
+        value: now,
+        delta,
+        pct,
+      })
+    }
+  }
+  return out.sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta)).slice(0, 8)
+})
+
+const binderList = computed(() => binderRows(visiblePortfolios.value))
+
+// ── "≈ $X to finish" + "want the rest" — lazy per-set fetch ───────────
+// Only the top 3 incomplete rows fetch their set list (fetchSetCards rides
+// the same cached layers as Browse, so repeat visits are free). Rows whose
+// showcase predates stored set ids keep the count-only fallback.
+const binderExtras = ref({}) // rowId → { cost, missingCards, isoDone }
+const _binderFetching = new Set()
+
+watch(binderList, (rows) => {
+  if (!navigator.onLine) return
+  const targets = (rows || []).filter(r => !r.complete && r.setId).slice(0, 3)
+  for (const row of targets) {
+    const id = row.portfolioId + row.key
+    if (binderExtras.value[id] || _binderFetching.has(id)) continue
+    _binderFetching.add(id)
+    fetchSetCards({ game: row.game, setId: row.setId, setName: row.name, lang: row.lang })
+      .then(cards => {
+        const p = store.portfolios.find(p => p.id === row.portfolioId)
+        const items = (p?.items || []).filter(i => msItemKey(i) === row.key)
+        const missingCards = missingFromList(items, cards)
+        const cost = missingCards.reduce((s, c) => s + (c.price || 0), 0)
+        binderExtras.value = { ...binderExtras.value, [id]: { cost, missingCards, isoDone: false } }
+      })
+      .catch(() => { /* count-only fallback stays */ })
+      .finally(() => _binderFetching.delete(id))
+  }
+}, { immediate: true })
+
+function wantTheRest(row) {
+  const id = row.portfolioId + row.key
+  const extra = binderExtras.value[id]
+  if (!extra || extra.isoDone) return
+  isoCards(extra.missingCards, { game: row.game || 'pokemon', setName: row.name || '' })
+  binderExtras.value = { ...binderExtras.value, [id]: { ...extra, isoDone: true } }
+  // The Hunting module reads the same wantlist — refresh it in place
+  try { wants.value = loadWantlist() } catch { /* keep current */ }
+}
+
+const wants = ref([])
+const wantsPreview = computed(() => wants.value.slice(0, 3))
+
+// Today card — conservative triggers only (R4): triggered alerts, then an
+// active booth day. No render when nothing is live.
+const todayCard = computed(() => {
+  const triggers = []
+  const triggered = alertsToday.value
+  if (triggered.length > 0) {
+    const a = triggered[0]
+    triggers.push({
+      to: '/settings#alerts',
+      text: `${a.cardName} crossed $${Number(a.threshold).toFixed(2)}`,
+    })
+  }
+  if (boothToday.value) {
+    triggers.push({
+      to: `/booth/${boothToday.value.id}/table`,
+      text: `Booth day — ${boothToday.value.name || 'your booth'} is live`,
+    })
+  }
+  if (triggers.length === 0) return null
+  return { ...triggers[0], more: triggers.length - 1 || null }
+})
+const alertsToday = ref([])
+const boothToday = ref(null)
 
 // New Releases — latest Pokémon sets (getSets is newest-first and localStorage-cached)
 const latestSets = ref([])
@@ -472,7 +724,22 @@ function getPortfolioGainPct(portfolio) {
 // Module-level guard: rapid Home↔elsewhere navigation must not stack several
 // of these loops (each is minutes of sequential fetches on a big shelf).
 let _refreshRunning = false
+// Local-storage-backed modules load once per mount (all cheap, all local)
+function loadHomeModules() {
+  try { wants.value = loadWantlist() } catch { wants.value = [] }
+  try { alertsToday.value = getTriggeredAlerts() } catch { alertsToday.value = [] }
+  try {
+    // "Booth day" = a booth with ledger activity today — conservative on purpose
+    const todays = todayEntries(loadJournal())
+    if (todays.length > 0) {
+      const boothId = todays[todays.length - 1].boothId
+      boothToday.value = loadBooths().find(b => b.id === boothId) || null
+    }
+  } catch { boothToday.value = null }
+}
+
 onMounted(async () => {
+  loadHomeModules()
   loadLatestReleases()
   if (_refreshRunning) return
   _refreshRunning = true
@@ -1124,6 +1391,141 @@ async function refreshAllPrices() {
 }
 @media (prefers-reduced-motion: reduce) {
   .ld-marquee-track { animation: none; }
+}
+
+
+/* ── Redesigned Home modules ───────────────────────────────────────── */
+.hero-card { padding: 20px; }
+.hero-label {
+  font-family: var(--font-mono, monospace);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+.hero-value-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: 4px 0 6px; }
+.hero-value { font-size: clamp(30px, 6vw, 40px); font-weight: 900; letter-spacing: -0.03em; }
+.hero-ath { transform: rotate(-2deg); font-size: 12px; }
+.hero-sub { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+.hero-delta { font-family: var(--font-mono, monospace); }
+.hero-cost { font-size: 12.5px; color: var(--text-secondary); }
+
+.shelf-chips { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; -webkit-overflow-scrolling: touch; }
+.shelf-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  min-height: 40px;
+  padding: 8px 14px;
+  background: var(--bg-card);
+  border: var(--bw) solid var(--ink);
+  border-radius: 999px;
+  box-shadow: var(--shadow-xs);
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--ink);
+  cursor: pointer;
+}
+.shelf-chip:active { box-shadow: var(--shadow-pressed); transform: translate(1px, 1px); }
+.shelf-chip.active { background: var(--accent); box-shadow: var(--shadow-pressed); transform: translate(1px, 1px); }
+.shelf-chip-dot { width: 10px; height: 10px; border-radius: 50%; border: 1.5px solid var(--ink); }
+
+.today-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px;
+  text-decoration: none;
+  color: var(--ink);
+}
+.today-card:hover { text-decoration: none; }
+.today-text { font-weight: 800; font-size: 14px; flex: 1; min-width: 0; }
+.today-more { font-size: 12px; color: var(--text-secondary); flex-shrink: 0; }
+.today-arrow { font-weight: 800; flex-shrink: 0; }
+
+.movers-rail { display: flex; gap: 12px; overflow-x: auto; padding: 4px 2px 8px; -webkit-overflow-scrolling: touch; }
+.mover-tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 118px;
+  flex-shrink: 0;
+  text-decoration: none;
+  color: var(--ink);
+}
+.mover-tile:hover { text-decoration: none; }
+.mover-frame {
+  display: block;
+  width: 100%;
+  aspect-ratio: 5 / 7;
+  background: var(--bg-card);
+  border: var(--bw) solid var(--ink);
+  border-radius: 8px;
+  padding: 4px;
+  box-shadow: var(--shadow-xs);
+}
+.mover-frame img { width: 100%; height: 100%; object-fit: contain; }
+.mover-delta {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  font-family: var(--font-mono, monospace);
+  font-size: 11px;
+  box-shadow: var(--shadow-xs);
+}
+.mover-name { font-size: 12.5px; font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mover-price { font-family: var(--font-mono, monospace); font-size: 12px; color: var(--text-secondary); }
+
+.binder-list { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr)); }
+.binder-row { display: block; padding: 14px 16px; text-decoration: none; color: var(--ink); }
+.binder-row:hover { text-decoration: none; }
+.binder-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; margin-bottom: 8px; }
+.binder-name { font-weight: 800; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.binder-count { font-family: var(--font-mono, monospace); font-size: 12.5px; font-weight: 700; flex-shrink: 0; }
+.binder-foot { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 8px; }
+.binder-missing { font-size: 12.5px; color: var(--text-secondary); }
+.binder-shelf { font-size: 11.5px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.binder-iso-btn { margin-top: 10px; width: 100%; }
+
+.wants-row { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); }
+.want-tile { display: flex; align-items: center; gap: 12px; padding: 10px 12px; text-decoration: none; color: var(--ink); }
+.want-tile:hover { text-decoration: none; }
+.want-frame { width: 44px; aspect-ratio: 5 / 7; flex-shrink: 0; padding: 2px; }
+.want-info { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.want-set { font-size: 12px; color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.want-cap { font-family: var(--font-mono, monospace); font-size: 11px; flex-shrink: 0; }
+
+@media (max-width: 360px) {
+  .mover-tile { width: 100px; }
+  .hero-card { padding: 16px; }
+}
+
+
+/* ── Desktop review posture (6.8): two-column dashboard ≥1280px ──────
+   Three wrappers so BOTH layouts hold: below 1280 they dissolve
+   (display:contents) and DOM order = the phone's value → change →
+   progress → wants sequence; at ≥1280 binder progress takes the left
+   column while Today/movers (rail-a) and the wantlist (rail-b) stack
+   in the right rail. */
+.dash-col { display: contents; }
+
+@media (min-width: 1280px) {
+  .dash-grid {
+    display: grid;
+    grid-template-columns: 5fr 4fr;
+    grid-template-rows: auto auto;
+    gap: 0 20px;
+    align-items: start;
+    max-width: 1160px;
+    margin: 0 auto;
+  }
+  .dash-col { display: block; min-width: 0; }
+  .dash-col-main { grid-column: 1; grid-row: 1 / span 2; }
+  .dash-rail-a { grid-column: 2; grid-row: 1; }
+  .dash-rail-b { grid-column: 2; grid-row: 2; }
 }
 
 </style>

@@ -24,6 +24,7 @@
  * camera-scannable QR.
  */
 import { gzip, gunzip } from './qrTransfer.js'
+import { loadWantlist } from './wantlist.js'
 
 const BOOTHS_KEY = 'rarebox_booths'
 const SAVED_SHOPS_KEY = 'rarebox_saved_shops'
@@ -37,6 +38,7 @@ export const DIR_VERSION = 1
  *  slower (~35 frames). */
 export const MAX_BOOTH_ITEMS = 600
 export const MAX_BINDERS = 24
+export const MAX_SHARE_WANTS = 80
 
 // ── Local storage ──────────────────────────────────────────────────────
 
@@ -106,6 +108,17 @@ function packBooth(booth) {
     packed.loc = [+booth.loc[0].toFixed(5), +booth.loc[1].toFixed(5)]
     if (booth.locName) packed.locName = booth.locName
   }
+  // Wantlist (additive, 6.6): shares carry the OWNER's wants so a scanned
+  // shop can light up demand flags on the scanner's own table ("the vendor
+  // at table 12 wants this"). Own booths (they have a local id) attach the
+  // live wantlist at encode time; re-shared scanned booths keep the wl they
+  // arrived with — never the re-sharer's. ~20 bytes/entry gzipped, capped.
+  const wl = Array.isArray(booth.wl) ? booth.wl : (booth.id ? loadWantlist() : null)
+  if (wl?.length) {
+    packed.wl = wl.slice(0, MAX_SHARE_WANTS).map(w => [
+      w.game || '', w.cardId || '', w.name || '', w.setName || '', w.number || '',
+    ])
+  }
   return packed
 }
 
@@ -157,6 +170,18 @@ function unpackBooth(packed) {
       if (Number(pmax) >= 0) rule.pmax = num(pmax)
       return { id: 'bn-' + idx, name: str(name, 40), icon: str(icon, 4), rule }
     }).filter(b => b.name && Object.keys(b.rule).length) : [],
+    // Wants ride the same hostile-input rules as items: count + length clamps
+    wl: Array.isArray(packed.wl) ? packed.wl.slice(0, MAX_SHARE_WANTS).map((w, idx) => {
+      const [game, cardId, name, setName, number] = Array.isArray(w) ? w : []
+      return {
+        id: 'wl-' + idx,
+        game: str(game, 20),
+        cardId: str(cardId, 80),
+        name: str(name, 120),
+        setName: str(setName, 120),
+        number: str(number, 20),
+      }
+    }).filter(w => w.cardId || w.name) : [],
     items: packed.items.slice(0, MAX_BOOTH_ITEMS).map((it) => {
       const [type, game, cardId, name, setName, number, qty, price, img] = Array.isArray(it) ? it : []
       return {
