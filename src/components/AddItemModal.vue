@@ -69,27 +69,21 @@
           </p>
         </div>
 
-        <!-- Graded specific (all TCGs including Riftbound) -->
-        <div v-if="itemType === 'graded'" class="form-row mt-3">
+        <!-- Graded specific (all TCGs including Riftbound) — physical
+             key-caps, same as the trade grading prompt: the selected key
+             sits pressed-in (6.5) -->
+        <div v-if="itemType === 'graded'" class="mt-3">
           <div class="form-group">
             <label class="form-label">Grading Company</label>
-            <select v-model="form.gradingCompany" class="select">
-              <option value="PSA">PSA</option>
-              <option value="BGS">BGS</option>
-              <option value="CGC">CGC</option>
-              <option value="CGC Pristine">CGC Pristine</option>
-              <option value="SGC">SGC</option>
-              <option value="ACE">ACE</option>
-              <option value="TAG">TAG</option>
-              <option value="BGS Black">BGS Black Label</option>
-              <option value="Other">Other</option>
-            </select>
+            <div class="keycap-row">
+              <button v-for="c in gradeCompanies" :key="c" type="button" class="keycap keycap-sm" :class="{ selected: form.gradingCompany === c }" @click="setGradeCompany(c)">{{ c }}</button>
+            </div>
           </div>
           <div class="form-group">
             <label class="form-label">Grade</label>
-            <select v-model="form.grade" class="select">
-              <option v-for="g in gradeOptions" :key="g" :value="g">{{ g }}</option>
-            </select>
+            <div class="keycap-row">
+              <button v-for="g in gradeOptions" :key="g" type="button" class="keycap keycap-sm" :class="{ selected: String(form.grade) === g }" @click="form.grade = g">{{ g }}</button>
+            </div>
           </div>
         </div>
 
@@ -324,6 +318,13 @@ const gradesByCompany = {
   Other: ['10', '9.5', '9', '8', '7', '6', '5', '4', '3', '2', '1'],
 }
 const gradeOptions = computed(() => gradesByCompany[form.value.gradingCompany] || gradesByCompany.PSA)
+const gradeCompanies = Object.keys(gradesByCompany)
+function setGradeCompany(c) {
+  form.value.gradingCompany = c
+  const grades = gradesByCompany[c] || gradesByCompany.PSA
+  // Single-grade companies (CGC Pristine, BGS Black) force their only grade
+  if (!grades.includes(String(form.value.grade))) form.value.grade = grades[0]
+}
 
 // Graded PriceCharting fetch (all TCGs — grade-aware, never raw market)
 const gradingPcQuery = ref('')
@@ -861,6 +862,10 @@ watch(
   font-size: 11px;
   color: var(--text-muted);
 }
+
+/* Grade key-caps (6.5) */
+.keycap-row { display: flex; gap: 6px; flex-wrap: wrap; }
+.keycap-sm { min-height: 42px; padding: 6px 11px; font-size: 12.5px; }
 
 /* Mobile responsive */
 @media (max-width: 640px) {
