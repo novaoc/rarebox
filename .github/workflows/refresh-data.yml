@@ -51,6 +51,10 @@ jobs:
       - name: English Pokémon prices (fallback for sets pokemontcg.io leaves priceless)
         run: python3 scripts/build_en_prices.py
 
+      - name: English Pokémon extras (cards pokemontcg.io lacks entirely — ME promos etc.)
+        run: python3 scripts/build_en_extras.py
+        continue-on-error: true # supplement going stale beats blocking prices
+
       - name: Japanese Pokémon search index
         run: python3 scripts/build_jp_index.py
 

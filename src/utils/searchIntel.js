@@ -21,6 +21,7 @@
 import { multiSearch } from '../services/tcg/multiSearch'
 import { searchSealed } from '../services/sealedIndex'
 import { searchJapanese } from '../services/jpSearch'
+import { searchEnExtras } from '../services/enExtras'
 import { getSets as getPokemonSets, getJapaneseSets, JP_EN_NAMES, getMarketPrice } from '../services/pokemonApi'
 import { getEnPriceMap, enrichPokemonCard, hasLivePrices } from '../services/tcg/enPrices'
 import { getProvider } from '../services/tcg/providers'
@@ -492,6 +493,14 @@ export async function smartSearch(q, { pageSize = 24, sealedLimit = 12, provider
   if (pokemonOk && (wantJa || jaSets.length || text)) {
     const jpLimit = (wantJa || jaSets.length) ? fetchSize : Math.min(10, fetchSize)
     jobs.push(leg(searchJapanese(parsed.clean, { limit: jpLimit, setIds: jaSets.length ? jaSets : null, number: parsed.number })
+      .then(cards => ({ kind: 'cards', cards })).catch(() => ({ kind: 'cards', cards: [] })), { kind: 'cards', cards: [] }))
+  }
+
+  // EN extras leg — TCGplayer-only cards pokemontcg.io lacks entirely
+  // (ME promos, McDonald's sets, …). Local static file, zero API cost,
+  // capped and ranked under exact EN hits like the JP leg.
+  if (pokemonOk && !wantJa && text) {
+    jobs.push(leg(searchEnExtras(parsed.clean, { limit: Math.min(10, fetchSize), number: parsed.number })
       .then(cards => ({ kind: 'cards', cards })).catch(() => ({ kind: 'cards', cards: [] })), { kind: 'cards', cards: [] }))
   }
 

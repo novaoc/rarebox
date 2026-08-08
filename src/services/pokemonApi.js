@@ -93,6 +93,14 @@ export async function getCard(id, lang = null) {
   if (lang === 'ja') {
     return getJapaneseCardDetail(id)
   }
+  // x- ids live only in the EN extras supplement (TCGplayer-only cards
+  // like the ME promos) — pokemontcg.io would just 404 on them
+  if (/^x-/.test(String(id))) {
+    const { extraCardById } = await import('./enExtras.js')
+    const card = await extraCardById(id)
+    if (card) return card
+    throw new Error('extra card not in supplement')
+  }
   const url = `${BASE_URL}/cards/${id}`
   const data = await fetchWithCache(url)
   await enrichEnCards([data.data])

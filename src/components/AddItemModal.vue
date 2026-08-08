@@ -327,9 +327,12 @@ const gradeOptions = computed(() => gradesByCompany[form.value.gradingCompany] |
 const cardNorm = computed(() => {
   const c = props.card
   if (!c) return null
+  // Set id from the card id's prefix before the LAST dash: SV8-136 → SV8,
+  // x-mep-29 → x-mep. Ids without a dash carry no derivable set id.
+  const cid = String(c.id || '')
   const set = typeof c.set === 'string'
     ? {
-        id: /^[^\s-]+-[^\s-]+$/.test(String(c.id || '')) ? String(c.id).split('-')[0] : undefined,
+        id: cid.includes('-') ? cid.slice(0, cid.lastIndexOf('-')) : undefined,
         name: c.set.replace(/\s*\([^)]*\)\s*$/, ''),
       }
     : c.set
