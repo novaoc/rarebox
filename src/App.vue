@@ -41,7 +41,28 @@
           <svg v-if="theme === 'dark'" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32 1.41 1.41M2 12h2m16 0h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
           <svg v-else xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
         </button>
-        <router-link to="/search" class="btn btn-primary btn-sm add-card-btn">+ Add Card</router-link>
+        <!-- Desktop "+ Add": same three actions as the phone disc's fan.
+             Scan works here too — the viewfinder falls back to file upload
+             when there's no webcam. -->
+        <div class="add-menu-wrap add-card-btn">
+          <button class="btn btn-primary btn-sm" :aria-expanded="addMenuOpen" aria-haspopup="menu" @click="addMenuOpen = !addMenuOpen">+ Add</button>
+          <transition name="fade">
+            <div v-if="addMenuOpen" class="add-menu" role="menu" aria-label="Add to your shelf">
+              <button class="add-menu-item" role="menuitem" @click="fanScan">
+                <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>
+                Scan card
+              </button>
+              <button class="add-menu-item" role="menuitem" @click="fanGo('/search')">
+                <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                Search
+              </button>
+              <button class="add-menu-item" role="menuitem" @click="fanSealed">
+                <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>
+                Sealed
+              </button>
+            </div>
+          </transition>
+        </div>
         <router-link to="/settings" class="btn btn-ghost btn-icon settings-btn" aria-label="Settings">
           <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
         </router-link>
@@ -206,8 +227,14 @@ const route = useRoute()
 const router = useRouter()
 
 const fanOpen = ref(false)
+const addMenuOpen = ref(false)
 const scanOpen = ref(false)
 const theme = ref(resolvedTheme())
+
+// Desktop add-menu closes on any click outside its wrapper
+document.addEventListener('click', (e) => {
+  if (addMenuOpen.value && !e.target.closest?.('.add-menu-wrap')) addMenuOpen.value = false
+})
 
 // Shelf tab: the active shelf (or the first one). With no shelves the tab
 // offers to create one instead of leading nowhere.
@@ -234,14 +261,17 @@ function toggleFan() {
 }
 function fanGo(path) {
   fanOpen.value = false
+  addMenuOpen.value = false
   router.push(path)
 }
 function fanScan() {
   fanOpen.value = false
+  addMenuOpen.value = false
   scanOpen.value = true
 }
 function fanSealed() {
   fanOpen.value = false
+  addMenuOpen.value = false
   const id = store.activePortfolioId || store.portfolios[0]?.id
   // The sealed add flow lives on a shelf; without one, search still works
   router.push(id ? `/shelf/${id}?add=sealed` : '/search')
@@ -283,8 +313,8 @@ const showTradeTour = ref(false)
 const showBoothTour = ref(false)
 const tourKey = ref(0)
 
-// Close the fan on navigation
-watch(() => route.fullPath, () => { fanOpen.value = false })
+// Close the fan + add menu on navigation
+watch(() => route.fullPath, () => { fanOpen.value = false; addMenuOpen.value = false })
 
 // Which tab is lit for the current route
 const TAB_FOR_ROUTE = {
@@ -528,6 +558,42 @@ onErrorCaptured((err, instance, info) => {
   flex-shrink: 0;
 }
 .add-card-btn { display: none; }
+
+/* ── Desktop add menu — the fan's three actions, dropdown posture ───── */
+.add-menu-wrap { position: relative; }
+.add-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 80;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 170px;
+  padding: 8px;
+  background: var(--bg-card);
+  border: var(--bw) solid var(--ink);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+}
+.add-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 12px;
+  background: transparent;
+  border: none;
+  border-radius: 10px;
+  font-size: 13.5px;
+  font-weight: 800;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+.add-menu-item:hover { background: var(--bg-hover); }
+.add-menu-item:active { background: var(--accent-dim); }
 /* With the More sheet gone, Settings lives in the top bar on every size */
 .settings-btn { display: inline-flex; }
 .theme-btn { display: inline-flex; }
