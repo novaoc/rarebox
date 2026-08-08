@@ -28,8 +28,13 @@ export async function compareBoothToMarket(booth, onProgress) {
   const perItem = new Array(items.length).fill(null)
   let done = 0
 
+  // Singles only: sealed/graded listings carry a real `game` plus a
+  // TCGplayer product id in cardId, which resolveCard would misread as a
+  // card id and price against the wrong product.
   const queue = items.map((it, i) => ({ it, i }))
-    .filter(({ it }) => it.cardId && it.game && it.game !== 'sealed')
+    .filter(({ it }) => it.cardId && it.game && (it.type || 'card') === 'card')
+
+  const total = queue.length // fixed denominator — in-flight items made it fluctuate
 
   async function worker() {
     while (queue.length) {
@@ -37,7 +42,7 @@ export async function compareBoothToMarket(booth, onProgress) {
       const card = await resolveCard(it.cardId, it.game)
       if (card?.price > 0) perItem[i] = card.price
       done++
-      onProgress?.(done, queue.length + done)
+      onProgress?.(done, total)
     }
   }
   await Promise.all(Array.from({ length: CONCURRENCY }, worker))

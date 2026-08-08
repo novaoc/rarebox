@@ -132,9 +132,9 @@
         </div>
         <div class="be-item-controls">
           <label class="be-mini-label">Qty</label>
-          <input type="number" min="1" class="input be-qty" v-model.number="it.qty" @change="onQtyChange(it)" />
+          <input type="number" min="1" class="input be-qty" v-model.number="it.qty" @change="it.qty = Math.max(1, Math.floor(+it.qty) || 1); onQtyChange(it)" />
           <label class="be-mini-label">Asking $</label>
-          <input type="number" min="0" step="0.01" class="input be-price" v-model.number="it.price" @change="persist" />
+          <input type="number" min="0" step="0.01" class="input be-price" v-model.number="it.price" @change="it.price = Math.max(0, +it.price || 0); persist()" />
           <button class="btn btn-ghost btn-icon" aria-label="Remove listing" @click="removeItem(i)">✕</button>
         </div>
       </div>
@@ -272,7 +272,7 @@ import { ref, computed, watch, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
 import { usePortfolioStore } from '../stores/portfolio'
 import BoothShareModal from '../components/BoothShareModal.vue'
-import { loadBooths, saveBooths, boothTotal, MAX_BOOTH_ITEMS } from '../utils/booth'
+import { loadBooths, saveBooths, boothTotal, MAX_BOOTH_ITEMS, binderItems, suggestBinders, MAX_BINDERS } from '../utils/booth'
 import { smartSearch, warmSearchIntel } from '../utils/searchIntel'
 import { syncOn, ensureBoothShelf, shelfAdd, shelfSetQty, returnToSource, moveFromCurated, syncAll } from '../utils/boothShelf'
 import { searchGradedProducts } from '../services/priceServer'

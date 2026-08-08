@@ -8,7 +8,7 @@
 import { spawn } from 'node:child_process'
 import puppeteer from 'puppeteer-core'
 
-const CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
+const CHROME = process.env.PUPPETEER_EXECUTABLE_PATH || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
 const PORT = 5199
 
 const vite = spawn('npx', ['vite', '--port', String(PORT), '--strictPort'], { stdio: 'pipe', shell: true })

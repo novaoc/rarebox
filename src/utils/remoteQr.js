@@ -29,6 +29,9 @@
  */
 
 const NTFY = 'https://ntfy.sh'
+// Largest state we'll decode off the relay (base64 chars). Booth shares are
+// clamped well below this; anything bigger is garbage or hostile.
+const MAX_STATE_B64_CHARS = 256 * 1024
 
 const te = new TextEncoder()
 
@@ -134,9 +137,16 @@ export function subscribeState({ topic, key }, onState, onStatus = () => {}) {
       const msg = JSON.parse(ev.data)
       let packet
       if (msg.attachment?.url) {
-        const r = await fetch(msg.attachment.url)
-        packet = b64ToBytes(await r.text())
+        // The attachment envelope sits OUTSIDE the AES-GCM ciphertext, so it
+        // is attacker-controllable on a world-writable topic: only fetch from
+        // the relay itself, with a timeout, and clamp before decoding.
+        if (!String(msg.attachment.url).startsWith(`${NTFY}/`)) return
+        const r = await fetch(msg.attachment.url, { signal: AbortSignal.timeout(15000) })
+        const text = await r.text()
+        if (text.length > MAX_STATE_B64_CHARS) return
+        packet = b64ToBytes(text)
       } else if (msg.message) {
+        if (msg.message.length > MAX_STATE_B64_CHARS) return
         packet = b64ToBytes(msg.message)
       } else return
       const state = await open(key, packet)

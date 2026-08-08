@@ -31,11 +31,18 @@ const secret = ref(secretFromLocation(window.location.hash))
 const booth = ref(null)
 const bytes = ref(null)
 const status = ref('connecting')
+const direct = ref(false)
 
 let stop = null
+let stopSig = null
+let peer = null
+let p2pTs = 0
 let wakeLock = null
 
 const displayStatus = computed(() => {
+  // A live WebRTC channel means we're current even if the relay (which
+  // needs internet) can't connect — that's the whole hotspot story.
+  if (direct.value) return booth.value ? 'live' : 'waiting'
   if (status.value !== 'connected') return status.value === 'reconnecting' ? 'reconnecting' : 'connecting'
   return booth.value ? 'live' : 'waiting'
 })
@@ -53,12 +60,35 @@ onMounted(async () => {
   // tidy the URL so the secret doesn't sit in the address bar / history
   history.replaceState(null, '', window.location.pathname)
   const channel = await deriveChannel(secret.value)
-  stop = subscribeState(channel, async ({ shareBytes }) => {
+  stop = subscribeState(channel, async ({ ts, shareBytes }) => {
     try {
+      if (ts <= p2pTs) return // the direct leg already delivered something newer
       booth.value = await decodeBoothBytes(shareBytes)
       bytes.value = shareBytes
     } catch { /* malformed state — keep showing the last good one */ }
   }, s => { status.value = s })
+
+  // Direct (WebRTC) leg: answer the phone's offers and take sealed states
+  // over the data channel — same decoder as the relay, no internet needed.
+  const sigChannel = await deriveSigChannel(secret.value)
+  peer = displayPeer({
+    sigChannel,
+    onPacket: async (sealed) => {
+      try {
+        const state = await openPacket(channel.key, sealed)
+        if (state.ts <= p2pTs) return
+        p2pTs = state.ts
+        booth.value = await decodeBoothBytes(state.shareBytes)
+        bytes.value = state.shareBytes
+      } catch { /* not ours / garbage — ignore */ }
+    },
+    onMode: (m) => { direct.value = m === 'direct' },
+  })
+  stopSig = subscribeSig(sigChannel, (msg) => {
+    if (msg.t === 'offer' && typeof msg.sdp === 'string') peer?.onOffer(msg.sdp)
+  })
+  publishSig(sigChannel, { t: 'hello' }) // tell an armed phone we just arrived
+
   acquireWakeLock()
   // iOS releases wake locks when the tab loses visibility — re-grab
   document.addEventListener('visibilitychange', () => {

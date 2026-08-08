@@ -43,7 +43,7 @@
           <div class="bt-item-name">{{ it.name }}</div>
           <div class="bt-item-sub">{{ [it.setName, it.number ? '#' + it.number : ''].filter(Boolean).join(' · ') }}</div>
           <div class="bt-item-meta">
-            <span class="bt-price">$<input type="number" min="0" step="0.01" class="bt-price-input" v-model.number="it.price" @change="persist" /></span>
+            <span class="bt-price">$<input type="number" min="0" step="0.01" class="bt-price-input" v-model.number="it.price" @change="it.price = Math.max(0, +it.price || 0); persist()" /></span>
             <span v-if="(it.qty || 1) > 1" class="badge badge-info">×{{ it.qty }}</span>
             <button class="btn btn-ghost btn-icon" aria-label="Remove listing (not a sale)" @click="removeQuiet(i)">✕</button>
           </div>
@@ -484,6 +484,7 @@ function logTrade() {
     game: it.game, type: it.type, cardId: it.cardId, tradeId,
   }).id)
   const listed = []
+  const received = [] // every trade-in, listed or not — undo must reverse all shelf mirrors
   for (const inc of tradeIncoming.value) {
     ids.push(addEntry(journal.value, {
       boothId: booth.value.id, boothName: booth.value.name, kind: 'trade-in',
@@ -498,6 +499,7 @@ function logTrade() {
     // trade-ins are inventory whether or not they go on the table;
     // cost basis = the value you gave up for them
     shelfAdd(booth.value, incomingItem, { qty: 1, purchasePrice: inc.value || 0 })
+    received.push(incomingItem)
     if (inc.list && !atCap.value) {
       booth.value.items.unshift(incomingItem)
       listed.push(incomingItem)
@@ -509,7 +511,7 @@ function logTrade() {
   closeTrade()
   showUndo({
     label: `Traded ${snapshot.name}${listed.length ? ` (+${listed.length} listed)` : ''}`,
-    journalIds: ids, snapshot, index: i, incoming: listed,
+    journalIds: ids, snapshot, index: i, incoming: received,
   })
 }
 
@@ -674,7 +676,7 @@ function addFromSearch(c, asBuy = false) {
     addEntry(journal.value, {
       boothId: booth.value.id, boothName: booth.value.name, kind: 'buy',
       name: c.name || '', setName: c.set || '', price: cost, cash: -cost,
-      game: c.game || '', type: c.sealed ? 'sealed' : 'card', cardId: c.id || '',
+      game: c.game || '', type: listing.type, cardId: c.id || '', // graded buys ledger as 'graded', not 'card'
     })
   }
   persist()
