@@ -1399,8 +1399,14 @@ async function refreshPrices() {
       }),
       // Non-Pokémon raw cards + sealed — priceFeedService routes per game
       mapPool(otherTcgRawItems, REFRESH_CONCURRENCY, async item => {
-        const query = item.name || item.cardData?.name
-        if (!query) return
+        const name = item.name || item.cardData?.name
+        if (!name) return
+        // Sealed names are often just the SKU ("Collector Booster Box") —
+        // the set lives in setName. Without it the query matches EVERY
+        // set's box and the first hit wins ($380 box → $1800 wrong-set box).
+        const query = item.type === 'sealed'
+          ? [name, item.setName].filter(Boolean).join(' ')
+          : name
         try {
           const price = await getTcgPrice(query, item.game)
           if (typeof price === 'number' && Number.isFinite(price)) {

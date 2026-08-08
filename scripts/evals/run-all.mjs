@@ -14,6 +14,7 @@ const evals = [
   'scripts/evals/backup-roundtrip.mjs',
   'scripts/evals/riftbound-graded.mjs',
   'scripts/evals/pricecharting-full-grades.mjs',
+  'scripts/evals/sealed-sku-scoring.mjs',
   ['python3', 'scripts/evals/pricecharting_full_grades.py'],
 ]
 

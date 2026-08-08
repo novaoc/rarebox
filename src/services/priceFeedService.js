@@ -10,6 +10,7 @@
 // service is what makes OTHER TCGs trackable in the app.
 
 import db from '../db'
+import { pickBestPriced } from './priceMatch.js'
 
 const PC_BASE = 'https://www.pricecharting.com'
 const CACHE_DURATION = 6 * 60 * 60 * 1000 // 6 hours
@@ -161,7 +162,7 @@ export async function getPrice(query, game = 'pokemon') {
   if (!q) return null
   try {
     const results = await searchProducts(q, game)
-    const hit = results.find(r => r.price != null) || results[0]
+    const hit = pickBestPriced(results, q)
     return hit ? hit.price : null
   } catch {
     return null
