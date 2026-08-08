@@ -530,7 +530,7 @@ async function refreshAllPrices() {
       const query = item.cardData?.name || item.name
       if (!query) continue
       const price = await getTcgPrice(query, item.game)
-      if (price) store.updateItem(item.portfolioId, item.id, { currentMarketPrice: price, lastPriceUpdate: new Date().toISOString() })
+      if (price != null) store.updateItem(item.portfolioId, item.id, { currentMarketPrice: price, lastPriceUpdate: new Date().toISOString() })
     } catch (e) {
       console.warn(`Failed to refresh ${item.game} card "${item.cardData?.name}":`, e.message)
     }

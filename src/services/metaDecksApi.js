@@ -851,8 +851,6 @@ const FALLBACK_DECKS = {
   ],
 }
 
-function getFallbackDecks(game) {
+export function getFallbackDecks(game) {
   return FALLBACK_DECKS[game] || FALLBACK_DECKS.pokemon
 }
-
-export const fallbackMetaDecks = FALLBACK_DECKS.pokemon

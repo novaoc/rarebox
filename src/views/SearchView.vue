@@ -237,7 +237,11 @@ const showAlertForm = ref(false)
 const alertCondition = ref('below')
 const alertThreshold = ref(null)
 
+// Alerts live in plain localStorage — bump a version ref on mutation so the
+// panel reflects saves/removes immediately instead of on reopen.
+const alertsVersion = ref(0)
 const activeAlert = computed(() => {
+  alertsVersion.value
   if (!selectedCard.value) return []
   return getAlertsForCard(selectedCard.value.id)
 })
@@ -254,10 +258,12 @@ async function saveAlert() {
   )
   showAlertForm.value = false
   alertThreshold.value = null
+  alertsVersion.value++
 }
 
 function removeAlertById(id) {
   removeAlert(id)
+  alertsVersion.value++
 }
 
 let debounceTimer = null
@@ -273,7 +279,9 @@ let searchSeq = 0
 const understood = ref([])
 async function doSearch(resetPage = true) {
   if (!query.value.trim()) return
-  if (resetPage === true) { page.value = 1; activeFilter.value = 'all' }
+  // Template handlers pass the DOM event as the first arg — anything that
+  // isn't an explicit `false` (pagination) means "new search, reset".
+  if (resetPage !== false) { page.value = 1; activeFilter.value = 'all' }
   const seq = ++searchSeq // debounced keystrokes can land out of order
   loading.value = true
   searched.value = true

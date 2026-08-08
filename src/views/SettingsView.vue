@@ -389,19 +389,24 @@ const hideLoader = ref(localStorage.getItem('hide_load_indicator') === 'true')
 const themePref = ref(getThemePref())
 function setTheme(opt) { themePref.value = opt; setThemePref(opt) }
 
-// Alert state
+// Alert state — alerts live in plain localStorage (no reactivity), so a
+// version ref is bumped after every mutation to force the computeds to
+// re-read; without it the ✕ / Clear buttons appear dead.
+const alertsVersion = ref(0)
 const allAlerts = computed(() => {
+  alertsVersion.value
   const active = getActiveAlerts()
   const triggered = getTriggeredAlerts()
   return [...triggered, ...active]
 })
-const triggeredCount = computed(() => getTriggeredAlerts().length)
+const triggeredCount = computed(() => (alertsVersion.value, getTriggeredAlerts().length))
 
-function removeAlertById(id) { removeAlert(id) }
-function doClearTriggered() { clearTriggeredAlerts() }
+function removeAlertById(id) { removeAlert(id); alertsVersion.value++ }
+function doClearTriggered() { clearTriggeredAlerts(); alertsVersion.value++ }
 function doClearAllAlerts() {
   if (confirm('Are you sure you want to delete all price alerts?')) {
     clearAllAlerts()
+    alertsVersion.value++
   }
 }
 

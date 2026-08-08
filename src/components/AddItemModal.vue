@@ -182,7 +182,7 @@
                 <div class="sealed-result-name">{{ r.name }}</div>
                 <div class="sealed-result-set">{{ r.set }}</div>
               </div>
-              <div class="sealed-result-price text-accent" v-if="r.price">${{ r.price.toFixed(2) }}</div>
+              <div class="sealed-result-price text-accent" v-if="r.price != null">${{ r.price.toFixed(2) }}</div>
               <div class="sealed-result-price text-muted" v-else>—</div>
             </div>
           </div>
@@ -437,7 +437,7 @@ function selectSealed(result) {
   form.value.setName = result.set
   form.value.pcUrl = result.url
   form.value.imageUrl = result.image || ''
-  if (result.price) form.value.currentValue = result.price
+  if (result.price != null) form.value.currentValue = result.price // $0 is a valid PC price
   // Pokémon results are always sealed; other TCGs carry an inferred `sealed` flag.
   selectedIsSealed.value = isPokemon.value ? true : (result.sealed !== false)
   sealedResults.value = []

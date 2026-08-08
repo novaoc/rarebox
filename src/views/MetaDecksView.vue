@@ -27,6 +27,12 @@
       <p class="text-muted" style="margin-top:12px">Fetching latest meta decks...</p>
     </div>
 
+    <!-- Empty state (live + bundled fallback both unavailable) -->
+    <div v-else-if="metaDecks.length === 0" class="meta-loading">
+      <p class="text-muted">Couldn't load meta decks right now.</p>
+      <button class="btn btn-secondary btn-sm" style="margin-top:12px" @click="switchGame(activeGame)">Try again</button>
+    </div>
+
     <div v-else class="meta-grid">
       <div v-for="deck in metaDecks" :key="deck.name" class="meta-card">
         <div class="meta-card-header">
@@ -70,7 +76,7 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useDeckStore } from '../stores/decks'
-import { fetchLiveMetaDecks, fallbackMetaDecks } from '../services/metaDecksApi'
+import { fetchLiveMetaDecks, getFallbackDecks } from '../services/metaDecksApi'
 
 const GAME_LABELS = {
   pokemon: 'Pokémon', mtg: 'MTG', lorcana: 'Lorcana',
@@ -112,12 +118,15 @@ const source = ref('live')
 const lastUpdated = ref(null)
 const activeGame = ref('pokemon')
 
+let switchSeq = 0
 async function switchGame(game) {
   activeGame.value = game
   loading.value = true
   metaDecks.value = []
+  const seq = ++switchSeq // rapid tab clicks: only the latest fetch may land
   try {
     const decks = await fetchLiveMetaDecks(game)
+    if (seq !== switchSeq) return
     if (decks?.length) {
       metaDecks.value = decks
       source.value = 'live'
@@ -127,10 +136,13 @@ async function switchGame(game) {
       throw new Error('No decks')
     }
   } catch {
+    if (seq !== switchSeq) return
+    // Never leave the grid blank — fall back to the bundled deck lists.
+    metaDecks.value = getFallbackDecks(game) || []
     source.value = 'fallback'
     lastUpdated.value = null
   }
-  loading.value = false
+  if (seq === switchSeq) loading.value = false
 }
 
 onMounted(async () => {
@@ -139,9 +151,15 @@ onMounted(async () => {
 
 async function importDeck(metaDeck) {
   importing.value = metaDeck.archetype || metaDeck.name
-  const deck = await deckStore.importMetaDeck(metaDeck)
-  importing.value = null
-  router.push(`/decks/${deck.id}`)
+  try {
+    const deck = await deckStore.importMetaDeck(metaDeck)
+    if (deck?.id) router.push(`/decks/${deck.id}`)
+  } catch (e) {
+    console.warn('Meta deck import failed:', e)
+    alert('Import failed — check your connection and try again.')
+  } finally {
+    importing.value = null
+  }
 }
 </script>
 

@@ -246,6 +246,11 @@ async function lookupCard(entry) {
   }
 }
 
+// A run token so that going Back (or re-triggering the lookup) cancels the
+// old loop — otherwise it keeps fetching, pushes duplicate rows, and yanks
+// the user back to the preview when it finally finishes.
+let lookupSeq = 0
+
 async function startLookup() {
   parseError.value = ''
   const entries = parseDeckList(deckText.value)
@@ -254,6 +259,7 @@ async function startLookup() {
     return
   }
 
+  const seq = ++lookupSeq
   step.value = 'loading'
   resolved.value = []
   unresolved.value = []
@@ -276,6 +282,7 @@ async function startLookup() {
 
   for (const entry of dedupeList) {
     const card = await lookupCard(entry)
+    if (seq !== lookupSeq) return // user went Back or restarted the lookup
     resolvedCount.value++
 
     if (card) {
@@ -294,12 +301,14 @@ async function startLookup() {
 
     // Small delay to avoid hammering the API
     await new Promise(r => setTimeout(r, 80))
+    if (seq !== lookupSeq) return
   }
 
-  step.value = 'preview'
+  if (seq === lookupSeq) step.value = 'preview'
 }
 
 function handleBack() {
+  lookupSeq++ // cancel any in-flight lookup loop
   if (step.value === 'input') {
     emit('close')
   } else {

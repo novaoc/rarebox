@@ -30,8 +30,8 @@ const routes = [
   { path: '/designs/pulse', name: 'DesignPulse', component: () => import('../views/designs/DesignPulseView.vue'), meta: { bare: true, title: 'Design — Pulse' } },
   // Shelf alias — friendly URL for portfolio pages (named route keeps params encoding-safe)
   { path: '/shelf/:id', redirect: to => ({ name: 'Portfolio', params: { id: to.params.id } }) },
-  // 404 catch-all — redirect to dashboard
-  { path: '/:pathMatch(.*)*', redirect: '/' },
+  // 404 catch-all — a typo'd URL should say so, not silently land on the dashboard
+  { path: '/:pathMatch(.*)*', name: 'NotFound', component: () => import('../views/NotFoundView.vue'), meta: { title: 'Page Not Found' } },
 ]
 
 const router = createRouter({
@@ -47,16 +47,15 @@ router.onError((err) => {
   console.error('Navigation error:', err)
 })
 
-// Log store state on each navigation for diagnostics
+// Log navigation for diagnostics — dev only, keep production consoles quiet
 router.beforeEach((to, from) => {
-  if (from.path !== to.path) {
+  if (import.meta.env.DEV && from.path !== to.path) {
     console.log(`[nav] ${from.path} → ${to.path}`)
   }
 })
 
 // Update document title and meta description on navigation
 router.afterEach((to) => {
-  console.log(`[nav] arrived at ${to.path}`)
   const title = to.meta.title || 'Dashboard'
   document.title = `${title} — Rarebox`
 
