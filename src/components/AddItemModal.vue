@@ -29,11 +29,11 @@
         </div>
 
         <!-- Card / Graded: show card info (Pokémon raw card or prefilled TCG card) -->
-        <div v-if="card && (itemType === 'card' || itemType === 'graded')" class="card-preview">
-          <img v-if="card.images?.small" :src="card.images.small" :alt="card.name" class="card-thumb" @error="$event.target.style.display='none'" />
+        <div v-if="cardNorm && (itemType === 'card' || itemType === 'graded')" class="card-preview">
+          <img v-if="cardNorm.images?.small" :src="cardNorm.images.small" :alt="cardNorm.name" class="card-thumb" @error="$event.target.style.display='none'" />
           <div class="card-preview-info">
-            <div class="card-preview-name">{{ card.name }}</div>
-            <div class="card-preview-set">{{ card.set?.name }} · #{{ card.number }}</div>
+            <div class="card-preview-name">{{ cardNorm.name }}</div>
+            <div class="card-preview-set">{{ cardNorm.set?.name }} · #{{ cardNorm.number }}</div>
             <div class="card-preview-price" v-if="currentPrice != null">
               Market: <span class="text-accent font-bold">${{ currentPrice.toFixed(2) }}</span>
             </div>
@@ -318,6 +318,24 @@ const gradesByCompany = {
   Other: ['10', '9.5', '9', '8', '7', '6', '5', '4', '3', '2', '1'],
 }
 const gradeOptions = computed(() => gradesByCompany[form.value.gradingCompany] || gradesByCompany.PSA)
+
+// Search legs can hand a FLAT Pokémon card (JP index results: `image`
+// instead of `images`, a string `set` like "Super Electric Breaker (SV8)",
+// top-level `price`) — normalize to the rich pokemontcg.io shape once so
+// the preview and both submit paths store images/set correctly. Cards
+// added through the raw flat shape saved with no picture and no set.
+const cardNorm = computed(() => {
+  const c = props.card
+  if (!c) return null
+  const set = typeof c.set === 'string'
+    ? {
+        id: /^[^\s-]+-[^\s-]+$/.test(String(c.id || '')) ? String(c.id).split('-')[0] : undefined,
+        name: c.set.replace(/\s*\([^)]*\)\s*$/, ''),
+      }
+    : c.set
+  const images = c.images || (c.image ? { small: c.image, large: c.image } : undefined)
+  return { ...c, set, images }
+})
 const gradeCompanies = Object.keys(gradesByCompany)
 function setGradeCompany(c) {
   form.value.gradingCompany = c
@@ -337,7 +355,7 @@ function gradedIdentitySrc() {
     return {
       game: 'pokemon',
       name: props.card.name,
-      setName: props.card.set?.name,
+      setName: cardNorm.value?.set?.name,
       number: props.card.number,
     }
   }
@@ -489,8 +507,10 @@ const currentPrice = computed(() => {
     return num(v?.market) ?? num(v?.mid)
   }
   const result = getMarketPrice(props.card)
-  // Default path returns {price,variant}; never collapse $0 with ||
-  return num(result?.price) ?? (typeof result === 'number' ? num(result) : null)
+  // Default path returns {price,variant}; never collapse $0 with ||.
+  // Flat search shapes (JP index results) carry price top-level instead of
+  // tcgplayer.prices — without this fallback they saved with NO price.
+  return num(result?.price) ?? (typeof result === 'number' ? num(result) : null) ?? num(props.card.price)
 })
 
 const canSubmit = computed(() => {
@@ -574,34 +594,36 @@ function submit() {
       }
     }
   } else if (itemType.value === 'card') {
+    const c = cardNorm.value
     item = {
       ...item,
-      cardId: props.card.id,
-      _lang: props.card._lang || null,
+      cardId: c.id,
+      _lang: c._lang || null,
       cardData: {
-        name: props.card.name,
-        number: props.card.number,
-        images: props.card.images,
-        set: { id: props.card.set?.id, name: props.card.set?.name },
-        rarity: props.card.rarity,
-        supertype: props.card.supertype,
-        subtypes: props.card.subtypes,
+        name: c.name,
+        number: c.number,
+        images: c.images,
+        set: { id: c.set?.id, name: c.set?.name },
+        rarity: c.rarity,
+        supertype: c.supertype,
+        subtypes: c.subtypes,
       },
       priceVariant: form.value.priceVariant,
       currentMarketPrice: currentPrice.value,
     }
   } else if (itemType.value === 'graded') {
     const num = v => (typeof v === 'number' && Number.isFinite(v) ? v : null)
+    const c = cardNorm.value
     item = {
       ...item,
-      cardId: props.card.id,
-      _lang: props.card._lang || null,
+      cardId: c.id,
+      _lang: c._lang || null,
       cardData: {
-        name: props.card.name,
-        number: props.card.number,
-        images: props.card.images,
-        set: { id: props.card.set?.id, name: props.card.set?.name },
-        rarity: props.card.rarity,
+        name: c.name,
+        number: c.number,
+        images: c.images,
+        set: { id: c.set?.id, name: c.set?.name },
+        rarity: c.rarity,
       },
       gradingCompany: form.value.gradingCompany,
       grade: form.value.grade,

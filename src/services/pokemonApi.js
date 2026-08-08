@@ -398,6 +398,29 @@ function jpPriceKey(setId, localId) {
   return `${String(setId || '').toLowerCase()}-${num.toLowerCase()}`
 }
 
+// tcgdex CDN scan URL — the CDN requires 3-digit zero-padded numbers
+// (/SV8/006 works, /SV8/6 is a 404), unlike the API's localId.
+export function jpScanUrl(setId, localId, size = 'low') {
+  const series = jpSetToSeries(setId)
+  if (!series) return null
+  return `https://assets.tcgdex.net/ja/${series}/${setId}/${String(localId).padStart(3, '0')}/${size}.webp`
+}
+
+// Images for a JP card the tcgdex API may not know: scan URL when the set
+// has scans (the CDN carries secret-rare scans the API omits), TCGplayer
+// product photo otherwise (the Mega era has no scans at all).
+function jpIndexImages(jpIdx, setId, localId, key) {
+  const meta = jpIdx.sets[String(setId).toLowerCase()]
+  const pid = jpIdx.pids[key]
+  if (meta && meta.scans === false) {
+    return { small: jpProductImage(pid), large: jpProductImage(pid, true) }
+  }
+  const small = jpScanUrl(setId, localId, 'low')
+  return small
+    ? { small, large: jpScanUrl(setId, localId, 'high') }
+    : { small: jpProductImage(pid), large: jpProductImage(pid, true) }
+}
+
 export async function getJapaneseCardsBySet(setId, page = 1, pageSize = 36) {
   // Fetch the set to get card list (names, numbers)
   const url = `https://api.tcgdex.net/v2/ja/sets/${setId}`
@@ -449,14 +472,85 @@ export async function getJapaneseCardsBySet(setId, page = 1, pageSize = 36) {
       _hasImage: !!(imageBase || pid)
     }
   })
+
+  // Secret rares: the tcgdex API stops at each set's official count (SV8
+  // lists 106 cards while Pikachu ex is 136/106), but the TCGplayer-built
+  // jp-index knows the full print run — and the tcgdex CDN carries the
+  // secret scans the API omits. Append every index card the API left out.
+  const have = new Set(allCards.map(c => jpPriceKey(setId, c.number)))
+  const prefix = `${String(setId).toLowerCase()}-`
+  const extras = []
+  for (const key of Object.keys(jpIdx.names)) {
+    if (!key.startsWith(prefix) || have.has(key)) continue
+    const num = key.slice(prefix.length)
+    const en = jpIdx.names[key]
+    const price = jpPrices[key]
+    extras.push({
+      id: `${setId}-${num}`,
+      name: en ? `${en} (JP)` : `Card ${num}`,
+      nameJp: '',
+      number: num,
+      set: { id: setId, name: enName },
+      images: jpIndexImages(jpIdx, setId, num, key),
+      supertype: 'Pokémon',
+      tcgplayer: price != null ? { prices: { normal: { market: price, low: null, mid: price } } } : undefined,
+      _lang: 'ja',
+      _hasImage: true
+    })
+  }
+  extras.sort((a, b) => (parseInt(a.number, 10) || 0) - (parseInt(b.number, 10) || 0))
+  allCards.push(...extras)
+
   const start = (page - 1) * pageSize
   const paged = allCards.slice(start, start + pageSize)
   return { data: paged, totalCount: allCards.length }
 }
 
+// A tcgdex-shaped detail for cards only the jp-index knows (secret rares:
+// the API 404s past a set's official count). Price from jp-prices, image
+// from the CDN scan / TCGplayer product photo.
+async function jpDetailFromIndex(cardId) {
+  const at = String(cardId).lastIndexOf('-')
+  if (at <= 0) return null
+  const setId = cardId.slice(0, at)
+  const localId = cardId.slice(at + 1)
+  const key = jpPriceKey(setId, localId)
+  const [jpIdx, jpPrices] = await Promise.all([getJpIndex(), getJpPriceMap()])
+  const en = jpIdx.names[key]
+  if (!en) return null
+  const price = jpPrices[key]
+  return {
+    id: cardId,
+    name: `${en} (JP)`,
+    number: localId,
+    set: { id: setId, name: JP_EN_NAMES[setId] || setId },
+    images: jpIndexImages(jpIdx, setId, localId, key),
+    supertype: 'Pokémon',
+    subtypes: [],
+    types: [],
+    hp: null,
+    rarity: null,
+    attacks: [],
+    weaknesses: [],
+    retreatCost: [],
+    tcgplayer: { prices: price != null ? { normal: { market: price, low: null, mid: price } } : null },
+    _lang: 'ja'
+  }
+}
+
 export async function getJapaneseCardDetail(cardId) {
   const url = `https://api.tcgdex.net/v2/ja/cards/${cardId}`
-  const data = await fetchWithCache(url)
+  let data
+  try {
+    data = await fetchWithCache(url)
+  } catch (e) {
+    // Secret rares 404 on the tcgdex API even though the CDN has their
+    // scans and the jp-index their names/prices — synthesize instead of
+    // failing, so these cards refresh and render like any other.
+    const synth = await jpDetailFromIndex(cardId)
+    if (synth) return synth
+    throw e
+  }
   
   // Prefer the TCGplayer USD price from the static asset; fall back to
   // tcgdex's cardmarket data (EUR, converted) where TCGplayer has nothing.

@@ -15,6 +15,7 @@ const evals = [
   'scripts/evals/riftbound-graded.mjs',
   'scripts/evals/pricecharting-full-grades.mjs',
   'scripts/evals/sealed-sku-scoring.mjs',
+  'scripts/evals/jp-secret-heal.mjs',
   ['python3', 'scripts/evals/pricecharting_full_grades.py'],
 ]
 

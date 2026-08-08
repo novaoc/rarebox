@@ -42,7 +42,8 @@ function jpImage(setId, localId, pid) {
   const meta = _sets[String(setId).toLowerCase()]
   if (meta && meta.scans === false) return jpProductImage(pid) || ''
   const series = jpSetToSeries(setId)
-  if (series) return `https://assets.tcgdex.net/ja/${series}/${setId}/${localId}/low.webp`
+  // CDN paths need 3-digit zero-padding: /SV8/006 works, /SV8/6 is a 404
+  if (series) return `https://assets.tcgdex.net/ja/${series}/${setId}/${String(localId).padStart(3, '0')}/low.webp`
   return jpProductImage(pid) || ''
 }
 

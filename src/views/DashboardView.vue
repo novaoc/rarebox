@@ -393,6 +393,7 @@ import { usePortfolioStore } from '../stores/portfolio'
 import { getCard, getMarketPrice, getSets } from '../services/pokemonApi'
 import { getPrice as getTcgPrice } from '../services/priceFeedService'
 import { checkAlerts, notifyTriggered } from '../utils/alerts'
+import { refreshUpdates } from '../utils/refreshHeal'
 // Online failures hide the card; offline failures are handled globally by
 // the offlineArt sweep (which swaps the src to a sleeve — don't hide that)
 function hideIfOnline(e) {
@@ -764,13 +765,19 @@ async function refreshAllPrices() {
   const enCards = pokemonCards.filter(i => !store.isJPCard(i))
   const jpCards = pokemonCards.filter(i => store.isJPCard(i))
 
+  // Faceless items (no stored image) bypass the staleness window: the
+  // refresh fetch carries the missing images/set, so healing shouldn't
+  // wait a day for the price to go stale
+  const faceless = i => !(i.cardData?.images?.small || i.imageUrl)
+
   for (const item of enCards) {
-    if (!store.isPriceStale(item)) continue // 24h staleness window — was refetching everything every visit
+    if (!store.isPriceStale(item) && !faceless(item)) continue // 24h staleness window — was refetching everything every visit
     try {
       const card = await getCard(item.cardId, item._lang)
       const result = getMarketPrice(card, item.priceVariant)
       const price = result?.price ?? result
-      if (typeof price === 'number' && Number.isFinite(price)) store.updateItem(item.portfolioId, item.id, { currentMarketPrice: price, lastPriceUpdate: new Date().toISOString() })
+      const updates = refreshUpdates(item, card, price)
+      if (updates) store.updateItem(item.portfolioId, item.id, updates)
     } catch (e) {
       console.warn(`Failed to refresh EN card ${item.cardId}:`, e.message)
     }
@@ -779,12 +786,13 @@ async function refreshAllPrices() {
 
   // Pokemon JP cards — only refresh stale ones (tcgdex needs one request per card)
   for (const item of jpCards) {
-    if (!store.isPriceStale(item)) continue
+    if (!store.isPriceStale(item) && !faceless(item)) continue
     try {
       const card = await getCard(item.cardId, item._lang)
       const result = getMarketPrice(card, item.priceVariant)
       const price = result?.price ?? result
-      if (typeof price === 'number' && Number.isFinite(price)) store.updateItem(item.portfolioId, item.id, { currentMarketPrice: price, lastPriceUpdate: new Date().toISOString() })
+      const updates = refreshUpdates(item, card, price)
+      if (updates) store.updateItem(item.portfolioId, item.id, updates)
     } catch (e) {
       console.warn(`Failed to refresh JP card ${item.cardId}:`, e.message)
     }

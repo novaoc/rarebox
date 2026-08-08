@@ -604,6 +604,7 @@ import {
   RIFTBOUND_GRADED_NO_NUMBER_MSG,
 } from '../utils/gradedPriceQuery'
 import { checkAlerts, notifyTriggered } from '../utils/alerts'
+import { refreshUpdates } from '../utils/refreshHeal'
 import PriceChart from '../components/PriceChart.vue'
 import PortfolioChart from '../components/PortfolioChart.vue'
 import AddItemModal from '../components/AddItemModal.vue'
@@ -1334,8 +1335,11 @@ async function refreshPrices() {
           const card = await getCard(item.cardId, item._lang)
           const priceResult = getMarketPrice(card, item.priceVariant)
           const price = priceResult?.price ?? priceResult
-          if (typeof price === 'number' && Number.isFinite(price)) {
-            store.updateItem(shelfId, item.id, { currentMarketPrice: price, lastPriceUpdate: new Date().toISOString() })
+          // Price when valid + backfill of missing images/set/name — the
+          // fetched card has them, so faceless items heal on refresh
+          const updates = refreshUpdates(item, card, price)
+          if (updates) {
+            store.updateItem(shelfId, item.id, updates)
             updated++
           }
         } catch {}
@@ -1347,8 +1351,9 @@ async function refreshPrices() {
           const card = await getCard(item.cardId, item._lang)
           const priceResult = getMarketPrice(card, item.priceVariant)
           const price = priceResult?.price ?? priceResult
-          if (typeof price === 'number' && Number.isFinite(price)) {
-            store.updateItem(shelfId, item.id, { currentMarketPrice: price, lastPriceUpdate: new Date().toISOString() })
+          const updates = refreshUpdates(item, card, price)
+          if (updates) {
+            store.updateItem(shelfId, item.id, updates)
             updated++
           }
         } catch {}
