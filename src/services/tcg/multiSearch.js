@@ -553,7 +553,7 @@ async function resolveRiftboundCard(cardId) {
 export async function resolveCard(cardId, game) {
   try {
     if (game === 'pokemon') return await resolvePokemonCard(cardId)
-    if (game === 'mtg') return await resolveMtgCard(cardId)
+    if (game === 'mtg' || game === 'magic') return await resolveMtgCard(cardId)
     if (game === 'yugioh') return await resolveYugiohCard(cardId)
     if (game === 'lorcana') return await resolveLorcanaCard(cardId)
     if (game === 'one-piece') return await resolveOnePieceCard(cardId)

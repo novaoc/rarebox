@@ -1308,7 +1308,10 @@ async function refreshPrices() {
     const priceMap = new Map()
     for (const item of alertItems) {
       if (item.type === 'card' && item.cardId) {
-        priceMap.set(item.cardId, finiteMoney(item.currentMarketPrice) ?? finiteMoney(item.purchasePrice) ?? 0)
+        // Alerts compare against real market prices only — falling back to
+        // purchase price or 0 makes "below $X" fire on unpriced cards.
+        const mp = finiteMoney(item.currentMarketPrice)
+        if (mp != null) priceMap.set(item.cardId, mp)
       }
     }
     const triggered = checkAlerts(priceMap)

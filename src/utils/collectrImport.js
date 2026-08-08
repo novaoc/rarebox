@@ -194,27 +194,42 @@ export function convertRow(row) {
 
 // ── CSV parsing ────────────────────────────────────────────────────────────
 
-function parseLine(line) {
-  const result = []
-  let current = ''
+// Full RFC-4180-style parse over the whole text: handles escaped quotes
+// ("") inside quoted fields and newlines inside quoted fields (e.g. Notes),
+// which a per-line split silently corrupts into extra bogus rows.
+function parseCsvRows(text) {
+  const rows = []
+  let row = []
+  let field = ''
   let inQuotes = false
 
-  for (const ch of line) {
-    if (ch === '"') {
-      inQuotes = !inQuotes
-    } else if (ch === ',' && !inQuotes) {
-      result.push(current)
-      current = ''
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i]
+    if (inQuotes) {
+      if (ch === '"') {
+        if (text[i + 1] === '"') { field += '"'; i++ }
+        else inQuotes = false
+      } else {
+        field += ch
+      }
+    } else if (ch === '"') {
+      inQuotes = true
+    } else if (ch === ',') {
+      row.push(field)
+      field = ''
+    } else if (ch === '\n' || ch === '\r') {
+      if (ch === '\r' && text[i + 1] === '\n') i++
+      row.push(field)
+      field = ''
+      if (row.some(f => f.trim() !== '')) rows.push(row)
+      row = []
     } else {
-      current += ch
+      field += ch
     }
   }
-  result.push(current)
-
-  return result.map(f => {
-    if (f.startsWith('"') && f.endsWith('"')) return f.slice(1, -1)
-    return f
-  })
+  row.push(field)
+  if (row.some(f => f.trim() !== '')) rows.push(row)
+  return rows
 }
 
 /**
@@ -226,14 +241,16 @@ function stripBom(text) {
 
 export function convertCsv(text, onlyPortfolio) {
   text = stripBom(text)
-  const lines = text.split('\n').filter(l => l.trim())
-  if (lines.length < 2) throw new Error('CSV is empty or has no data rows')
+  const rows = parseCsvRows(text)
+  if (rows.length < 2) throw new Error('CSV is empty or has no data rows')
 
-  const header = parseLine(lines[0])
-  const groups = {}
+  const header = rows[0]
+  // Object.create(null): a shelf literally named "__proto__" or
+  // "constructor" must group like any other name, not hit the prototype.
+  const groups = Object.create(null)
 
-  for (let i = 1; i < lines.length; i++) {
-    const row = parseLine(lines[i])
+  for (let i = 1; i < rows.length; i++) {
+    const row = rows[i]
     const entry = {}
     for (let j = 0; j < header.length; j++) {
       entry[header[j].trim()] = (row[j] || '').trim()
@@ -277,7 +294,7 @@ function convertExcelRows(rows, onlyPortfolio) {
   const entries = rowsToObjectArrays(rows)
   if (entries.length === 0) throw new Error('Excel file has no data rows')
 
-  const groups = {}
+  const groups = Object.create(null)
   for (const entry of entries) {
     const { portfolioName, item } = convertRow(entry)
     if (onlyPortfolio && portfolioName !== onlyPortfolio) continue

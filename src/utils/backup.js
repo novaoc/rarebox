@@ -92,8 +92,10 @@ export function validateBackup(data) {
   const hasPortfolios = data.data.portfolios
   if (!hasPortfolios) return 'Backup missing shelf data'
 
-  // Quick shape check
-  if (hasPortfolios.portfolios && !Array.isArray(hasPortfolios.portfolios)) {
+  // Shape check — accept the canonical { portfolios: [...] } state object or
+  // the legacy bare-array form. Anything else would restore to an empty app
+  // after wiping the device, so it must be rejected here, before the wipe.
+  if (!Array.isArray(hasPortfolios) && !Array.isArray(hasPortfolios.portfolios)) {
     return 'Shelf data is corrupted'
   }
 
@@ -126,7 +128,12 @@ export async function restoreBackupData(data, {
     .filter(k => k.startsWith('ph_cache_'))
     .forEach(k => storage.removeItem(k))
 
-  const state = data.data.portfolios || { portfolios: [], activePortfolioId: null, settings: { currency: 'USD' } }
+  // Normalize the legacy bare-array shape into the canonical state object —
+  // saving the array as-is would leave init() unable to find any shelves.
+  const raw = data.data.portfolios
+  const state = Array.isArray(raw)
+    ? { portfolios: raw, activePortfolioId: raw[0]?.id || null, settings: { currency: 'USD' } }
+    : (raw || { portfolios: [], activePortfolioId: null, settings: { currency: 'USD' } })
   if (data.data.settings) state.settings = { ...(state.settings || {}), ...data.data.settings }
   if (data.data.snapshots) {
     state.snapshots = data.data.snapshots
