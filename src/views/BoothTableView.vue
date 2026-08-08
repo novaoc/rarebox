@@ -7,6 +7,7 @@
         <div class="bt-title">{{ booth.name }}</div>
         <div class="bt-recap">
           <span class="bt-chip bt-chip-cash" :class="{ neg: totals.cashNet < 0 }"><RbIcon name="coin" :size="13" /> {{ fmtMoney(totals.cashNet) }} today</span>
+          <span v-if="totals.sales.count" class="bt-chip bt-chip-trade">{{ totals.sales.count }} sold</span>
           <span class="bt-chip bt-chip-trade"><RbIcon name="swap" :size="13" /> {{ totals.tradesOut.count }} trade{{ totals.tradesOut.count !== 1 ? 's' : '' }}</span>
           <span v-if="totals.buys.count" class="bt-chip bt-chip-trade"><RbIcon name="download" :size="13" /> {{ totals.buys.count }} bought</span>
         </div>

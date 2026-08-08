@@ -476,7 +476,11 @@
               </div>
               <div class="form-group">
                 <label class="form-label">Quantity</label>
-                <input v-model.number="editForm.quantity" class="input" type="number" min="1" />
+                <div class="stepper" role="group" aria-label="Quantity">
+                  <button type="button" class="stepper-btn" :disabled="(editForm.quantity || 1) <= 1" aria-label="Decrease quantity" @click="editForm.quantity = Math.max(1, (editForm.quantity || 1) - 1)">−</button>
+                  <span class="stepper-value">{{ editForm.quantity || 1 }}</span>
+                  <button type="button" class="stepper-btn" aria-label="Increase quantity" @click="editForm.quantity = (editForm.quantity || 1) + 1">+</button>
+                </div>
               </div>
             </div>
             <div v-if="editingItem.type !== 'card'" class="form-group">

@@ -88,6 +88,24 @@ const deltaLabel = computed(() => {
   return 'Even trade'
 })
 
+// Shared with effectivePrice's tables — used by the grading key-caps' live price
+function gradeMultiplier(company: string, grade: string): number {
+  const mults: Record<string, Record<string, number>> = {
+    PSA:  { '10': 2.0, '9': 1.5, '8': 1.2, '7': 1.0, '6': 0.8, '5': 0.7, '4': 0.5, '3': 0.4, '2': 0.3, '1': 0.2 },
+    BGS:  { '10': 2.0, '9.5': 1.7, '9': 1.4, '8.5': 1.2, '8': 1.1, '7': 1.0, '6': 0.8, '5': 0.7, '4': 0.5, '3': 0.4, '2': 0.3, '1': 0.2 },
+    CGC:  { '10': 2.0, '9.5': 1.5, '9': 1.3, '8.5': 1.1, '8': 1.0, '7': 0.8, '6': 0.7, '5': 0.6, '4': 0.5, '3': 0.4, '2': 0.3, '1': 0.2 },
+    SGC:  { '10': 1.8, '9.5': 1.4, '9': 1.2, '8': 1.0, '7': 0.8, '6': 0.7, '5': 0.6, '4': 0.5, '3': 0.4, '2': 0.3, '1': 0.2 },
+  }
+  return mults[company]?.[grade] || 1.0
+}
+
+// Side A's share of the combined effective value — the fairness meter split
+const fairnessPctA = computed(() => {
+  const total = effectiveTotalA.value + effectiveTotalB.value
+  if (total <= 0) return 50
+  return Math.min(96, Math.max(4, (effectiveTotalA.value / total) * 100))
+})
+
 function openScanner(side: 'A' | 'B') {
   preloadScanIndexes()
   activeSide.value = side
@@ -384,6 +402,19 @@ onMounted(async () => {
     >
       <span class="delta-label">{{ deltaLabel }}</span>
       <span class="font-bold font-mono">{{ deltaFormatted }}</span>
+    </div>
+
+    <!-- Fairness meter: one drawn bar split at the value ratio — the meter
+         does the math. Uses the same effective totals as the verdict. -->
+    <div
+      v-if="effectiveTotalA + effectiveTotalB > 0"
+      class="fairness-meter"
+      role="img"
+      :aria-label="`Side A ${fairnessPctA.toFixed(0)}% of total value, Side B ${(100 - fairnessPctA).toFixed(0)}%`"
+    >
+      <div class="fairness-a" :style="{ width: fairnessPctA + '%' }"></div>
+      <div class="fairness-b"></div>
+      <span class="fairness-tick" aria-hidden="true"></span>
     </div>
 
     <!-- Split screen -->
@@ -828,13 +859,21 @@ onMounted(async () => {
               <input type="checkbox" v-model="pendingGraded" />
               This card is graded
             </label>
-            <div v-if="pendingGraded" class="grade-selects" style="margin-top:8px">
-              <select v-model="pendingGradeCompany">
-                <option v-for="c in GRADE_COMPANIES" :key="c" :value="c">{{ c }}</option>
-              </select>
-              <select v-model="pendingGrade">
-                <option v-for="g in GRADES[pendingGradeCompany] || []" :key="g" :value="g">{{ g }}</option>
-              </select>
+            <!-- Physical key-caps: the selected key sits pressed-in, and the
+                 shown price recomputes the instant a grade is pressed —
+                 teaching the multiplier system through touch -->
+            <div v-if="pendingGraded" style="margin-top:10px">
+              <div class="keycap-row">
+                <button v-for="c in GRADE_COMPANIES" :key="c" type="button" class="keycap" :class="{ selected: pendingGradeCompany === c }" @click="pendingGradeCompany = c; if (!(GRADES[c] || []).includes(pendingGrade)) pendingGrade = '9'">{{ c }}</button>
+              </div>
+              <div class="keycap-row" style="margin-top:8px">
+                <button v-for="g in GRADES[pendingGradeCompany] || []" :key="g" type="button" class="keycap keycap-sm" :class="{ selected: pendingGrade === g }" @click="pendingGrade = g">{{ g }}</button>
+              </div>
+              <div class="grade-live-price" aria-live="polite">
+                {{ pendingGradeCompany }} {{ pendingGrade }} ≈
+                <strong>${{ (Number(pendingCard.price ?? 0) * gradeMultiplier(pendingGradeCompany, pendingGrade)).toFixed(2) }}</strong>
+                <span class="grade-mult">×{{ gradeMultiplier(pendingGradeCompany, pendingGrade).toFixed(1) }}</span>
+              </div>
             </div>
           </div>
           <div class="modal-footer" style="gap:8px">
@@ -1265,4 +1304,37 @@ onMounted(async () => {
     justify-content: center;
   }
 }
+
+/* ── Fairness meter ─────────────────────────────────────────────────── */
+.fairness-meter {
+  position: relative;
+  display: flex;
+  height: 16px;
+  margin: 10px 0 14px;
+  border: var(--bw) solid var(--ink);
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--bg-card);
+}
+.fairness-a { background: var(--info); border-right: var(--bw) solid var(--ink); transition: width 0.25s ease; }
+.fairness-b { flex: 1; background: var(--accent); }
+.fairness-tick {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--ink);
+  opacity: 0.35;
+}
+@media (prefers-reduced-motion: reduce) {
+  .fairness-a { transition: none; }
+}
+
+
+.keycap-row { display: flex; gap: 6px; flex-wrap: wrap; }
+.keycap-sm { min-height: 42px; padding: 6px 11px; font-size: 12.5px; }
+.grade-live-price { margin-top: 10px; font-size: 13.5px; }
+.grade-mult { color: var(--text-secondary); font-size: 12px; margin-left: 4px; }
+
 </style>
