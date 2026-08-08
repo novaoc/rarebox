@@ -25,12 +25,19 @@ export const SUPPORTED_GAMES = [
   { id: 'riftbound', label: 'Riftbound',  suffix: 'riftbound', match: 'riftbound' },
 ]
 
+// The search stack tags MTG cards `game: 'mtg'` while this registry uses
+// 'magic' — without the alias, gameDef('mtg') silently fell back to the
+// Pokémon entry and refreshed MTG cards against the Pokémon catalog.
+const GAME_ALIASES = { mtg: 'magic' }
+
 export function gameLabel(id) {
-  return (SUPPORTED_GAMES.find(g => g.id === id) || {}).label || id
+  const key = GAME_ALIASES[id] || id
+  return (SUPPORTED_GAMES.find(g => g.id === key) || {}).label || id
 }
 
 function gameDef(id) {
-  return SUPPORTED_GAMES.find(g => g.id === id) || SUPPORTED_GAMES[0]
+  const key = GAME_ALIASES[id] || id
+  return SUPPORTED_GAMES.find(g => g.id === key) || SUPPORTED_GAMES[0]
 }
 
 function parsePrice(val) {

@@ -506,16 +506,23 @@ async function resolveLorcanaCard(cardId) {
 }
 
 async function resolveOnePieceCard(cardId) {
-  const cards = await getOptCards()
-  const c = cards.find(x => x.card_set_id === cardId)
-  if (!c) return null
+  // Search mints variant ids like "OP01-001#sp" — split off the variant so
+  // alt-art/manga cards resolve instead of permanently nulling on refresh.
+  const [baseId, variant = ''] = String(cardId).split('#')
+  const [cards, priceMap] = await Promise.all([getOptCards(), getOpPriceMap()])
+  const candidates = cards.filter(x => x.card_set_id === baseId)
+  if (candidates.length === 0) return null
+  const c = (variant
+    ? candidates.find(x => opVariantSlug(x.card_name) === variant)
+    : candidates.find(x => !opVariantSlug(x.card_name))) || candidates[0]
   return {
-    id: c.card_set_id,
+    id: cardId,
     name: c.card_name,
     number: c.card_set_id,
     set: c.set_name || '',
     image: c.card_image || '',
-    price: c.market_price || c.inventory_price || null,
+    // Same TCGplayer-first join as search — optcgapi's own prices lag badly
+    price: opPriceFor(priceMap, c.card_set_id, c.card_name, c.market_price ?? c.inventory_price),
     rarity: c.rarity || '',
     game: 'one-piece',
     _raw: c,
@@ -553,7 +560,7 @@ async function resolveRiftboundCard(cardId) {
 export async function resolveCard(cardId, game) {
   try {
     if (game === 'pokemon') return await resolvePokemonCard(cardId)
-    if (game === 'mtg') return await resolveMtgCard(cardId)
+    if (game === 'mtg' || game === 'magic') return await resolveMtgCard(cardId)
     if (game === 'yugioh') return await resolveYugiohCard(cardId)
     if (game === 'lorcana') return await resolveLorcanaCard(cardId)
     if (game === 'one-piece') return await resolveOnePieceCard(cardId)

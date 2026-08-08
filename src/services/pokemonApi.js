@@ -361,7 +361,7 @@ let _jpPrices = null
 async function getJpPriceMap() {
   if (_jpPrices) return _jpPrices
   try {
-    const res = await fetch('/jp-prices.json')
+    const res = await fetch('/jp-prices.json', { signal: AbortSignal.timeout(10000) })
     if (res.ok) _jpPrices = (await res.json()).prices || {}
   } catch { /* leave null — retry next call (first attempt may be offline) */ }
   return _jpPrices || {}
@@ -373,7 +373,7 @@ let _jpIndex = null
 async function getJpIndex() {
   if (_jpIndex) return _jpIndex
   try {
-    const res = await fetch('/jp-index.json')
+    const res = await fetch('/jp-index.json', { signal: AbortSignal.timeout(10000) })
     if (res.ok) {
       const d = await res.json()
       const names = {}
@@ -444,7 +444,7 @@ export async function getJapaneseCardsBySet(setId, page = 1, pageSize = 36) {
       set: { id: setId, name: enName },
       images,
       supertype: 'Pokémon',
-      tcgplayer: price ? { prices: { normal: { market: price, low: null, mid: price } } } : undefined,
+      tcgplayer: price != null ? { prices: { normal: { market: price, low: null, mid: price } } } : undefined,
       _lang: 'ja',
       _hasImage: !!(imageBase || pid)
     }
@@ -463,7 +463,7 @@ export async function getJapaneseCardDetail(cardId) {
   let tcgPrices = null
   const jpPrices = await getJpPriceMap()
   const jpUsd = jpPrices[jpPriceKey(data.set?.id, data.localId)]
-  if (jpUsd) {
+  if (jpUsd != null) { // $0 is a real TCGplayer price — don't fall to EUR conversion
     tcgPrices = { normal: { market: jpUsd, low: null, mid: jpUsd } }
   } else {
     const EUR_TO_USD = 1.08

@@ -3,7 +3,9 @@
   Does NOT block the app. Cards load in background after selection.
 -->
 <template>
-  <div class="loader-overlay" @click.self="$emit('ready')">
+  <!-- Outside taps go through confirm() too — dismissing without saving
+       prefs left the app with no card database and empty search forever. -->
+  <div class="loader-overlay" @click.self="confirm">
     <div class="loader-card">
       <div class="loader-logo">
         <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">

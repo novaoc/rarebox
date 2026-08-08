@@ -65,10 +65,16 @@ function effectivePrice(card: any): number {
   return base * mult
 }
 
+// One source of truth for the verdict: grade-multiplied (effective) totals.
+// The badge/bar previously colored themselves from the raw store delta while
+// showing the effective figure — a PSA 10 on one side could render a red
+// "losing" bar around a green "+$X".
+const effectiveTotalA = computed(() => tradeStore.sideA.items.reduce((s, c) => s + effectivePrice(c), 0))
+const effectiveTotalB = computed(() => tradeStore.sideB.items.reduce((s, c) => s + effectivePrice(c), 0))
+const effectiveDelta = computed(() => effectiveTotalB.value - effectiveTotalA.value)
+
 const deltaFormatted = computed(() => {
-  const a = tradeStore.sideA.items.reduce((s, c) => s + effectivePrice(c), 0)
-  const b = tradeStore.sideB.items.reduce((s, c) => s + effectivePrice(c), 0)
-  const d = b - a
+  const d = effectiveDelta.value
   const abs = Math.abs(d)
   if (abs < 0.01) return '$0.00'
   const sign = d > 0 ? '+' : '-'
@@ -76,9 +82,7 @@ const deltaFormatted = computed(() => {
 })
 
 const deltaLabel = computed(() => {
-  const a = tradeStore.sideA.items.reduce((s, c) => s + effectivePrice(c), 0)
-  const b = tradeStore.sideB.items.reduce((s, c) => s + effectivePrice(c), 0)
-  const d = b - a
+  const d = effectiveDelta.value
   if (d > 0.01) return "You're winning"
   if (d < -0.01) return "You're losing"
   return 'Even trade'
@@ -202,6 +206,12 @@ function addScannedCard(card: SearchResult) {
 }
 
 function dismissError() {
+  scanError.value = ''
+}
+
+function closeScanResults() {
+  showScanResults.value = false
+  scanCandidates.value = []
   scanError.value = ''
 }
 
@@ -358,9 +368,9 @@ onMounted(async () => {
 
       <!-- Delta badge -->
       <div
-        v-if="Math.abs(tradeStore.priceDelta) >= 0.01"
+        v-if="Math.abs(effectiveDelta) >= 0.01"
         class="badge"
-        :class="tradeStore.priceDelta > 0 ? 'badge-success' : 'badge-danger'"
+        :class="effectiveDelta > 0 ? 'badge-success' : 'badge-danger'"
       >
         {{ deltaFormatted }}
       </div>
@@ -370,7 +380,7 @@ onMounted(async () => {
     <!-- Delta detail bar -->
     <div
       class="delta-bar"
-      :class="tradeStore.priceDelta > 0.01 ? 'delta-win' : tradeStore.priceDelta < -0.01 ? 'delta-lose' : 'delta-even'"
+      :class="effectiveDelta > 0.01 ? 'delta-win' : effectiveDelta < -0.01 ? 'delta-lose' : 'delta-even'"
     >
       <span class="delta-label">{{ deltaLabel }}</span>
       <span class="font-bold font-mono">{{ deltaFormatted }}</span>
@@ -387,7 +397,7 @@ onMounted(async () => {
             <span class="text-secondary" style="font-size:13px">My Cards</span>
           </div>
           <div class="flex items-center gap-2">
-            <span class="font-bold font-mono">${{ tradeStore.sideA.totalValue.toFixed(2) }}</span>
+            <span class="font-bold font-mono">${{ effectiveTotalA.toFixed(2) }}</span>
             <button
               v-if="tradeStore.sideA.items.length > 0"
               class="btn btn-ghost btn-icon btn-sm"
@@ -575,7 +585,7 @@ onMounted(async () => {
             <span class="text-secondary" style="font-size:13px">Their Cards</span>
           </div>
           <div class="flex items-center gap-2">
-            <span class="font-bold font-mono">${{ tradeStore.sideB.totalValue.toFixed(2) }}</span>
+            <span class="font-bold font-mono">${{ effectiveTotalB.toFixed(2) }}</span>
             <button
               v-if="tradeStore.sideB.items.length > 0"
               class="btn btn-ghost btn-icon btn-sm"
@@ -764,7 +774,7 @@ onMounted(async () => {
 
     <!-- Scan candidates picker -->
     <transition name="fade">
-      <div v-if="showScanResults" class="modal-overlay" @click.self="dismissError">
+      <div v-if="showScanResults" class="modal-overlay" @click.self="closeScanResults">
         <div class="modal" style="max-width:480px">
           <div class="modal-header">
             <h3>Select Card</h3>
@@ -791,7 +801,7 @@ onMounted(async () => {
             <p v-else class="text-secondary" style="font-size:13px">No candidates found.</p>
           </div>
           <div class="modal-footer">
-            <button class="btn btn-secondary" @click="openSearch(activeSide)">Search Manually</button>
+            <button class="btn btn-secondary" @click="closeScanResults(); openSearch(activeSide)">Search Manually</button>
           </div>
         </div>
       </div>

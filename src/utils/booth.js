@@ -320,7 +320,11 @@ function unpackDirectory(packed) {
     title: str(packed.t, 120),
     entries: packed.e.slice(0, MAX_DIR_ENTRIES).map((en) => {
       const [name, venue, count, total, ref] = Array.isArray(en) ? en : []
-      return { name: str(name, 80), venue: str(venue, 120), count: num(count, 9999), total: num(total), ref: str(ref, 200) }
+      // Self-contained entries carry a full #b= booth URL, which can run to
+      // many KB — a 200-char clamp broke every offline directory at decode
+      // time. Short-code refs stay tightly clamped.
+      const refLimit = /^https?:\/\/[^\s]*#b=/.test(String(ref || '')) ? 65536 : 200
+      return { name: str(name, 80), venue: str(venue, 120), count: num(count, 9999), total: num(total), ref: str(ref, refLimit) }
     }),
   }
 }

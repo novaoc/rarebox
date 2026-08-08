@@ -405,15 +405,18 @@ const bulkAdding = ref(false)
 const bulkAddDone = ref(false)
 const bulkLoading = ref(false)
 
+// "Needed" means cards you don't own — keyed off the immutable `owned`
+// flag, not the user-toggleable `checked` (which previously inverted the
+// count: "Needed" listed owned cards and priced completion from them).
 const filteredBulkCards = computed(() => {
-  if (bulkAddFilter.value === 'needed') return bulkAddCards.value.filter(c => !c.checked)
+  if (bulkAddFilter.value === 'needed') return bulkAddCards.value.filter(c => !c.owned)
   return bulkAddCards.value
 })
 
 const bulkSelectedCount = computed(() => bulkAddCards.value.filter(c => c.checked).length)
-const bulkNeededCount = computed(() => bulkAddCards.value.filter(c => !c.checked).length)
+const bulkNeededCount = computed(() => bulkAddCards.value.filter(c => !c.owned).length)
 const bulkNeededCost = computed(() => {
-  return bulkAddCards.value.filter(c => !c.checked).reduce((s, c) => s + (c.price || 0), 0)
+  return bulkAddCards.value.filter(c => !c.owned).reduce((s, c) => s + (c.price || 0), 0)
 })
 const bulkSelectedCost = computed(() => {
   return bulkAddCards.value.filter(c => c.checked).reduce((s, c) => s + (c.price || 0), 0)
@@ -622,6 +625,7 @@ async function openBulkAddModal() {
       supertype: card.supertype,
       set: card.set,
       price,
+      owned: ownedIds.has(card.id),
       checked: !ownedIds.has(card.id), // pre-check cards NOT already owned
       _lang: card._lang || 'en',
     }

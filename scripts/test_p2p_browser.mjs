@@ -18,7 +18,7 @@ import { extname, join } from 'node:path'
 import puppeteer from 'puppeteer-core'
 
 const ROOT = new URL('..', import.meta.url).pathname
-const CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
+const CHROME = process.env.PUPPETEER_EXECUTABLE_PATH || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
 const MIME = { '.js': 'text/javascript', '.mjs': 'text/javascript', '.html': 'text/html', '.json': 'application/json' }
 const PAGE_FILE = 'scripts/p2p_loopback_page.html'
 

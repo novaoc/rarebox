@@ -183,8 +183,11 @@ const refreshing = ref(false)
 
 async function refreshPrices() {
   refreshing.value = true
-  await deckStore.refreshDeckPrices(deck.value.id)
-  refreshing.value = false
+  try {
+    await deckStore.refreshDeckPrices(deck.value.id)
+  } finally {
+    refreshing.value = false
+  }
 }
 
 function startEditName() {

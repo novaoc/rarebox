@@ -18,7 +18,7 @@ async function loadIndex() {
   if (_loading) return _loading
   _loading = (async () => {
     try {
-      const res = await fetch('/jp-index.json')
+      const res = await fetch('/jp-index.json', { signal: AbortSignal.timeout(10000) })
       if (!res.ok) throw new Error(`http_${res.status}`)
       const d = await res.json()
       _index = d.cards || []
@@ -74,7 +74,7 @@ export async function searchJapanese(query, { limit = 24, setIds = null, number 
       number: localId,
       set: jpSetLabel(setId),
       image: jpImage(setId, localId, pid),
-      price: price || null,
+      price: price ?? null, // $0 is a real price
       game: 'pokemon',
       _lang: 'ja',
       jp: true,

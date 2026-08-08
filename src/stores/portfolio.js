@@ -215,6 +215,8 @@ export const usePortfolioStore = defineStore('portfolio', () => {
     if (activePortfolioId.value === id) {
       activePortfolioId.value = portfolios.value[0]?.id || null
     }
+    delete snapshots.value[id]
+    if (settings.value.defaultPortfolioId === id) settings.value.defaultPortfolioId = null
     persist()
     cleanupSnapshots()
   }
@@ -484,9 +486,17 @@ export const usePortfolioStore = defineStore('portfolio', () => {
 
   // ── Bulk import (Collectr etc.) ─────────────────────────────────────
 
+  // Adds the imported shelves alongside existing ones — an import must
+  // never destroy the collection the user already has. Name collisions get
+  // an "(imported)" suffix so both shelves stay distinguishable.
   async function importAll(newPortfolios) {
-    portfolios.value = newPortfolios
-    activePortfolioId.value = newPortfolios[0]?.id || null
+    const existingNames = new Set(portfolios.value.map(p => p.name.toLowerCase()))
+    for (const p of newPortfolios) {
+      if (existingNames.has(p.name.toLowerCase())) p.name = `${p.name} (imported)`
+      existingNames.add(p.name.toLowerCase())
+    }
+    portfolios.value = [...portfolios.value, ...newPortfolios]
+    activePortfolioId.value = newPortfolios[0]?.id || activePortfolioId.value
     await persistNow()
   }
 
@@ -600,16 +610,20 @@ export const usePortfolioStore = defineStore('portfolio', () => {
             const digits = String(parseInt(number.replace(/^[A-Z]+/i, ''), 10))
             candidates = await pkmSearch(`name:"${name}" number:${digits}`)
           }
-          // Last resort: name only (e.g. promo numbering schemes)
+          // Last resort: name only (e.g. promo numbering schemes). On this
+          // path the number didn't match, so only accept a candidate whose
+          // set matches — otherwise we'd silently rewrite the card's identity.
+          let nameOnly = false
           if (candidates.length === 0) {
             candidates = await pkmSearch(`name:"${name}"`)
+            nameOnly = true
           }
           const setName = (item.cardData.set?.name || '').toLowerCase()
           let match = candidates.find(c =>
             c.set?.name?.toLowerCase() === setName ||
             c.set?.id?.toLowerCase() === setName.replace(/\s+/g, '')
           )
-          if (!match && candidates.length > 0) match = candidates[0]
+          if (!match && candidates.length > 0 && !nameOnly) match = candidates[0]
 
           if (match) {
             // me2pt5 and later sets return the tcgplayer URL only from
@@ -671,7 +685,9 @@ export const usePortfolioStore = defineStore('portfolio', () => {
 
             if (cardData && matchedId) {
               const cm = cardData.tcgplayer?.prices?.normal
-              const marketPrice = cm?.market || cm?.mid || null
+              // $0 is a real market price — finite checks, not truthiness.
+              const num = v => (typeof v === 'number' && Number.isFinite(v) ? v : null)
+              const marketPrice = num(cm?.market) ?? num(cm?.mid)
               const updates = {
                 cardId: `${matchedId}-${localId}`,
                 _lang: 'ja',
@@ -683,9 +699,11 @@ export const usePortfolioStore = defineStore('portfolio', () => {
                   set: { id: matchedId, name: item.cardData.set?.name },
                   rarity: cardData.rarity || item.cardData.rarity,
                 },
-                currentMarketPrice: marketPrice,
                 lastPriceUpdate: new Date().toISOString(),
               }
+              // Keep the imported price when tcgdex has none — never
+              // overwrite a real value with null.
+              if (marketPrice != null) updates.currentMarketPrice = marketPrice
               updateItem(portfolioId, item.id, updates)
               resolved++
             } else {
@@ -732,19 +750,26 @@ export const usePortfolioStore = defineStore('portfolio', () => {
 
           const card = mtgCache.get(name.toLowerCase())
           if (card) {
+            // The named-exact lookup returns *a* printing, not necessarily
+            // the imported one — only adopt its set/number identity when the
+            // set actually matches; otherwise keep the imported identity.
+            const importedSet = (item.cardData.set?.name || '').toLowerCase()
+            const setMatches = !importedSet || card.set_name?.toLowerCase() === importedSet
             const updates = {
               cardId: card.id,
               cardData: {
                 name: card.name,
-                number: card.collector_number || item.cardData.number,
+                number: setMatches ? (card.collector_number || item.cardData.number) : item.cardData.number,
                 images: { small: card.image_uris?.small || '', large: card.image_uris?.large || '' },
-                set: { id: card.set, name: card.set_name },
+                set: setMatches ? { id: card.set, name: card.set_name } : item.cardData.set,
                 rarity: card.rarity || item.cardData.rarity,
               },
               lastPriceUpdate: new Date().toISOString(),
             }
-            const price = card.prices?.usd || card.prices?.eur || null
-            if (price) updates.currentMarketPrice = parseFloat(price)
+            // USD only — storing EUR as a USD figure corrupts totals. Only
+            // trust the price when it belongs to the matching printing.
+            const usd = parseFloat(card.prices?.usd)
+            if (setMatches && Number.isFinite(usd)) updates.currentMarketPrice = usd
             updateItem(portfolioId, item.id, updates)
             resolved++
           }

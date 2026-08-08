@@ -28,7 +28,7 @@ const cache = new Map() // file → Promise<rows>
 
 function loadFile(file) {
   if (!cache.has(file)) {
-    const p = fetch(`/sealed-index/${file}.json`)
+    const p = fetch(`/sealed-index/${file}.json`, { signal: AbortSignal.timeout(10000) })
       .then(r => (r.ok ? r.json() : { rows: [] }))
       .then(d => (Array.isArray(d.rows) ? d.rows : []))
       .catch(() => {

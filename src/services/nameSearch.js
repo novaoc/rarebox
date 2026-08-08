@@ -21,7 +21,7 @@ async function loadIndex() {
   if (_loading) return _loading
   _loading = (async () => {
     try {
-      const res = await fetch('/name-index.json')
+      const res = await fetch('/name-index.json', { signal: AbortSignal.timeout(10000) })
       if (!res.ok) throw new Error(`http_${res.status}`)
       _index = (await res.json()).cards || []
     } catch {

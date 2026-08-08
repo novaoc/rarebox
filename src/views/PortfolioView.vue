@@ -1140,9 +1140,37 @@ function formatDate(iso) { return iso ? new Date(iso).toLocaleDateString('en-US'
 function startEditName() { editName.value = portfolio.value.name; editingName.value = true; nextTick(() => nameInputRef.value?.focus()) }
 function saveName() { if (editName.value.trim()) store.updatePortfolio(portfolio.value.id, { name: editName.value.trim() }); editingName.value = false }
 function selectItem(item) { selectedItem.value = selectedItem.value?.id === item.id ? null : item; editCurrentValue.value = getCurrentValue(item) }
-function editItem(item) { editingItem.value = item; editForm.value = { ...item, notes: item.notes || '' } }
-function saveEditItem() { store.updateItem(portfolio.value.id, editingItem.value.id, editForm.value); editingItem.value = null }
-function saveCurrentValue() { if (selectedItem.value) store.updateItem(portfolio.value.id, selectedItem.value.id, { [selectedItem.value.type === 'card' ? 'currentMarketPrice' : 'currentValue']: editCurrentValue.value }) }
+// The edit form carries only the editable fields — writing the whole item
+// snapshot back would clobber anything a background price refresh updated
+// while the modal was open (currentMarketPrice, lastPriceUpdate…).
+function editItem(item) {
+  editingItem.value = item
+  editForm.value = {
+    purchasePrice: item.purchasePrice,
+    quantity: item.quantity,
+    currentValue: item.currentValue,
+    purchaseDate: item.purchaseDate,
+    notes: item.notes || '',
+  }
+}
+function saveEditItem() {
+  const f = editForm.value
+  const updates = {
+    purchasePrice: finiteMoney(f.purchasePrice) ?? 0,
+    quantity: Math.max(1, Math.floor(Number(f.quantity) || 1)),
+    purchaseDate: f.purchaseDate,
+    notes: f.notes,
+  }
+  if (editingItem.value.type !== 'card') updates.currentValue = finiteMoney(f.currentValue)
+  store.updateItem(portfolio.value.id, editingItem.value.id, updates)
+  editingItem.value = null
+}
+function saveCurrentValue() {
+  if (!selectedItem.value) return
+  const v = finiteMoney(editCurrentValue.value)
+  if (v == null) return // emptied input yields '' — never store that
+  store.updateItem(portfolio.value.id, selectedItem.value.id, { [selectedItem.value.type === 'card' ? 'currentMarketPrice' : 'currentValue']: v })
+}
 function onBulkImported(count) { refreshStatus.value = `Imported ${count} cards`; setTimeout(() => { refreshStatus.value = '' }, 3000) }
 function removeItem(item) { if (confirm(`Remove ${getItemName(item)}?`)) store.removeItem(portfolio.value.id, item.id) }
 
@@ -1308,7 +1336,10 @@ async function refreshPrices() {
     const priceMap = new Map()
     for (const item of alertItems) {
       if (item.type === 'card' && item.cardId) {
-        priceMap.set(item.cardId, finiteMoney(item.currentMarketPrice) ?? finiteMoney(item.purchasePrice) ?? 0)
+        // Alerts compare against real market prices only — falling back to
+        // purchase price or 0 makes "below $X" fire on unpriced cards.
+        const mp = finiteMoney(item.currentMarketPrice)
+        if (mp != null) priceMap.set(item.cardId, mp)
       }
     }
     const triggered = checkAlerts(priceMap)

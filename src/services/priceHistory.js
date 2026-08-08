@@ -45,7 +45,8 @@ export function resolveHistoryKey(ref) {
     if (i === -1) return null
     ref = { game: 'pokemon', setId: ref.slice(0, i), number: ref.slice(i + 1) }
   }
-  const game = ref.game || 'pokemon'
+  // Collectr imports tag MTG items 'magic'; the history repo keys on 'mtg'.
+  const game = ref.game === 'magic' ? 'mtg' : (ref.game || 'pokemon')
   if (game === 'pokemon') {
     let setId = ref.setId
     let number = ref.number

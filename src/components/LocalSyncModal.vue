@@ -105,10 +105,11 @@
         <button
           v-if="mode === 'receive'"
           class="btn btn-primary"
-          :disabled="!parsedBackup"
+          :disabled="!parsedBackup || importing"
           @click="doImport"
         >
-          Import
+          <span v-if="importing" class="spinner spinner-sm"></span>
+          <span v-else>Import</span>
         </button>
       </div>
     </div>
@@ -355,12 +356,19 @@ watch(receiveInput, async (val) => {
   }
 })
 
-function doImport() {
-  if (!parsedBackup.value) return
+// importBackup is async and ends in a page reload on success — awaiting it
+// is what lets failures actually reach the catch instead of vanishing as an
+// unhandled rejection while the modal sits there looking done.
+const importing = ref(false)
+async function doImport() {
+  if (!parsedBackup.value || importing.value) return
+  importing.value = true
   try {
-    importBackup(parsedBackup.value)
+    await importBackup(parsedBackup.value)
   } catch (e) {
     parseError.value = `Import failed: ${e.message}`
+  } finally {
+    importing.value = false
   }
 }
 

@@ -530,7 +530,7 @@ async function refreshAllPrices() {
       const query = item.cardData?.name || item.name
       if (!query) continue
       const price = await getTcgPrice(query, item.game)
-      if (price) store.updateItem(item.portfolioId, item.id, { currentMarketPrice: price, lastPriceUpdate: new Date().toISOString() })
+      if (price != null) store.updateItem(item.portfolioId, item.id, { currentMarketPrice: price, lastPriceUpdate: new Date().toISOString() })
     } catch (e) {
       console.warn(`Failed to refresh ${item.game} card "${item.cardData?.name}":`, e.message)
     }
@@ -542,7 +542,10 @@ async function refreshAllPrices() {
   for (const portfolio of store.portfolios) {
     for (const item of portfolio.items) {
       if (item.type === 'card' && item.cardId) {
-        priceMap.set(item.cardId, finiteMoney(item.currentMarketPrice) ?? finiteMoney(item.purchasePrice) ?? 0)
+        // Alerts compare against real market prices only — falling back to
+        // purchase price or 0 makes "below $X" fire on unpriced cards.
+        const mp = finiteMoney(item.currentMarketPrice)
+        if (mp != null) priceMap.set(item.cardId, mp)
       }
     }
   }

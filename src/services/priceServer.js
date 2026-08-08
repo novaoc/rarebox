@@ -81,6 +81,8 @@ async function searchPC(query) {
         }
         throw new Error('timeout')
       }
+      // Definitive client errors (404 etc.) won't change on retry
+      if (/^pc_error_4/.test(e.message || '')) throw e
       if (attempt < MAX_RETRIES) {
         await new Promise(r => setTimeout(r, 1000 * (attempt + 1)))
         continue
@@ -166,7 +168,7 @@ export async function searchGradedProducts(query, { limit = 12 } = {}) {
       psa10: parsePrice(p.price2),
       graded: true,
     }))
-    .filter(p => p.name && (p.psa9 || p.psa10))
+    .filter(p => p.name && (p.psa9 != null || p.psa10 != null)) // $0 grades are real prices
     .slice(0, limit)
 }
 
