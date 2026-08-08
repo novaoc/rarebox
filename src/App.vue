@@ -100,10 +100,12 @@
         <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="7" height="7" x="3" y="3" rx="1.5"/><rect width="7" height="7" x="14" y="3" rx="1.5"/><rect width="7" height="7" x="14" y="14" rx="1.5"/><rect width="7" height="7" x="3" y="14" rx="1.5"/></svg>
         <span>Home</span>
       </router-link>
-      <component :is="shelfTabTo ? 'router-link' : 'button'" :to="shelfTabTo || undefined" class="tab" :class="{ active: isTab('shelf') }" @click="!shelfTabTo && (showNewPortfolioModal = true)">
+      <!-- Shelf tab: goes to the shelf you LAST visited (not the default);
+           tapping it again while on a shelf opens the switcher sheet -->
+      <button class="tab" :class="{ active: isTab('shelf') }" @click="onShelfTab">
         <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h16v4H4z"/><path d="M4 12h16v4H4z"/><path d="M7 8v4"/><path d="M17 8v4"/><path d="M4 20h16"/></svg>
         <span>Shelf</span>
-      </component>
+      </button>
       <button class="tab tab-hero" :aria-expanded="fanOpen" aria-label="Add to your shelf" @click="toggleFan">
         <span class="tab-hero-disc" :class="{ open: fanOpen }">
           <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
@@ -146,6 +148,28 @@
 
     <!-- Scan-to-add: camera → identify → prefilled add modal -->
     <ScanAddModal v-if="scanOpen" @close="scanOpen = false" />
+
+    <!-- Shelf switcher: tap the Shelf tab while on a shelf to jump shelves -->
+    <transition name="fade">
+      <div v-if="shelfSwitcherOpen" class="switcher-overlay" @click.self="shelfSwitcherOpen = false">
+        <div class="switcher-sheet">
+          <span class="switcher-grab" aria-hidden="true"></span>
+          <div class="switcher-title">Your shelves</div>
+          <button
+            v-for="p in store.portfolios"
+            :key="p.id"
+            class="switcher-row"
+            :class="{ current: p.id === route.params.id }"
+            @click="goShelf(p.id)"
+          >
+            <span class="switcher-dot" :style="{ background: p.color }"></span>
+            <span class="switcher-name">{{ p.name }}</span>
+            <span class="switcher-count">{{ p.items.length }} items</span>
+          </button>
+          <button class="btn btn-secondary switcher-new" @click="shelfSwitcherOpen = false; showNewPortfolioModal = true">+ New Shelf</button>
+        </div>
+      </div>
+    </transition>
 
     <!-- New Portfolio Modal -->
     <transition name="fade">
@@ -236,11 +260,29 @@ document.addEventListener('click', (e) => {
   if (addMenuOpen.value && !e.target.closest?.('.add-menu-wrap')) addMenuOpen.value = false
 })
 
-// Shelf tab: the active shelf (or the first one). With no shelves the tab
-// offers to create one instead of leading nowhere.
-const shelfTabTo = computed(() => {
+// Shelf tab: the LAST-VISITED shelf (or the first one). With no shelves the
+// tab offers to create one instead of leading nowhere. Tapping the tab while
+// already on a shelf opens the switcher sheet.
+const shelfSwitcherOpen = ref(false)
+
+function onShelfTab() {
   const id = store.activePortfolioId || store.portfolios[0]?.id
-  return id ? `/shelf/${id}` : null
+  if (!id) { showNewPortfolioModal.value = true; return }
+  if (route.name === 'Portfolio') { shelfSwitcherOpen.value = true; return }
+  router.push(`/shelf/${id}`)
+}
+
+function goShelf(id) {
+  shelfSwitcherOpen.value = false
+  router.push(`/shelf/${id}`)
+}
+
+// Visiting a shelf makes it the tab's target — no more snapping back to the
+// default shelf every time the tab is pressed.
+watch(() => [route.name, route.params.id], ([name, id]) => {
+  if (name === 'Portfolio' && id && store.portfolios.some(p => p.id === id)) {
+    if (store.activePortfolioId !== id) store.setActivePortfolio(id)
+  }
 })
 
 // One-time muscle-memory callout: the disc was Trade for three releases.
@@ -313,8 +355,8 @@ const showTradeTour = ref(false)
 const showBoothTour = ref(false)
 const tourKey = ref(0)
 
-// Close the fan + add menu on navigation
-watch(() => route.fullPath, () => { fanOpen.value = false; addMenuOpen.value = false })
+// Close the fan + add menu + shelf switcher on navigation
+watch(() => route.fullPath, () => { fanOpen.value = false; addMenuOpen.value = false; shelfSwitcherOpen.value = false })
 
 // Which tab is lit for the current route
 const TAB_FOR_ROUTE = {
@@ -741,6 +783,52 @@ onErrorCaptured((err, instance, info) => {
   .fan-btn { animation: none; }
   .tab-hero-disc { transition: none; }
 }
+
+/* ── Shelf switcher sheet ───────────────────────────────────────────── */
+.switcher-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  background: rgba(20, 20, 20, 0.45);
+  display: flex;
+  align-items: flex-end;
+}
+.switcher-sheet {
+  width: 100%;
+  max-height: 70vh;
+  overflow-y: auto;
+  background: var(--bg-primary);
+  border-top: var(--bw) solid var(--ink);
+  border-radius: 20px 20px 0 0;
+  padding: 10px 16px calc(16px + var(--tabbar-height) + env(safe-area-inset-bottom, 0px));
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.switcher-grab { width: 44px; height: 4px; border-radius: 999px; background: var(--ink); margin: 2px auto 6px; }
+.switcher-title { font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-secondary); }
+.switcher-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+  padding: 10px 14px;
+  background: var(--bg-card);
+  border: var(--bw) solid var(--ink);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-pressed);
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--ink);
+  cursor: pointer;
+  text-align: left;
+}
+.switcher-row:active { box-shadow: none; transform: translate(1px, 1px); }
+.switcher-row.current { background: var(--accent); color: var(--on-accent); }
+.switcher-dot { width: 12px; height: 12px; border-radius: 50%; border: 1.5px solid var(--ink); flex-shrink: 0; }
+.switcher-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.switcher-count { font-size: 12px; font-weight: 700; opacity: 0.7; flex-shrink: 0; }
+.switcher-new { margin-top: 4px; }
 
 /* ── Color swatches (new portfolio modal) ───────────────────────────── */
 .color-picker-row { display: flex; gap: 10px; flex-wrap: wrap; }

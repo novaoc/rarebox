@@ -162,28 +162,7 @@
     </div>
 
     <div v-else>
-      <!-- ── Hero: what's it worth ─────────────────────────────────── -->
-      <div class="card hero-card mb-4">
-        <div class="hero-label">Total shelf value</div>
-        <div class="hero-value-row">
-          <span class="hero-value">${{ store.totalPortfolioValue.toFixed(2) }}</span>
-          <!-- Home's single rotation: only when the shelf crosses its previous peak -->
-          <span v-if="isAllTimeHigh" class="sticker sticker-green hero-ath">All-time high</span>
-        </div>
-        <div class="hero-sub">
-          <span v-if="todayDelta != null" class="badge hero-delta" :class="todayDelta >= 0 ? 'badge-success' : 'badge-danger'">
-            {{ todayDelta >= 0 ? '+' : '−' }}${{ Math.abs(todayDelta).toFixed(2) }} today
-          </span>
-          <span class="hero-cost">
-            Cost basis ${{ store.totalCostBasis.toFixed(2) }} ·
-            <span :class="totalGain >= 0 ? 'text-success' : 'text-danger'">{{ totalGain >= 0 ? '+' : '' }}${{ Math.abs(totalGain).toFixed(2) }} ({{ totalGainPct.toFixed(1) }}%)</span>
-            · {{ totalItems }} items
-          </span>
-        </div>
-        <PortfolioChart :portfolios="store.portfolios" :height="240" label="All Shelves" />
-      </div>
-
-      <!-- ── Shelf chips: filter movers + binder below ─────────────── -->
+      <!-- ── Shelf chips: scope the hero, chart, movers + binder ───── -->
       <div v-if="store.portfolios.length > 1" class="shelf-chips mb-4">
         <button class="shelf-chip" :class="{ active: !selectedShelfId }" @click="selectedShelfId = null">All</button>
         <button
@@ -195,6 +174,27 @@
         >
           <span class="shelf-chip-dot" :style="{ background: p.color }"></span>{{ p.name }}
         </button>
+      </div>
+
+      <!-- ── Hero: what's it worth (all shelves, or the picked one) ── -->
+      <div class="card hero-card mb-4">
+        <div class="hero-label">{{ selectedShelf ? selectedShelf.name : 'Total shelf value' }}</div>
+        <div class="hero-value-row">
+          <span class="hero-value">${{ heroValue.toFixed(2) }}</span>
+          <!-- Home's single rotation: only when ALL shelves cross their previous peak -->
+          <span v-if="isAllTimeHigh && !selectedShelfId" class="sticker sticker-green hero-ath">All-time high</span>
+        </div>
+        <div class="hero-sub">
+          <span v-if="todayDelta != null" class="badge hero-delta" :class="todayDelta >= 0 ? 'badge-success' : 'badge-danger'">
+            {{ todayDelta >= 0 ? '+' : '−' }}${{ Math.abs(todayDelta).toFixed(2) }} today
+          </span>
+          <span class="hero-cost">
+            Cost basis ${{ heroCost.toFixed(2) }} ·
+            <span :class="heroGain >= 0 ? 'text-success' : 'text-danger'">{{ heroGain >= 0 ? '+' : '' }}${{ Math.abs(heroGain).toFixed(2) }} ({{ heroGainPct.toFixed(1) }}%)</span>
+            · {{ heroItems }} items
+          </span>
+        </div>
+        <PortfolioChart :key="selectedShelfId || 'all'" :portfolios="visiblePortfolios" :height="240" :label="selectedShelf ? selectedShelf.name : 'All Shelves'" />
       </div>
 
       <div class="dash-grid">
@@ -419,6 +419,16 @@ const visiblePortfolios = computed(() =>
     ? store.portfolios.filter(p => p.id === selectedShelfId.value)
     : store.portfolios
 )
+const selectedShelf = computed(() =>
+  store.portfolios.find(p => p.id === selectedShelfId.value) || null)
+
+// Hero figures follow the chip selection: one shelf's numbers when picked,
+// every shelf's when not
+const heroValue = computed(() => visiblePortfolios.value.reduce((s, p) => s + getPortfolioValue(p), 0))
+const heroCost = computed(() => visiblePortfolios.value.reduce((s, p) => s + getPortfolioCost(p), 0))
+const heroGain = computed(() => heroValue.value - heroCost.value)
+const heroGainPct = computed(() => heroCost.value > 0 ? (heroGain.value / heroCost.value) * 100 : 0)
+const heroItems = computed(() => visiblePortfolios.value.reduce((s, p) => s + p.items.length, 0))
 
 // Per-unit display value, matching getPortfolioValue's rules
 function itemUnitValue(item) {
@@ -443,7 +453,7 @@ function prevSnapshot(portfolioId) {
 const todayDelta = computed(() => {
   let delta = 0
   let matched = false
-  for (const p of store.portfolios) {
+  for (const p of visiblePortfolios.value) {
     const prev = prevSnapshot(p.id)
     if (!prev) continue
     for (const item of p.items) {
@@ -687,9 +697,6 @@ function scrollToFeatures() {
   featuresRef.value?.scrollIntoView({ behavior: 'smooth' })
 }
 
-const totalGain = computed(() => store.totalPortfolioValue - store.totalCostBasis)
-const totalGainPct = computed(() => store.totalCostBasis > 0 ? (totalGain.value / store.totalCostBasis) * 100 : 0)
-const totalItems = computed(() => store.portfolios.reduce((s, p) => s + p.items.length, 0))
 
 /** Finite shelf display value; $0 is valid (never collapse with ||). */
 function finiteMoney(v) {
