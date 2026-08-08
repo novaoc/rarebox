@@ -178,7 +178,12 @@ async function fetchPokemonBulk(onProgress) {
   return allCards
 }
 
-async function fetchPokemonPrices(allCards, onProgress) {
+// Generation counter for the fire-and-forget price pass: a pass started by
+// an earlier preload keeps running for minutes and must never save its stale
+// card array over a newer run's freshly downloaded dataset.
+let pokemonPriceGen = 0
+
+async function fetchPokemonPrices(allCards, onProgress, isCurrent = () => true) {
   const PAGE_SIZE = 250
   const first = await fetchJson(
     `https://api.pokemontcg.io/v2/cards?page=1&pageSize=${PAGE_SIZE}&select=id,tcgplayer`
@@ -198,7 +203,9 @@ async function fetchPokemonPrices(allCards, onProgress) {
 
   let fetched = 1
   const pages = Array.from({ length: totalPages - 1 }, (_, i) => i + 2)
-  await parallelPool(pages, 6, async (page) => {
+  // 4-way: pokemontcg.io rate-limits readily, and parallelPool silently
+  // skips failed pages — a 429 burst would leave them permanently unpriced
+  await parallelPool(pages, 4, async (page) => {
     const d = await fetchJson(`https://api.pokemontcg.io/v2/cards?page=${page}&pageSize=${PAGE_SIZE}&select=id,tcgplayer`)
     for (const c of (d.data || [])) priceById.set(c.id, pickPokemonPrice(c.tcgplayer))
     fetched++
@@ -206,7 +213,7 @@ async function fetchPokemonPrices(allCards, onProgress) {
     // Persist progress every ~15 pages — the pass takes minutes and the user
     // may close the tab; partial prices beat a priceless 24h cache.
     if (fetched % 15 === 0) {
-      if (applyPrices() > 0) await saveGameCards('pokemon', allCards)
+      if (isCurrent() && applyPrices() > 0) await saveGameCards('pokemon', allCards)
     }
   })
 
@@ -231,8 +238,10 @@ async function resumePokemonPricesIfNeeded() {
     const priced = rows.filter(c => c.price != null).length
     if (priced / rows.length >= 0.3) return
     const cards = rows.map(({ game, cachedAt, cid, ...c }) => c)
-    const n = await fetchPokemonPrices(cards, () => {})
-    if (n > 0) await saveGameCards('pokemon', cards)
+    const gen = ++pokemonPriceGen
+    const isCurrent = () => gen === pokemonPriceGen
+    const n = await fetchPokemonPrices(cards, () => {}, isCurrent)
+    if (n > 0 && isCurrent()) await saveGameCards('pokemon', cards)
   } catch (e) {
     console.warn('Pokemon price resume failed:', e.message)
   }
@@ -255,8 +264,10 @@ async function fetchPokemon(onProgress) {
   // Phase 2 — prices, fire-and-forget. pokemontcg.io takes minutes even in
   // parallel; blocking the loader UI on it made the preload look stuck.
   // Prices merge into the cache silently when they arrive.
-  fetchPokemonPrices(allCards, () => {})
-    .then(priced => { if (priced > 0) return saveGameCards('pokemon', allCards) })
+  const gen = ++pokemonPriceGen
+  const isCurrent = () => gen === pokemonPriceGen
+  fetchPokemonPrices(allCards, () => {}, isCurrent)
+    .then(priced => { if (priced > 0 && isCurrent()) return saveGameCards('pokemon', allCards) })
     .catch(err => console.warn('Pokemon price pass failed (cards remain usable):', err.message))
 
   return allCards.length

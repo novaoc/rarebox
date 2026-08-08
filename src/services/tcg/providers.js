@@ -51,7 +51,9 @@ export async function sweepBrowseCache(max = 400) {
     const rows = await db.state.where('key').startsWith('browse:').toArray()
     if (rows.length <= max) return
     rows.sort((a, b) => (a.ts || 0) - (b.ts || 0))
-    const evict = rows.slice(0, rows.length - max).map(r => r.key)
+    // Never evict the durable EN price asset — it's what keeps offline
+    // pricing alive, and (being rarely rewritten) it sorts as "oldest".
+    const evict = rows.slice(0, rows.length - max).map(r => r.key).filter(k => k !== 'browse:en:tcgp-prices')
     await db.state.bulkDelete(evict)
   } catch { /* sweep is best-effort */ }
 }
@@ -273,7 +275,11 @@ export function opNormalizeJapaneseSet(s) {
 export function opNormalizeJapaneseCard(c, set, priceMap = {}) {
   const number = opCleanString(c?.number || c?.id, 40)
   const id = opCleanString(c?.id || `jp:${set?.id || 'op'}:${number}`, 80)
-  const price = opPriceFor(priceMap, set?.id || set?.code, number, null)
+  // Price keys are "<CARD-NUMBER>|<variant>" (e.g. "OP01-001|parallel") —
+  // the variant rides the JP id suffix (_pN = parallel), never the name.
+  // Passing the set id here could never match a card-level key.
+  const variant = /_p\d+/.test(String(c?.id || '')) ? 'parallel' : ''
+  const price = priceMap[`${number.toUpperCase()}|${variant}`] ?? null
   return {
     id,
     name: opCleanString(c?.name || number, 160),
@@ -331,7 +337,9 @@ const onePiece = {
       return cached(`opt-ja:cards:${setId}`, 600_000, async (signal) => {
         const idx = await fetchOpJpIndex(signal)
         const set = (idx.sets || []).find(s => s.id === setId || s.code === setId) || { id: setId }
-        const priceMap = await getOpJpPriceMap(signal) || await getOpPriceMap(signal)
+        // {} is truthy — check emptiness, or the EN-map fallback is dead code
+        let priceMap = await getOpJpPriceMap(signal)
+        if (!priceMap || Object.keys(priceMap).length === 0) priceMap = await getOpPriceMap(signal)
         return (idx.cards?.[setId] || []).map(c => opNormalizeJapaneseCard(c, set, priceMap))
       })
     }
@@ -493,8 +501,10 @@ const riftbound = {
           const p = tcgp[card.tcgplayerId]
           if (!p) continue
           // Promos/Signatures are foil-only; plain cards use the normal print.
-          const val = p.normal ?? p.foil
-          if (val > 0) { card.price = val; priced++ }
+          // $0 is a valid price, and a $0 normal must not block the foil.
+          const norm = (typeof p.normal === 'number' && p.normal > 0) ? p.normal : null
+          const val = norm ?? ((typeof p.foil === 'number' && p.foil >= 0) ? p.foil : (typeof p.normal === 'number' ? p.normal : null))
+          if (val != null) { card.price = val; priced++ }
         }
       } catch { /* proxy unreachable — fall back to PriceCharting below */ }
 

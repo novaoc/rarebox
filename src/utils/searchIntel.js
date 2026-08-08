@@ -425,7 +425,7 @@ const MEMO_MAX = 40
 
 export async function smartSearch(q, { pageSize = 24, sealedLimit = 12, providers = null } = {}) {
   const provSet = providers?.length ? new Set(providers) : null
-  const memoKey = `v2|${q.trim().toLowerCase()}|${pageSize}|${providers ? [...providers].sort().join(',') : ''}`
+  const memoKey = `v2|${q.trim().toLowerCase()}|${pageSize}|${sealedLimit}|${providers ? [...providers].sort().join(',') : ''}`
   const hit = _memo.get(memoKey)
   if (hit && Date.now() - hit.ts < MEMO_TTL) return hit.result
   // community slang: "moonbreon" → the canonical query, resolved by the

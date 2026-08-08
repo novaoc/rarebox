@@ -40,7 +40,10 @@ export async function fetchSetCards({ game, setId, setName, lang }) {
       game: 'pokemon',
     }))
   }
-  const raw = await getProvider(game)?.getSetCards(setId) || []
+  // Forward lang: JP One Piece set ids overlap the EN catalog (PRB-01,
+  // EB-04…), so dropping it silently loads the English card list — and
+  // _lang:'ja' must survive normalization (see AGENTS.md).
+  const raw = await getProvider(game)?.getSetCards(setId, { lang }) || []
   return raw.map(c => ({
     id: c.id,
     name: c.name,
@@ -49,7 +52,7 @@ export async function fetchSetCards({ game, setId, setName, lang }) {
     rarity: c.rarity,
     set: { id: setId, name: setName },
     price: (typeof c.price === 'number' && Number.isFinite(c.price)) ? c.price : 0,
-    _lang: null,
+    _lang: c._lang === 'ja' || lang === 'ja' ? 'ja' : null,
     game,
   }))
 }

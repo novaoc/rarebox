@@ -25,7 +25,7 @@ export async function fetchLiveMetaDecks(game = 'pokemon') {
   // Try the pre-built static asset
   let serverDecks = []
   try {
-    const res = await fetch(`/meta-decks/${game}.json`)
+    const res = await fetch(`/meta-decks/${game}.json`, { signal: AbortSignal.timeout(10000) })
     if (res.ok) {
       const data = await res.json()
       if (data.decks?.length) serverDecks = data.decks

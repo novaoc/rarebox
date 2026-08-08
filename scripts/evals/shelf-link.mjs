@@ -221,9 +221,12 @@ runEval('PortfolioView shelf-link polish source guards', () => {
     'refreshPrices finally must not flush setup after dispose')
   assert(/if\s*\(\s*disposed\s*\|\|\s*gen\s*!==\s*msMetaGen\s*\)\s*return|if\s*\(\s*disposed\s*\)\s*return[\s\S]{0,80}gen\s*!==\s*msMetaGen/.test(metaFn[0]),
     'loadMsSetMeta completion must no-op when disposed')
-  // Alert priceMap: preserve explicit $0 via finiteMoney/nullish, not ||
-  assert(/finiteMoney\(\s*item\.currentMarketPrice\s*\)\s*\?\?\s*finiteMoney\(\s*item\.purchasePrice\s*\)\s*\?\?\s*0/.test(refreshFn[0]),
-    'alert priceMap must preserve $0 with finiteMoney/?? not ||')
+  // Alert priceMap: real market prices only ($0 preserved via finiteMoney;
+  // no purchase-price/0 fallback — that made "below $X" fire on unpriced cards)
+  assert(/const\s+mp\s*=\s*finiteMoney\(\s*item\.currentMarketPrice\s*\)[\s\S]{0,120}if\s*\(\s*mp\s*!=\s*null\s*\)\s*priceMap\.set\(/.test(refreshFn[0]),
+    'alert priceMap must only contain finite real market prices (no fallback)')
+  assert(!/priceMap\.set\([^)]*purchasePrice/.test(refreshFn[0]),
+    'alert priceMap must not fall back to purchasePrice')
   assert(!/currentMarketPrice\s*\|\|\s*item\.purchasePrice\s*\|\|\s*0/.test(refreshFn[0]),
     'alert priceMap must not collapse $0 with ||')
 
