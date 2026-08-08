@@ -197,6 +197,8 @@
         </button>
       </div>
 
+      <div class="dash-grid">
+        <div class="dash-col dash-col-rail">
       <!-- ── Today: contextual, renders only when a trigger is live ── -->
       <router-link v-if="todayCard" :to="todayCard.to" class="card today-card mb-4">
         <span class="badge badge-info">Today</span>
@@ -224,35 +226,6 @@
         </div>
       </template>
 
-      <!-- ── Binder progress ───────────────────────────────────────── -->
-      <template v-if="binderList.length">
-        <div class="section-header">
-          <div class="section-title">Binder progress</div>
-        </div>
-        <div class="binder-list mb-4">
-          <router-link
-            v-for="row in binderList.slice(0, 5)"
-            :key="row.portfolioId + row.key"
-            :to="`/shelf/${row.portfolioId}`"
-            class="card binder-row"
-          >
-            <div class="binder-head">
-              <span class="binder-name">{{ row.name }}</span>
-              <span class="binder-count">{{ row.owned }}/{{ row.total ?? '?' }}<template v-if="row.pct != null"> · {{ row.pct }}%</template></span>
-            </div>
-            <div class="progressbar" role="progressbar" :aria-valuenow="row.pct ?? 0" aria-valuemin="0" aria-valuemax="100" :aria-label="`${row.name} completion`">
-              <div class="progressbar-fill" :class="{ complete: row.complete }" :style="{ width: (row.pct ?? 0) + '%' }"></div>
-            </div>
-            <div class="binder-foot">
-              <span v-if="row.complete" class="badge badge-success">SET!</span>
-              <span v-else-if="row.missing != null" class="binder-missing">{{ row.missing }} missing</span>
-              <span v-else class="binder-missing">{{ row.owned }} owned</span>
-              <span class="binder-shelf">{{ row.portfolioName }}</span>
-            </div>
-          </router-link>
-        </div>
-      </template>
-
       <!-- ── ISO wantlist preview ──────────────────────────────────── -->
       <template v-if="wantsPreview.length">
         <div class="section-header">
@@ -272,6 +245,11 @@
           </router-link>
         </div>
       </template>
+
+        </div>
+        <div class="dash-col dash-col-main">
+        </div>
+      </div>
 
       <!-- New Releases (Pokémon sets — the only sets feed wired up so far) -->
       <div class="section-header">
@@ -1440,6 +1418,25 @@ async function refreshAllPrices() {
 @media (max-width: 360px) {
   .mover-tile { width: 100px; }
   .hero-card { padding: 16px; }
+}
+
+
+/* ── Desktop review posture (6.8): two-column dashboard ≥1280px ────── */
+.dash-col { display: contents; } /* below 1280 the wrappers vanish — DOM order = mobile order */
+
+@media (min-width: 1280px) {
+  .dash-col { display: block; }
+  .dash-grid {
+    display: grid;
+    grid-template-columns: 5fr 4fr;
+    gap: 20px;
+    align-items: start;
+    max-width: 1160px;
+    margin: 0 auto;
+  }
+  .dash-col { min-width: 0; }
+  .dash-col-main { order: 1; }
+  .dash-col-rail { order: 2; }
 }
 
 </style>
