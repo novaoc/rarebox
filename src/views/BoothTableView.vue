@@ -13,6 +13,15 @@
         </div>
       </div>
       <button class="btn btn-primary btn-sm" @click="kioskOpen = true"><RbIcon name="antenna" :size="15" /> Live QR</button>
+
+      <!-- Undo bar: slides in right under the recap chips, inside the
+           sticky head — always visible without covering the deal buttons -->
+      <Transition name="bt-undo">
+        <div v-if="lastAction" class="undobar bt-undobar">
+          <span class="undobar-text">{{ lastAction.label }}</span>
+          <button class="btn btn-primary btn-sm" @click="undo">Undo</button>
+        </div>
+      </Transition>
     </header>
 
     <div class="bt-tools">
@@ -43,6 +52,9 @@
         <div class="bt-item-main">
           <div class="bt-item-name">{{ it.name }}</div>
           <div class="bt-item-sub">{{ [it.setName, it.number ? '#' + it.number : ''].filter(Boolean).join(' · ') }}</div>
+          <div v-if="demandFlags.get(i)" class="bt-iso-flag" :title="'Wanted by ' + demandFlags.get(i).join(', ')">
+            🎯 ISO — {{ demandFlags.get(i)[0] }}<template v-if="demandFlags.get(i).length > 1"> +{{ demandFlags.get(i).length - 1 }}</template>
+          </div>
           <div class="bt-item-meta">
             <span class="bt-price">$<input type="number" min="0" step="0.01" class="bt-price-input" v-model.number="it.price" @change="it.price = Math.max(0, +it.price || 0); persist()" /></span>
             <span v-if="(it.qty || 1) > 1" class="badge badge-info">×{{ it.qty }}</span>
@@ -81,14 +93,6 @@
         </div>
       </div>
     </section>
-
-    <!-- Undo toast -->
-    <Transition name="bt-toast">
-      <div v-if="lastAction" class="bt-toast">
-        <span class="bt-toast-text">{{ lastAction.label }}</span>
-        <button class="btn btn-primary btn-sm" @click="undo">Undo</button>
-      </div>
-    </Transition>
 
     <!-- Add: search cards + sealed -->
     <div v-if="searchOpen" class="modal-overlay" @click.self="searchOpen = false">
@@ -299,7 +303,8 @@
 import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute } from 'vue-router'
 import QRCode from 'qrcode'
-import { loadBooths, saveBooths, boothTotal, encodeBoothBytes, MAX_BOOTH_ITEMS } from '../utils/booth'
+import { loadBooths, saveBooths, loadSavedShops, boothTotal, encodeBoothBytes, MAX_BOOTH_ITEMS } from '../utils/booth'
+import { itemMatchesWant } from '../utils/wantlist'
 import BoothLiveQr from '../components/BoothLiveQr.vue'
 import RbIcon from '../components/icons/RbIcon.vue'
 import { loadJournal, addEntry, removeEntry, todayEntries, boothEntries, journalTotals, generateJournalId } from '../utils/boothJournal'
@@ -334,6 +339,28 @@ let filterTimer = null
 watch(filter, (v) => {
   clearTimeout(filterTimer)
   filterTimer = setTimeout(() => { filterDebounced.value = v }, 160)
+})
+
+// ── ISO demand flags (6.6): listings other scanned vendors want ────────
+// Saved shops whose shares carried a wantlist (wl) mark demand on MY
+// table: "the vendor at that booth is hunting this card". Matching reuses
+// the wantlist rules (exact id first, name/number fallback).
+const shopsWithWants = loadSavedShops()
+  .filter(s => s.booth?.wl?.length)
+  .map(s => ({ name: s.booth.name || 'Saved shop', wl: s.booth.wl }))
+
+const demandFlags = computed(() => {
+  const out = new Map() // item index → [shop names]
+  if (!shopsWithWants.length || !booth.value) return out
+  const items = booth.value.items || []
+  for (let i = 0; i < items.length; i++) {
+    let names = null
+    for (const s of shopsWithWants) {
+      if (s.wl.some(w => itemMatchesWant(items[i], w))) (names ||= []).push(s.name)
+    }
+    if (names) out.set(i, names)
+  }
+  return out
 })
 
 const matchedItems = computed(() => {
@@ -820,6 +847,7 @@ onBeforeUnmount(() => {
 .bt-head {
   position: sticky; top: 0; z-index: 20;
   display: flex; align-items: center; gap: 10px;
+  flex-wrap: wrap; /* the undo bar docks as its own full-width row */
   padding: calc(18px + env(safe-area-inset-top, 0px)) 0 10px;
   background: var(--bg-body, var(--bg-secondary));
   border-bottom: var(--bw) solid var(--ink);
@@ -849,6 +877,14 @@ onBeforeUnmount(() => {
 .bt-item-name { font-weight: 800; font-size: 14px; line-height: 1.25; }
 .bt-item-sub { font-size: 11.5px; color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .bt-item-meta { display: flex; align-items: center; gap: 8px; margin-top: 4px; }
+.bt-iso-flag {
+  display: inline-block;
+  margin-top: 3px;
+  font-size: 11px; font-weight: 800;
+  padding: 1px 8px;
+  background: var(--pink-dim); border: 1.5px solid var(--ink); border-radius: 99px;
+  max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
 .bt-price { font-weight: 800; font-size: 13px; display: inline-flex; align-items: center; }
 .bt-price-input {
   width: 88px; font: inherit; font-weight: 800;
@@ -881,19 +917,10 @@ onBeforeUnmount(() => {
 .bt-log-time { color: var(--text-muted); font-weight: 700; flex-shrink: 0; }
 .bt-log-name { flex: 1; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-.bt-toast {
-  position: fixed; left: 50%; bottom: calc(22px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%);
-  z-index: 120;
-  display: flex; align-items: center; gap: 12px;
-  padding: 10px 14px;
-  background: var(--bg-card);
-  border: var(--bw) solid var(--ink); border-radius: var(--radius);
-  box-shadow: var(--shadow-sm);
-  max-width: min(92vw, 440px);
-}
-.bt-toast-text { font-size: 13px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.bt-toast-enter-active, .bt-toast-leave-active { transition: opacity .18s, transform .18s; }
-.bt-toast-enter-from, .bt-toast-leave-to { opacity: 0; transform: translateX(-50%) translateY(8px); }
+/* undo bar rides the sticky head as a full-width row under the recap */
+.bt-undobar { flex-basis: 100%; order: 10; margin-bottom: 4px; }
+.bt-undo-enter-active, .bt-undo-leave-active { transition: opacity .18s, transform .18s; }
+.bt-undo-enter-from, .bt-undo-leave-to { opacity: 0; transform: translateY(-6px); }
 
 .bt-search-bar { display: flex; gap: 8px; margin-bottom: 12px; }
 .bt-search-bar .input { flex: 1; font-size: 16px; }

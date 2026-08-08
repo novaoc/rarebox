@@ -608,6 +608,27 @@ a:hover { text-decoration: underline; text-decoration-thickness: 2px; text-under
   font-variant-numeric: tabular-nums;
 }
 
+/* .undobar — an undo strip that docks under a sticky header row instead
+   of floating over content near the thumbs (drawn, not a toast). */
+.undobar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  background: var(--accent-dim);
+  border: var(--bw) solid var(--ink);
+  border-radius: var(--radius);
+}
+.undobar-text {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .keycap {
   min-height: 42px;
   padding: 8px 14px;
