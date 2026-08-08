@@ -250,6 +250,13 @@
     <!-- About -->
     <div class="settings-section card">
       <h3 class="settings-section-title">About</h3>
+      <div v-if="canShare" class="settings-item">
+        <div>
+          <div class="settings-item-label">Share Rarebox</div>
+          <div class="settings-item-sub">Send a friend the free, no-account tracker</div>
+        </div>
+        <button class="btn btn-secondary btn-sm" @click="shareRarebox">Share</button>
+      </div>
       <div class="about-grid">
         <div class="about-item">
           <div class="about-label">Version</div>
@@ -408,6 +415,16 @@ function doClearAllAlerts() {
     clearAllAlerts()
     alertsVersion.value++
   }
+}
+
+// Relocated from the old More sheet (the sheet is gone)
+const canShare = ref(!!navigator.share)
+function shareRarebox() {
+  navigator.share({
+    title: 'Rarebox — TCG Collection Tracker',
+    text: 'Track your TCG collection with Rarebox — offline-first, privacy-first, no account needed.',
+    url: 'https://rarebox.io'
+  }).catch(() => {})
 }
 
 function saveUiPrefs() {

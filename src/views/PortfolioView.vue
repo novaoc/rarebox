@@ -903,7 +903,10 @@ const editingName = ref(false)
 const editName = ref('')
 const nameInputRef = ref(null)
 const selectedItem = ref(null)
-const showAddSealed = ref(false)
+// ?add=sealed (the tab-bar Add fan's "Sealed" action) opens the sealed add
+// flow directly; the query is cleared so back/refresh don't reopen it.
+const showAddSealed = ref(route.query.add === 'sealed')
+if (route.query.add) router.replace({ path: route.path })
 const showBulkImport = ref(false)
 const editingItem = ref(null)
 const editForm = ref({})
