@@ -222,7 +222,7 @@
     </div>
 
     <!-- Price Alerts -->
-    <div class="settings-section card mb-4">
+    <div id="alerts" class="settings-section card mb-4">
       <h3 class="settings-section-title">Price Alerts</h3>
       <p class="settings-desc">Get notified when a card's price crosses your threshold. Alerts are checked when prices refresh.</p>
 
