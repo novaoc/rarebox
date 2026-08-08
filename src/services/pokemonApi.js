@@ -395,13 +395,39 @@ export async function getJapaneseSets() {
 // priceless without this. Keyed `${set id}-${number}`: lowercase, no
 // leading zeros.
 let _jpPrices = null
-async function getJpPriceMap() {
-  if (_jpPrices) return _jpPrices
+let _jpVariants = null
+async function loadJpPriceAsset() {
+  if (_jpPrices) return
   try {
     const res = await fetch('/jp-prices.json', { signal: AbortSignal.timeout(10000) })
-    if (res.ok) _jpPrices = (await res.json()).prices || {}
+    if (res.ok) {
+      const d = await res.json()
+      _jpPrices = d.prices || {}
+      _jpVariants = d.variants || {}
+    }
   } catch { /* leave null — retry next call (first attempt may be offline) */ }
+}
+async function getJpPriceMap() {
+  await loadJpPriceAsset()
   return _jpPrices || {}
+}
+// key → { masterball: 45.6, pokeball: 12.3, mirror: … } — the ball-pattern
+// and mirror printings that share the base card's collector number
+async function getJpVariantMap() {
+  await loadJpPriceAsset()
+  return _jpVariants || {}
+}
+
+/** tcgplayer.prices for a JP card: base under `normal`, ball patterns and
+ *  mirrors as their own variant keys so the add flow's variant picker
+ *  offers "Master Ball — $45.60" alongside Normal. */
+function jpTcgPrices(price, variantPrices) {
+  const out = {}
+  if (price != null) out.normal = { market: price, low: null, mid: price }
+  for (const [slug, v] of Object.entries(variantPrices || {})) {
+    if (v != null) out[slug] = { market: v, low: null, mid: v }
+  }
+  return Object.keys(out).length ? out : null
 }
 
 // English names + tcgplayer product ids + set meta (logos, scan flags)
@@ -497,7 +523,7 @@ export async function getJapaneseCardsBySet(setId, page = 1, pageSize = 36) {
     }
   }
 
-  const [jpPrices, jpIdx] = await Promise.all([getJpPriceMap(), getJpIndex()])
+  const [jpPrices, jpVariants, jpIdx] = await Promise.all([getJpPriceMap(), getJpVariantMap(), getJpIndex()])
   const allCards = rawCards.map(c => {
     const localId = c.localId || c.id?.split('-').pop() || ''
     const key = jpPriceKey(setId, localId)
@@ -509,7 +535,7 @@ export async function getJapaneseCardsBySet(setId, page = 1, pageSize = 36) {
     const images = imageBase
       ? { small: imageBase + '/low.webp', large: imageBase + '/high.webp' }
       : { small: jpProductImage(pid), large: jpProductImage(pid, true) }
-    const price = jpPrices[key]
+    const prices = jpTcgPrices(jpPrices[key], jpVariants[key])
     // English names (from TCGplayer's catalog) with the JP marker the
     // sealed index already uses — searchable + identifiable at a glance
     const en = jpIdx.names[key]
@@ -521,7 +547,7 @@ export async function getJapaneseCardsBySet(setId, page = 1, pageSize = 36) {
       set: { id: setId, name: enName },
       images,
       supertype: 'Pokémon',
-      tcgplayer: price != null ? { prices: { normal: { market: price, low: null, mid: price } } } : undefined,
+      tcgplayer: prices ? { prices } : undefined,
       _lang: 'ja',
       _hasImage: !!(imageBase || pid)
     }
@@ -569,10 +595,9 @@ async function jpDetailFromIndex(cardId) {
   const setId = cardId.slice(0, at)
   const localId = cardId.slice(at + 1)
   const key = jpPriceKey(setId, localId)
-  const [jpIdx, jpPrices] = await Promise.all([getJpIndex(), getJpPriceMap()])
+  const [jpIdx, jpPrices, jpVariants] = await Promise.all([getJpIndex(), getJpPriceMap(), getJpVariantMap()])
   const en = jpIdx.names[key]
   if (!en) return null
-  const price = jpPrices[key]
   return {
     id: cardId,
     name: `${en} (JP)`,
@@ -587,7 +612,7 @@ async function jpDetailFromIndex(cardId) {
     attacks: [],
     weaknesses: [],
     retreatCost: [],
-    tcgplayer: { prices: price != null ? { normal: { market: price, low: null, mid: price } } : null },
+    tcgplayer: { prices: jpTcgPrices(jpPrices[key], jpVariants[key]) },
     _lang: 'ja'
   }
 }
@@ -609,10 +634,13 @@ export async function getJapaneseCardDetail(cardId) {
   // Prefer the TCGplayer USD price from the static asset; fall back to
   // tcgdex's cardmarket data (EUR, converted) where TCGplayer has nothing.
   let tcgPrices = null
-  const jpPrices = await getJpPriceMap()
-  const jpUsd = jpPrices[jpPriceKey(data.set?.id, data.localId)]
-  if (jpUsd != null) { // $0 is a real TCGplayer price — don't fall to EUR conversion
-    tcgPrices = { normal: { market: jpUsd, low: null, mid: jpUsd } }
+  const [jpPrices, jpVariants] = await Promise.all([getJpPriceMap(), getJpVariantMap()])
+  const detailKey = jpPriceKey(data.set?.id, data.localId)
+  const jpUsd = jpPrices[detailKey]
+  const varPrices = jpVariants[detailKey]
+  if (jpUsd != null || (varPrices && Object.keys(varPrices).length)) {
+    // $0 is a real TCGplayer price — don't fall to EUR conversion
+    tcgPrices = jpTcgPrices(jpUsd, varPrices)
   } else {
     const EUR_TO_USD = 1.08
     const cm = data.pricing?.cardmarket
@@ -670,6 +698,15 @@ export function formatVariantLabel(key) {
     unlimitedNormal: 'Unlimited Normal',
     shadowlessHolofoil: 'Shadowless Holofoil',
     shadowlessNormal: 'Shadowless Normal',
+    // JP variant slugs (see variant_slug in scripts/build_jp_prices.py)
+    masterball: 'Master Ball',
+    pokeball: 'Poké Ball',
+    quickball: 'Quick Ball',
+    loveball: 'Love Ball',
+    friendball: 'Friend Ball',
+    duskball: 'Dusk Ball',
+    mirror: 'Mirror Holo',
+    energysymbol: 'Energy Symbol',
   }
   return labels[key] || key.replace(/([A-Z])/g, ' $1').trim()
 }

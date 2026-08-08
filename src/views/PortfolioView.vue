@@ -383,7 +383,7 @@
           <div class="panel-right">
             <div class="panel-info-grid">
               <div class="info-row"><span class="info-label">Type</span><span class="badge" :class="typeBadgeClass(selectedItem.type)">{{ selectedItem.type }}</span></div>
-              <div class="info-row" v-if="selectedItem.priceVariant"><span class="info-label">Variant</span><span>{{ selectedItem.priceVariant }}</span></div>
+              <div class="info-row" v-if="selectedItem.priceVariant"><span class="info-label">Variant</span><span>{{ formatVariantLabel(selectedItem.priceVariant) }}</span></div>
               <div class="info-row"><span class="info-label">Quantity</span>
                 <div class="stepper" role="group" aria-label="Quantity">
                   <button type="button" class="stepper-btn" :disabled="(selectedItem.quantity || 1) <= 1" aria-label="Decrease quantity" @click="bumpQuantity(-1)">−</button>
@@ -591,7 +591,7 @@ import { tokenMatch } from '../utils/search.js'
 import { useRoute, useRouter } from 'vue-router'
 import { usePortfolioStore } from '../stores/portfolio'
 import { exportPortfolioToExcel } from '../utils/excel'
-import { getCard, getMarketPrice } from '../services/pokemonApi'
+import { getCard, getMarketPrice, formatVariantLabel } from '../services/pokemonApi'
 // (master-set helpers from pokemonApi/providers/cardCache imported below)
 import { fetchPrice } from '../services/priceServer'
 import { itemHistoryRef } from '../services/priceHistory'
@@ -1160,7 +1160,7 @@ const GAME_LABELS = { magic: 'Magic', yugioh: 'Yu-Gi-Oh!', 'one-piece': 'One Pie
 function getItemSub(item) {
   if (item.type === 'graded') return `${item.gradingCompany || 'PSA'} ${item.grade || ''} · ${item.cardData?.set?.name || item.setName || ''}`
   if (item.game && item.game !== 'pokemon') return `${item.type === 'sealed' ? item.setName : item.cardData?.set?.name} · ${GAME_LABELS[item.game] || item.game}`
-  if (item.type === 'card') return `${item.cardData?.set?.name || ''} #${item.cardData?.number || ''} · ${item.priceVariant || ''}`
+  if (item.type === 'card') return `${item.cardData?.set?.name || ''} #${item.cardData?.number || ''} · ${item.priceVariant ? formatVariantLabel(item.priceVariant) : ''}`
   return item.setName || ''
 }
 

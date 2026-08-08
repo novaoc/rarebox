@@ -201,15 +201,23 @@ def main() -> int:
             cur = by_pid.setdefault(r["productId"], {})
             cur[(r.get("subTypeName") or "Normal").lower()] = p
 
+        # Two passes: base products claim their Number first; parenthesized
+        # products fill only Numbers that have NO base product. This keeps
+        # same-number variants out ("Erika's Oddish (Poke Ball)") while
+        # including uniquely-numbered cards whose TCGplayer name happens to
+        # carry a parenthetical — "Unown V (Full Art) 177/195" is its own
+        # card, and the old skip-all rule left EVERY full-art/secret tail
+        # of every modern set unpriced (Silver Tempest: 46 cards).
+        base, variant = [], []
         for p in prods:
             number = next((e["value"] for e in p.get("extendedData", []) if e.get("name") == "Number"), "")
             if not number:
                 continue  # sealed product, not a card
-            # Variant printings ("Erika's Oddish (Poke Ball)") share the base
-            # card's Number — keep only the base product so the key stays
-            # unambiguous (same rule as build_jp_prices.py).
             if re.search(r"\((?!.*/)[^)]+\)\s*$", p.get("name", "")):
-                continue
+                variant.append((number, p))
+            else:
+                base.append((number, p))
+        for number, p in base + variant:
             price = pick_variant_price(by_pid.get(p["productId"], {}))
             if price is not None and price >= 0:
                 key = card_key(set_id, number)

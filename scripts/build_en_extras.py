@@ -154,18 +154,23 @@ def main() -> int:
                 p = r.get("midPrice")
             by_pid.setdefault(r["productId"], {})[(r.get("subTypeName") or "Normal").lower()] = p
 
-        seen_nums: set[str] = set()
-        count = 0
+        # base products claim Numbers first; parenthesized products only fill
+        # Numbers with no base (unique-numbered "(Full Art)"-style cards)
+        base, variant = [], []
         for p in prods:
             number = next((e["value"] for e in p.get("extendedData", []) if e.get("name") == "Number"), "")
             if not number:
                 continue  # sealed product, not a card
             # TCGplayer names promos "Mega Charizard X ex - 029" — strip the
-            # trailing number for display; variant "(...)" dupes are skipped
-            # like the sibling builders so numbers stay unambiguous.
+            # trailing number for display
             name = re.sub(r"\s*-\s*[0-9/]+\s*$", "", p.get("name", "")).strip()
             if re.search(r"\((?!.*/)[^)]+\)\s*$", name):
-                continue
+                variant.append((number, name, p))
+            else:
+                base.append((number, name, p))
+        seen_nums: set[str] = set()
+        count = 0
+        for number, name, p in base + variant:
             key = number.lower()
             if key in seen_nums:
                 continue

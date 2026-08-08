@@ -44,6 +44,16 @@ def card_key(set_abbr: str, number: str) -> str:
     return f"{set_abbr.lower()}-{num.lower()}"
 
 
+def variant_slug(suffix: str) -> str:
+    """'Master Ball Pattern' → 'masterball', 'Mirror Holofoil' → 'mirror'.
+    MUST mirror jpVariantLabel keys in src/services/pokemonApi.js."""
+    s = suffix.strip().lower()
+    if s.startswith("mirror"):
+        return "mirror"
+    s = re.sub(r"\s*pattern$", "", s)
+    return re.sub(r"[^a-z0-9]", "", s)
+
+
 def main() -> int:
     stamp = fetch("https://tcgcsv.com/last-updated.txt").strip()
     if OUT.exists():
@@ -58,6 +68,13 @@ def main() -> int:
     print(f"{len(groups)} Pokemon Japan groups")
 
     prices: dict[str, float] = {}
+    # Variant printings share the base card's Number — Umbreon 092/187 exists
+    # base, "(Mirror Foil)", and "(Master Ball Pattern)". They used to be
+    # SKIPPED entirely, which made every JP ball-pattern card untrackable
+    # (7 sets carry them: SV2a, SV8a, SV11B/W, S9a, S11a, M2a). Base keeps
+    # the flat `prices` key (backward-compatible); variants land in a
+    # sibling map keyed by slug.
+    variants: dict[str, dict[str, float]] = {}
     for g in groups:
         abbr = (g.get("abbreviation") or "").strip()
         if not abbr:
@@ -78,22 +95,35 @@ def main() -> int:
             number = next((e["value"] for e in p.get("extendedData", []) if e.get("name") == "Number"), "")
             if not number:
                 continue  # sealed product, not a card
-            # Variant printings ("Budew (Mirror Foil)") share the base card's
-            # Number — keep only the base product so the key stays unambiguous.
-            if re.search(r"\((?!.*/)[^)]+\)\s*$", p.get("name", "")):
-                continue
             sub = by_pid.get(p["productId"], {})
             price = sub.get("normal") or sub.get("holofoil") or next(iter(sub.values()), None)
-            if price:
-                prices.setdefault(card_key(abbr, number), price)
+            if not price:
+                continue
+            key = card_key(abbr, number)
+            m = re.search(r"\(((?!.*/)[^)]+)\)\s*$", p.get("name", ""))
+            if m:
+                slug = variant_slug(m.group(1))
+                if slug:
+                    variants.setdefault(key, {}).setdefault(slug, price)
+            else:
+                prices.setdefault(key, price)
         time.sleep(0.1)  # tcgcsv asks for ~10 req/s max
 
     if len(prices) < 5000:  # the category is far bigger — bad pull
         print(f"only {len(prices)} priced cards — refusing to overwrite", file=sys.stderr)
         return 1
 
-    OUT.write_text(json.dumps({"stamp": stamp, "prices": prices}, separators=(",", ":")))
-    print(f"wrote {OUT.name}: {len(prices)} priced cards (stamp {stamp})")
+    # A parenthesized product whose Number has NO base product is not a
+    # variant of anything — it IS the card (the "Unown V (Full Art)" case).
+    # Promote its cheapest variant price to the base key.
+    for key, slugs in variants.items():
+        if key not in prices and slugs:
+            prices[key] = min(slugs.values())
+
+    n_var = sum(len(v) for v in variants.values())
+    OUT.write_text(json.dumps({"stamp": stamp, "prices": prices, "variants": variants},
+                              separators=(",", ":")))
+    print(f"wrote {OUT.name}: {len(prices)} priced cards + {n_var} variant prices (stamp {stamp})")
     return 0
 
 

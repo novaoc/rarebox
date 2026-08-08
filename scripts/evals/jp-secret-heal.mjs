@@ -57,4 +57,26 @@ await runEval('JP secret rares + faceless-item healing', async () => {
   assert(modal.includes('const cardNorm = computed'), 'AddItemModal must normalize flat search card shapes')
   assert(modal.includes('num(props.card.price)'), 'flat top-level price must seed currentPrice')
   ok('AddItemModal tolerates flat JP search shapes')
+
+  // ── JP ball-pattern variants + EN full-art tails (2026-08-08) ──
+  // TCGplayer parenthesized product names cover TWO different things:
+  // same-number variants (Umbreon (Master Ball Pattern) 092/187) and
+  // uniquely-numbered cards (Unown V (Full Art) 177/195). Skipping all of
+  // them made JP ball patterns untrackable AND left every EN full-art/
+  // secret tail unpriced.
+  assert(api.includes('getJpVariantMap') && api.includes('jpTcgPrices'),
+    'JP cards must merge variant prices into tcgplayer.prices')
+  assert(api.includes("masterball: 'Master Ball'") && api.includes("pokeball: 'Poké Ball'"),
+    'variant slugs must have human labels')
+  const jpAsset = JSON.parse(read('public/jp-prices.json'))
+  const umbreonMB = jpAsset.variants?.['sv8a-92']?.masterball
+  const flareonMB = jpAsset.variants?.['sv8a-21']?.masterball
+  assert(typeof umbreonMB === 'number' && umbreonMB > 0, `Umbreon SV8a 092 Master Ball priced (got ${umbreonMB})`)
+  assert(typeof flareonMB === 'number' && flareonMB > 0, `Flareon SV8a 021 Master Ball priced (got ${flareonMB})`)
+  ok(`JP ball patterns priced: Umbreon MB $${umbreonMB}, Flareon MB $${flareonMB}`)
+
+  const enAsset = JSON.parse(read('public/en-prices.json'))
+  assert(typeof enAsset.prices['swsh12-177'] === 'number',
+    'Unown V (Alternate Full Art) swsh12-177 must be priced — full-art tails no longer skipped')
+  ok(`EN full-art tail priced: swsh12-177 $${enAsset.prices['swsh12-177']}`)
 })
