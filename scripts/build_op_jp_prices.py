@@ -30,6 +30,7 @@ import json
 import re
 import sys
 import time
+import urllib.error
 import urllib.parse
 import urllib.request
 from datetime import datetime, timezone
@@ -51,16 +52,39 @@ SHARDS = 7
 SET_QUALIFIER = re.compile(r"^(OP|EB|ST|PRB)-?\d", re.I)
 
 
-def fetch(url: str, retries: int = 2):
+class Blocked(Exception):
+    """Upstream is bot-gating us (Cloudflare challenge, 2026-10). Retrying is
+    pointless and rude — every query burns ~5s without ever yielding data."""
+
+
+def _looks_blocked(text: str) -> bool:
+    # Cloudflare's "Just a moment..." challenge (and other HTML walls) come back
+    # as an HTML page; the real API returns a JSON object.
+    return (text or "").lstrip().startswith("<")
+
+
+def fetch(url: str, retries: int = 2) -> str:
     req = urllib.request.Request(url, headers=HEADERS)
     for attempt in range(retries + 1):
         try:
             with urllib.request.urlopen(req, timeout=30) as resp:
-                return resp.read().decode()
+                body = resp.read().decode()
+        except urllib.error.HTTPError as e:
+            if e.code == 403:  # Cloudflare access denied — not transient
+                raise Blocked() from e
+            if attempt >= retries:
+                raise
+            time.sleep(1.5 * (attempt + 1))
+            continue
         except Exception:  # noqa: BLE001
             if attempt >= retries:
                 raise
             time.sleep(1.5 * (attempt + 1))
+            continue
+        if _looks_blocked(body):
+            raise Blocked()
+        return body
+    raise Blocked()
 
 
 def parse_price(v):
@@ -85,6 +109,8 @@ def lookup(number: str):
     q = urllib.parse.quote(f"one piece japanese {number}")
     try:
         data = json.loads(fetch(f"{PC_SEARCH}?type=prices&q={q}"))
+    except Blocked:
+        raise
     except Exception:  # noqa: BLE001
         return {}
     products = data if isinstance(data, list) else data.get("products", [])
@@ -129,7 +155,12 @@ def main() -> int:
     prices = dict(existing)
     hit = 0
     for i, number in enumerate(todo):
-        found = lookup(number)
+        try:
+            found = lookup(number)
+        except Blocked:
+            print("PriceCharting is bot-gating (Cloudflare) — aborting shard, "
+                  "keeping existing prices", file=sys.stderr)
+            return 1
         if found:
             hit += 1
             # a refreshed number replaces BOTH its keys (a vanished parallel
