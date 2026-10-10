@@ -59,7 +59,6 @@ OUT = Path(__file__).resolve().parent.parent / "public" / "en-extras.json"
 EXTRA_GROUPS = {
     "24451": "ME: Mega Evolution Promo — Phantasmal Flames tin promos etc.",
     "24461": "MEE: Mega Evolution Energies",
-    "24722": "ME: 30th Celebration (cel25 is 2021's Celebrations, unrelated)",
     "24529": "Player Placement Trainer Promos",
     "24584": "First Partner Collection 2026",
     "24163": "McDonald's Promos 2024 (upstream mcd* stops at 2022)",

@@ -10,7 +10,8 @@ $114.99 market) and `tcgplayer_price` is the card's CHEAPEST printing
 (LOB-001 Blue-Eyes $0.15). TCGplayer market via tcgcsv is the cure.
 
 Request economy (tcgcsv asks ≤10k/day):
-- prices: ONE archive download (prices-{today}.ppmd.7z covers everything)
+- prices: per-group JSON (one /prices request per group, ~660/day — the
+  daily ppmd.7z archive was withdrawn by tcgcsv in 2026-10, see below)
 - product metadata (Number/Rarity per productId — changes only when new
   sets release): cached in scripts/data/ygo_products.json, fetched only
   for groups missing from the cache (first run ~1,100 requests, then ~0-2/day)
@@ -18,19 +19,14 @@ Request economy (tcgcsv asks ≤10k/day):
     python3 scripts/build_ygo_prices.py
 """
 
-import datetime as dt
 import json
 import re
-import shutil
-import subprocess
 import sys
-import tempfile
 import time
 import urllib.request
 from pathlib import Path
 
 TCGCSV = "https://tcgcsv.com/tcgplayer"
-ARCHIVE = "https://tcgcsv.com/archive/tcgplayer"
 YGO_CATEGORY = 2
 ROOT = Path(__file__).resolve().parent.parent
 OUT = ROOT / "public" / "ygo-prices.json"
@@ -57,13 +53,6 @@ def slug(s: str) -> str:
 
 def rarity_slug(s: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", (s or "").lower()).strip("-")
-
-
-def sevenzip() -> str:
-    for c in ("7zz", "7z"):
-        if shutil.which(c):
-            return c
-    raise SystemExit("7z not found")
 
 
 def main() -> int:
@@ -111,37 +100,27 @@ def main() -> int:
         PRODUCTS_CACHE.parent.mkdir(parents=True, exist_ok=True)
         PRODUCTS_CACHE.write_text(json.dumps(cache, separators=(",", ":")))
 
-    # ── prices: one archive download covers every group ──
-    zbin = sevenzip()
-    today = dt.date.today()
+    # ── prices: per-group JSON ──
+    # tcgcsv withdrew the daily ppmd.7z archive in 2026-10 (403: "temporarily
+    # removed... no workarounds"). Their guidance is to pull prices via the
+    # per-group /prices endpoint instead. ~660 requests/day at 100ms stagger
+    # stays far under tcgcsv's ~10k/day ceiling.
     by_pid = {}
-    with tempfile.TemporaryDirectory() as tmp_s:
-        tmp = Path(tmp_s)
-        arc = tmp / "a.7z"
-        got = None
-        for d in (today, today - dt.timedelta(days=1)):
-            try:
-                arc.write_bytes(fetch(f"{ARCHIVE}/prices-{d.isoformat()}.ppmd.7z"))
-                got = d.isoformat()
-                break
-            except Exception:  # noqa: BLE001
-                continue
-        if not got:
-            raise SystemExit("no price archive available")
-        subprocess.run([zbin, "x", "-y", f"-o{tmp}", str(arc)], capture_output=True, check=True)
-        cat_dir = tmp / got / str(YGO_CATEGORY)
-        for gdir in cat_dir.iterdir():
-            try:
-                rows = json.loads((gdir / "prices").read_text())["results"]
-            except (OSError, ValueError, KeyError):
-                continue
-            for r in rows:
-                p = r.get("marketPrice")
-                if p and p > 0:
-                    pid = str(r["productId"])
-                    if pid not in by_pid or p > by_pid[pid]:
-                        by_pid[pid] = round(p, 2)
-    print(f"archive {got}: {len(by_pid)} priced products")
+    for g in groups:
+        gid = g["groupId"]
+        try:
+            rows = json.loads(fetch(f"{TCGCSV}/{YGO_CATEGORY}/{gid}/prices"))["results"]
+        except Exception as e:  # noqa: BLE001
+            print(f"  group {gid}: {e} — skipping prices", file=sys.stderr)
+            continue
+        for r in rows:
+            p = r.get("marketPrice")
+            if p and p > 0:
+                pid = str(r["productId"])
+                if pid not in by_pid or p > by_pid[pid]:
+                    by_pid[pid] = round(p, 2)
+        time.sleep(0.1)
+    print(f"{len(by_pid)} priced products")
 
     # ── keys ──
     # The APP looks up by YGOPRODeck set names; tcgcsv groups use TCGplayer
