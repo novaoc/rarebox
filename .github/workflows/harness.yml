@@ -24,11 +24,14 @@ jobs:
 
       - uses: actions/setup-node@v5
         with:
-          node-version: 22
+          node-version-file: .nvmrc
           cache: npm
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Audit locked dependencies
+        run: npm audit --audit-level=moderate
 
       - name: Run harness evals
         run: npm run eval:harness

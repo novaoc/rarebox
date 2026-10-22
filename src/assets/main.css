@@ -1,6 +1,40 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import 'tailwindcss';
+
+@theme {
+  --color-rb-bg: #0d1117;
+  --color-rb-surface: #161b22;
+  --color-rb-card: #21262d;
+  --color-rb-hover: #2d333b;
+  --color-rb-border: #30363d;
+  --color-rb-text: #e6edf3;
+  --color-rb-text-secondary: #8b949e;
+  --color-rb-text-muted: #484f58;
+  --color-rb-accent: #f5a623;
+  --color-rb-accent-dim: rgba(245, 166, 35, 0.12);
+  --color-rb-success: #3fb950;
+  --color-rb-success-dim: rgba(63, 185, 80, 0.12);
+  --color-rb-danger: #f85149;
+  --color-rb-danger-dim: rgba(248, 81, 73, 0.12);
+  --color-rb-info: #58a6ff;
+}
+
+/*
+  The default border color has changed to `currentcolor` in Tailwind CSS v4,
+  so we've added these compatibility styles to make sure everything still
+  looks the same as it did with Tailwind CSS v3.
+
+  If we ever want to remove these styles, we need to add an explicit border
+  color utility to any element that depends on these defaults.
+*/
+@layer base {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-gray-200, currentcolor);
+  }
+}
 
 /* ════════════════════════════════════════════════════════════════════
    Rarebox · Tactile design system
