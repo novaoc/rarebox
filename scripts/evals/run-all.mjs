@@ -1,6 +1,7 @@
 import { spawnSync } from 'node:child_process'
 
 const evals = [
+  'scripts/evals/security-runtime.mjs',
   ['python3', 'scripts/evals/meta-deck-resolver.py'],
   'scripts/evals/provider-shape.mjs',
   'scripts/evals/provider-normalization.mjs',

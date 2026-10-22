@@ -15,11 +15,21 @@ Quick start:
 ```bash
 git clone https://github.com/novaoc/rarebox.git
 cd rarebox
-npm install
+nvm install
+nvm use
+npm ci
 npm run dev
 ```
 
 Opens at `http://localhost:5173`.
+
+Use patched Node 22 (minimum 22.23.4; `.nvmrc` selects the tested version).
+If you do not use nvm, install a supported Node 22 version with your preferred
+version manager before running `npm ci`. The dev/build preflight rejects stale
+or unsupported runtimes rather than silently building on them. CI uses `.nvmrc`
+and audits all locked dependencies. Vercel selects the major through
+`engines.node`; its minor/patch rollout is managed by Vercel, so the prebuild
+version check is also required there.
 
 Agentic engineering workflow:
 
